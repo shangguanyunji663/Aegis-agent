@@ -1,0 +1,58 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8091:8091"
+    environment:
+      DATABASE_URL: postgresql+psycopg://aegis:aegis@postgres:5432/aegis
+      REDIS_URL: redis://redis:6379/0
+      VECTOR_ENABLED: "true"
+      VECTOR_REQUIRED: "false"
+      VECTOR_BACKEND: chroma
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      EMBEDDING_TIMEOUT_SECONDS: "30"
+      CHROMA_HOST: chroma
+      CHROMA_PORT: "8000"
+      CHROMA_COLLECTION_NAME: aegis_knowledge
+      AUTH_DEFAULT_ADMIN_USERNAME: admin
+      AUTH_DEFAULT_ADMIN_PASSWORD: admin123!
+      AUTH_DEFAULT_STUDENT_USERNAME: student
+      AUTH_DEFAULT_STUDENT_PASSWORD: student123!
+    depends_on:
+      - postgres
+      - redis
+      - chroma
+    volumes:
+      - ./data:/app/data
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: aegis
+      POSTGRES_USER: aegis
+      POSTGRES_PASSWORD: aegis
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  chroma:
+    image: chromadb/chroma:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma-data:/chroma/chroma
+
+volumes:
+  postgres-data:
+  redis-data:
+  chroma-data:

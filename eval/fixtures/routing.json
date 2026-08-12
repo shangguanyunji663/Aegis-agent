@@ -1,0 +1,18 @@
+[
+  {
+    "message": "我最近考试压力很大，晚上睡不着",
+    "expected_intent": "counseling",
+    "expected_skills": ["supportive_response_baseline", "sleep_routine_support", "academic_stress_planning"]
+  },
+  {
+    "message": "焦虑一般如何支持？有没有权威一点的方法？",
+    "expected_intent": "research",
+    "expected_skills": ["supportive_response_baseline", "anxiety_grounding_support"]
+  },
+  {"message": "今天只是想找人说说话", "expected_intent": "companion"},
+  {
+    "message": "我不想活了，想结束生命",
+    "expected_intent": "risk",
+    "expected_skills": ["supportive_response_baseline", "high_risk_safety_plan", "counselor_handoff_summary"]
+  }
+]

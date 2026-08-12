@@ -1,0 +1,242 @@
+from __future__ import annotations
+
+from app.llm import LLMClient, LLMContext
+from app.models import AgentTrace, Intent, ResponsePlan, RiskLevel, SkillResult
+from app.skills import SkillRegistry
+
+
+class MemoryAgent:
+    name = "MemoryAgent"
+
+    def load(self, store, session_id: str) -> tuple[dict, AgentTrace | None]:
+        memory = store.get_memory(session_id)
+        summary = memory.get("summary", "")
+        if not summary:
+            return memory, None
+        return memory, AgentTrace(self.name, "load_memory", f"covered_messages={memory.get('covered_message_count', 0)}")
+
+    def update(self, store, session_id: str, user_message: str, assistant_answer: str) -> tuple[dict, AgentTrace]:
+        memory = store.update_memory(session_id, user_message, assistant_answer)
+        return memory, AgentTrace(self.name, "update_memory", f"covered_messages={memory.get('covered_message_count', 0)}")
+
+
+class RiskGuardianAgent:
+    name = "RiskGuardianAgent"
+
+    def __init__(self, registry: SkillRegistry):
+        self.registry = registry
+
+    def assess(self, message: str) -> tuple[SkillResult, RiskLevel, AgentTrace]:
+        result = self.registry.get("assess_risk").handler(message)
+        risk_level = RiskLevel(result.output["risk_level"])
+        detail = "; ".join(result.output["rationale"])
+        return result, risk_level, AgentTrace(self.name, "assess_risk", detail)
+
+    def create_report(self, message: str, session_id: str, risk_level: RiskLevel, intent: Intent, risk: SkillResult) -> tuple[SkillResult, AgentTrace]:
+        result = self.registry.get("create_pending_report").handler(
+            message,
+            session_id=session_id,
+            risk_level=risk_level.value,
+            rationale=risk.output["rationale"],
+            intent=intent.value,
+            emotion=risk.output.get("emotion", "high_risk"),
+            emotion_score=risk.output.get("emotion_score", 4.0),
+            confidence=risk.output.get("confidence", 0.95),
+            summary=risk.output.get("summary", ""),
+        )
+        return result, AgentTrace(self.name, "create_pending_report", result.output["report_id"])
+
+
+class LeadAgent:
+    name = "LeadAgent"
+
+    def route(self, message: str, risk_level: RiskLevel) -> tuple[Intent, AgentTrace]:
+        if risk_level is RiskLevel.HIGH:
+            intent = Intent.RISK
+        else:
+            research_terms = ["资料", "研究", "证据", "为什么", "原理", "指南", "权威"]
+            counseling_terms = ["焦虑", "抑郁", "低落", "压力", "睡眠", "失眠", "难受", "崩溃", "人际", "考试"]
+            if any(term in message for term in research_terms):
+                intent = Intent.RESEARCH
+            elif any(term in message for term in counseling_terms) or risk_level is RiskLevel.MEDIUM:
+                intent = Intent.COUNSELING
+            else:
+                intent = Intent.COMPANION
+        return intent, AgentTrace(self.name, "route", f"intent={intent.value}, risk={risk_level.value}")
+
+
+class KnowledgeAgent:
+    name = "KnowledgeAgent"
+
+    def __init__(self, registry: SkillRegistry, llm_client: LLMClient | None = None):
+        self.registry = registry
+        self.llm_client = llm_client
+
+    def search(self, message: str, memory_summary: str = "") -> tuple[SkillResult, AgentTrace]:
+        query = self.rewrite_query(message, memory_summary)
+        result = self.registry.get("search_knowledge").handler(query)
+        documents = result.output.get("documents", [])
+        enriched = SkillResult(
+            name=result.name,
+            output={
+                **result.output,
+                "documents": documents,
+                "knowledge_query": query,
+            },
+            side_effect=result.side_effect,
+        )
+        return enriched, AgentTrace(self.name, "search_knowledge", f"query={query}; hits={len(documents)}")
+
+    def rewrite_query(self, message: str, memory_summary: str = "") -> str:
+        text = " ".join((message or "").split()).strip()
+        if self.llm_client is not None:
+            try:
+                rewritten = self.llm_client.rewrite_knowledge_query(text, memory_summary)
+                if rewritten:
+                    return rewritten[:60]
+            except Exception:
+                pass
+        return text[:60]
+
+
+class CounselorAgent:
+    name = "CounselorAgent"
+
+    def __init__(self, registry: SkillRegistry, llm_client: LLMClient):
+        self.registry = registry
+        self.llm_client = llm_client
+
+    def grounding(self, message: str) -> tuple[SkillResult, AgentTrace]:
+        result = self.registry.get("grounding_exercise").handler(message)
+        return result, AgentTrace(self.name, "grounding_exercise", result.output["title"])
+
+    def compose(
+        self,
+        message: str,
+        intent: Intent,
+        risk_level: RiskLevel,
+        memory_summary: str,
+        knowledge: SkillResult | None,
+        grounding: SkillResult | None,
+        response_skill_context: str = "",
+    ) -> tuple[str, AgentTrace]:
+        plan, _ = self.compose_plan(message, intent, risk_level, memory_summary, knowledge, grounding, response_skill_context)
+        answer, trace = self.finalize_plan(plan)
+        return answer, trace
+
+    def compose_plan(
+        self,
+        message: str,
+        intent: Intent,
+        risk_level: RiskLevel,
+        memory_summary: str,
+        knowledge: SkillResult | None,
+        grounding: SkillResult | None,
+        response_skill_context: str = "",
+    ) -> tuple[ResponsePlan, AgentTrace]:
+        knowledge_snippets = [
+            f"[{item.get('source', '')}] {item.get('content') or item.get('snippet', '')}"
+            for item in (knowledge.output["documents"] if knowledge else [])
+        ]
+        grounding_steps = list(grounding.output["steps"] if grounding else [])
+        mode = "safety_template" if risk_level is RiskLevel.HIGH else ("research_support" if intent is Intent.RESEARCH else "support")
+        prompt_messages = [
+            {"role": "system", "content": f"mode={mode}; intent={intent.value}; risk={risk_level.value}"},
+            {"role": "system", "content": f"memory={memory_summary or 'none'}"},
+            {"role": "system", "content": f"skills={response_skill_context or 'none'}"},
+            {"role": "user", "content": message},
+        ]
+        plan = ResponsePlan(
+            mode=mode,
+            response_agent=self.name,
+            intent=intent.value,
+            risk_level=risk_level.value,
+            memory_brief=memory_summary,
+            knowledge_snippets=knowledge_snippets,
+            grounding_steps=grounding_steps,
+            skill_context=response_skill_context,
+            prompt_messages=prompt_messages,
+        )
+        return plan, AgentTrace(self.name, "compose_plan", f"mode={mode}; snippets={len(knowledge_snippets)}; grounding={len(grounding_steps)}")
+
+    def finalize_plan(self, plan: ResponsePlan) -> tuple[str, AgentTrace]:
+        fallback = self._fallback_answer(
+            Intent(plan.intent),
+            RiskLevel(plan.risk_level),
+            plan.memory_brief,
+            _knowledge_from_plan(plan),
+            _grounding_from_plan(plan),
+        )
+        risk_level = RiskLevel(plan.risk_level)
+        intent = Intent(plan.intent)
+        if risk_level is RiskLevel.HIGH:
+            return fallback, AgentTrace(self.name, "compose_answer", "plan:safety_template")
+
+        context = LLMContext(
+            message=next((item["content"] for item in reversed(plan.prompt_messages) if item.get("role") == "user"), ""),
+            intent=intent,
+            risk_level=risk_level,
+            memory_summary=plan.memory_brief,
+            knowledge_snippets=plan.knowledge_snippets,
+            grounding_steps=plan.grounding_steps,
+            response_skill_context=plan.skill_context,
+        )
+        generated = self.llm_client.generate_support_reply(context)
+        if generated:
+            return generated.strip(), AgentTrace(self.name, "compose_answer", f"llm:{self.llm_client.provider}/{self.llm_client.model}")
+        return fallback, AgentTrace(self.name, "compose_answer", f"fallback:{self.llm_client.provider}")
+
+    def _fallback_answer(self, intent: Intent, risk_level: RiskLevel, memory_summary: str, knowledge, grounding) -> str:
+        lines = []
+        if risk_level is RiskLevel.HIGH:
+            lines.append("我很在意你刚才提到的危险信号。此刻请先把安全放在第一位：如果你已经有明确计划或身边有可伤害自己的物品，请立刻联系身边可信任的人、学校心理中心或当地紧急服务。")
+        elif risk_level is RiskLevel.MEDIUM:
+            lines.append("听起来你已经撑得很辛苦了。我们先把这一刻稳定下来，再一起把问题拆小。")
+        else:
+            lines.append("我听到了你的困扰。我们可以先从最具体、最影响你的那一部分开始。")
+
+        if memory_summary:
+            latest_memory = memory_summary.splitlines()[-1][:180]
+            lines.append(f"\n我会结合你前面提到的情况继续陪你梳理：{latest_memory}")
+
+        if grounding:
+            steps = grounding.output["steps"]
+            lines.append(f"\n{grounding.output['title']}：")
+            lines.extend(f"{idx}. {step}" for idx, step in enumerate(steps, 1))
+
+        if risk_level is not RiskLevel.HIGH and knowledge and knowledge.output["documents"]:
+            top = knowledge.output["documents"][0]
+            content = top.get("content") or top.get("snippet") or ""
+            lines.append(f"\n我也查到一个相关支持方向：[{top['source']}] {content[:240]}")
+
+        if intent is Intent.RESEARCH:
+            lines.append("\n如果你愿意，我可以继续把资料整理成“原因、可尝试方法、何时求助”三段。")
+        elif intent is Intent.RISK:
+            lines.append("\n现在最重要的是不要一个人扛着。请尽快联系身边可信任的人，让对方陪你一起联系学校心理中心或当地紧急服务。")
+        else:
+            lines.append("\n你可以接着告诉我：这件事最难受的时刻通常发生在什么时候？")
+        return "\n".join(lines)
+
+
+class CompanionAgent:
+    name = "CompanionAgent"
+
+
+def _knowledge_from_plan(plan: ResponsePlan):
+    if not plan.knowledge_snippets:
+        return None
+    return SkillResult(
+        name="search_knowledge",
+        output={
+            "documents": [
+                {"source": "response_plan", "content": snippet, "snippet": snippet}
+                for snippet in plan.knowledge_snippets
+            ]
+        },
+    )
+
+
+def _grounding_from_plan(plan: ResponsePlan):
+    if not plan.grounding_steps:
+        return None
+    return SkillResult(name="grounding_exercise", output={"title": "稳定练习", "steps": plan.grounding_steps})

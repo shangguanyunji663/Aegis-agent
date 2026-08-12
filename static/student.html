@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Aegis 学生端</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body class="student-page">
+    <header class="role-topbar">
+      <div class="role-brand">
+        <div class="role-logo student-logo">A</div>
+        <div>
+          <p class="eyebrow">STUDENT COMPANION</p>
+          <h1>Aegis 学生心理陪伴</h1>
+        </div>
+      </div>
+      <div class="top-actions">
+        <span id="health" class="status-pill">checking</span>
+        <span id="model-state" class="status-pill secondary">model</span>
+        <div class="user-summary compact"><strong id="active-account">学生</strong><span>学生端</span></div>
+        <button id="logout-btn" class="ghost-btn" type="button">退出</button>
+      </div>
+    </header>
+
+    <main class="student-layout">
+      <aside class="student-rail">
+        <section class="panel-card">
+          <p class="eyebrow">QUICK SIGNAL</p>
+          <button class="signal-btn" type="button" data-quick="我最近考试压力很大，晚上总是睡不着。">压力失眠</button>
+          <button class="signal-btn" type="button" data-quick="我感觉很焦虑，考试前完全静不下来。">焦虑倾诉</button>
+          <button class="signal-btn" type="button" data-quick="我最近情绪很低落，不太想和别人说话。">低落求助</button>
+          <button class="signal-btn" type="button" data-quick="我想聊聊最近和家人的矛盾。">关系困扰</button>
+        </section>
+
+        <section class="panel-card">
+          <div class="section-title"><h2>会话历史</h2><button id="new-session" class="ghost-btn" type="button">新会话</button></div>
+          <div id="history-list" class="history-list split"></div>
+        </section>
+
+        <section class="panel-card">
+          <p class="eyebrow">CARE LOOP</p>
+          <ol class="loop-list">
+            <li>理解表达</li>
+            <li>安全分流</li>
+            <li>必要时检索支持知识</li>
+            <li>生成陪伴回应</li>
+          </ol>
+        </section>
+      </aside>
+
+      <section class="student-chat panel-card">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">STUDENT CHAT</p>
+            <h2>心理陪伴对话</h2>
+          </div>
+          <span id="session-badge" class="status-pill secondary">READY</span>
+        </div>
+        <div id="messages" class="messages">
+          <div class="intro">
+            <div class="intro-title">从一段真实表达开始</div>
+            <p>你可以说压力、睡眠、关系、考试，也可以只写下现在最卡住的一句话。</p>
+          </div>
+        </div>
+        <form id="chat-form" class="composer split-composer">
+          <textarea id="message-input" rows="3" placeholder="写下你现在想说的话..."></textarea>
+          <div class="composer-actions">
+            <span id="stream-status" class="status-pill secondary">idle</span>
+            <button id="send-btn" class="send-text-btn" type="submit">发送</button>
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <script src="/static/student.js"></script>
+  </body>
+</html>

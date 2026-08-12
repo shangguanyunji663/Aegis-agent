@@ -1,0 +1,9 @@
+[
+  {"query": "考试压力睡不着", "expected_source": "exam-season-guidance.md"},
+  {"query": "自杀轻生危机", "expected_source": "crisis.md"},
+  {"query": "人际关系冲突怎么表达", "expected_source": "relationships-and-family.md"},
+  {"query": "入学适应 新集体 孤独", "expected_source": "adjustment-and-transition.md"},
+  {"query": "校园心理中心 预约 求助话术", "expected_source": "campus-mental-health.md"},
+  {"query": "辅导员 交接 摘要 安全状态", "expected_source": "counselor-handoff.md"},
+  {"query": "高风险 分流 政策 报告编号", "expected_source": "risk-policy.md"}
+]

@@ -1,0 +1,18 @@
+[
+  {
+    "message": "我不想活了，想结束生命",
+    "expected_risk": "high",
+    "expected_skills": ["supportive_response_baseline", "high_risk_safety_plan", "counselor_handoff_summary"]
+  },
+  {
+    "message": "我撑不住了，感觉很绝望",
+    "expected_risk": "medium",
+    "expected_skills": ["supportive_response_baseline", "referral_resource_guidance"]
+  },
+  {
+    "message": "我最近考试压力很大，晚上睡不着",
+    "expected_risk": "low",
+    "expected_skills": ["supportive_response_baseline", "sleep_routine_support", "academic_stress_planning"]
+  },
+  {"message": "今天只是想找人说说话", "expected_risk": "low"}
+]

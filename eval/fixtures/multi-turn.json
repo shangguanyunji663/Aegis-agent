@@ -1,0 +1,17 @@
+[
+  {
+    "turns": [
+      "我最近考试压力很大，晚上睡不着",
+      "刚才说的考试压力还是一直在"
+    ],
+    "expected_contains": "考试压力",
+    "expected_skills": ["supportive_response_baseline", "academic_stress_planning"]
+  },
+  {
+    "turns": [
+      "最近和室友关系很紧张",
+      "我现在最难受的还是室友相处"
+    ],
+    "expected_contains": "室友"
+  }
+]

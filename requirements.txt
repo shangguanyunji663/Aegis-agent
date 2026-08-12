@@ -1,0 +1,12 @@
+fastapi>=0.115.0
+pydantic-settings>=2.0.0
+sqlalchemy>=2.0.0
+uvicorn>=0.30.0
+pytest>=8.0.0
+chromadb
+redis
+psycopg[binary]
+pypdf
+httpx
+mcp
+openpyxl>=3.1.0

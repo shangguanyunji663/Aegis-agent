@@ -27,8 +27,10 @@
         <p class="eyebrow">ACCOUNT GATE</p>
         <h2>选择账号进入对应工作台</h2>
         <form id="login-form" class="auth-form">
-          <input id="login-username" type="text" value="student" autocomplete="username" />
-          <input id="login-password" type="password" value="student123!" autocomplete="current-password" />
+          <label for="login-username">用户名</label>
+          <input id="login-username" type="text" value="student" autocomplete="username" placeholder="请输入用户名" />
+          <label for="login-password">密码</label>
+          <input id="login-password" type="password" value="student123!" autocomplete="current-password" placeholder="请输入密码" />
           <button id="login-submit" type="submit" class="primary-btn">登录并进入</button>
         </form>
         <div id="auth-error" class="callout error hidden"></div>

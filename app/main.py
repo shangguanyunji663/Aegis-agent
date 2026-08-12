@@ -88,6 +88,7 @@ def create_app(runtime_settings: Settings | None = None) -> FastAPI:
     engine = build_engine(settings)
     session_factory = build_session_factory(settings)
     create_schema(engine)
+    settings = runtime_settings or get_settings()
     store = DatabaseStore(session_factory, settings=settings)
     store.ensure_default_users()
     store.seed_knowledge_dir(knowledge_dir)
@@ -120,33 +121,6 @@ def create_app(runtime_settings: Settings | None = None) -> FastAPI:
     app.state.tool_gateway = tool_gateway
     app.state.tool_worker = tool_worker
 
-    @app.middleware("http")
-    async def attach_request_context(request: Request, call_next):
-        request_id = request.headers.get("X-Request-ID") or f"req-{uuid4().hex[:12]}"
-        trace_id = request.headers.get("X-Trace-ID") or f"trace-{uuid4().hex[:12]}"
-        request.state.request_id = request_id
-        request.state.trace_id = trace_id
-        started = time.perf_counter()
-        try:
-            response = await call_next(request)
-        finally:
-            duration_ms = round((time.perf_counter() - started) * 1000, 2)
-            payload = {
-                "event": "http_request",
-                "request_id": request_id,
-                "trace_id": trace_id,
-                "method": request.method,
-                "path": request.url.path,
-                "duration_ms": duration_ms,
-            }
-            if duration_ms >= settings.slow_request_threshold_ms:
-                logger.warning(json.dumps(payload | {"level": "warning", "kind": "slow_request"}, ensure_ascii=False))
-            else:
-                logger.info(json.dumps(payload | {"level": "info"}, ensure_ascii=False))
-        response.headers["X-Request-ID"] = request_id
-        response.headers["X-Trace-ID"] = trace_id
-        return response
-
     def current_principal(session_token: str | None = Cookie(default=None, alias=settings.auth_session_cookie)) -> AuthPrincipal:
         if not session_token:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="authentication required")
@@ -175,6 +149,8 @@ def create_app(runtime_settings: Settings | None = None) -> FastAPI:
 
     def audit(principal: AuthPrincipal, action: str, target_type: str, target_id: str, payload: dict | None = None) -> None:
         store.add_audit_log(principal.user_id, principal.username, principal.role, action, target_type, target_id, payload)
+
+#----------------------路由层---------------------
 
     @app.get("/", response_class=HTMLResponse)
     def index() -> str:

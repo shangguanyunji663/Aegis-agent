@@ -28,11 +28,17 @@ from app.tool_contracts import list_tool_contracts
 from app.tool_gateway import build_tool_gateway
 from app.services.tool_queue import ToolQueueWorker
 
+# 项目根目录
 ROOT = Path(__file__).resolve().parents[1]
+# 静态资源目录（HTML/CSS/JS）
 STATIC_DIR = ROOT / "static"
+# 评估测试用例目录
 EVAL_FIXTURES_DIR = ROOT / "eval" / "fixtures"
+# 评估结果输出目录
 EVAL_OUTPUT_DIR = ROOT / "data" / "eval"
+# 知识库备份目录
 KNOWLEDGE_BACKUP_DIR = ROOT / "data" / "knowledge-backups"
+# 应用日志记录器
 logger = logging.getLogger("aegis.app")
 
 

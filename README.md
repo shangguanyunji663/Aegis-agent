@@ -1,19 +1,4 @@
-<h1 align="center">Aegis Psych Agent</h1>
-
-<p align="center">
-  面向校园心理支持场景的多 Agent 风险识别与干预协作平台
-</p>
-
-<p align="center">
-  <a href="https://github.com/m4rklee/aegis-psych-agent"><img alt="GitHub repo" src="https://img.shields.io/badge/GitHub-aegis--psych--agent-181717?logo=github"></a>
-  <img alt="Python" src="https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white">
-  <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-Backend-009688?logo=fastapi&logoColor=white">
-  <img alt="MCP" src="https://img.shields.io/badge/FastMCP-Tools-4B5563">
-  <img alt="Tests" src="https://img.shields.io/badge/Pytest-43%20passed-0A7C42">
-  <img alt="RAG Eval" src="https://img.shields.io/badge/RAG%20Eval-66%20cases-2563EB">
-</p>
-
-## 项目简介
+## 面向校园心理支持场景的多 Agent 风险识别与干预协作平台项目简介
 
 `Aegis Psych Agent` 是一个校园心理支持多 Agent 平台，围绕学生端倾诉、心理知识检索、风险识别、辅导员工作台和高风险工具执行闭环展开。项目不是简单的聊天机器人，而是把“学生侧即时支持”和“管理侧可审计干预”拆成两套独立信息架构，并通过后端 Agent Runtime Harness 统一处理意图路由、记忆注入、RAG 检索、风险报告、trace 落库和工具计划。
 

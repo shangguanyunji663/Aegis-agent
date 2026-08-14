@@ -120,7 +120,7 @@ def create_app(runtime_settings: Settings | None = None) -> FastAPI:
     app.state.runtime = runtime
     app.state.tool_gateway = tool_gateway
     app.state.tool_worker = tool_worker
-
+#-------------------------认证层-------------------------   
     def current_principal(session_token: str | None = Cookie(default=None, alias=settings.auth_session_cookie)) -> AuthPrincipal:
         if not session_token:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="authentication required")
@@ -134,7 +134,7 @@ def create_app(runtime_settings: Settings | None = None) -> FastAPI:
             role=user["role"],
             auth_session_id=auth_session["auth_session_id"],
         )
-
+#-------------------------权限层-------------------------
     def require_admin(principal: AuthPrincipal = Depends(current_principal)) -> AuthPrincipal:
         if principal.role != UserRole.ADMIN.value:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="admin access required")
@@ -146,11 +146,11 @@ def create_app(runtime_settings: Settings | None = None) -> FastAPI:
             raise HTTPException(status_code=404, detail="session not found")
         if session["owner_user_id"] != principal.user_id:
             raise HTTPException(status_code=403, detail="session access denied")
-
+#-------------------------审计层-------------------------
     def audit(principal: AuthPrincipal, action: str, target_type: str, target_id: str, payload: dict | None = None) -> None:
         store.add_audit_log(principal.user_id, principal.username, principal.role, action, target_type, target_id, payload)
 
-#----------------------路由层---------------------
+#-------------------------前端路由层-------------------------
 
     @app.get("/", response_class=HTMLResponse)
     def index() -> str:
@@ -164,7 +164,7 @@ def create_app(runtime_settings: Settings | None = None) -> FastAPI:
     def admin_page() -> str:
         return (STATIC_DIR / "admin.html").read_text(encoding="utf-8")
 
-    @app.get("/api/health")
+    @app.get("/api/health")  # 探活接口
     def health() -> dict:
         return {
             "status": "UP",
@@ -173,7 +173,7 @@ def create_app(runtime_settings: Settings | None = None) -> FastAPI:
             "agent_runtime": settings.agent_runtime,
             "agent_models": orchestrator.model_registry.status(),
         }
-
+    
     @app.get("/api/agent/status")
     def agent_status(principal: AuthPrincipal = Depends(current_principal)) -> dict:
         return {
@@ -188,18 +188,18 @@ def create_app(runtime_settings: Settings | None = None) -> FastAPI:
                 "langgraph": "disabled_by_request",
                 "maxRounds": settings.agent_max_rounds,
                 "maxClaimsPerRound": settings.agent_max_claims_per_round,
-                "state": "append-only-blackboard",
+                "state": "append-only-blackboard",  #只追加不修改。Agent 的产出（artifact）以追加方式写入 blackboard
             },
             "agents": [
                 {"name": "MemoryAgent", "role": "session and private memory"},
                 {"name": "SupervisorAgent", "aliasOf": "LeadAgent", "role": "intent routing"},
-                {"name": "LeadAgent", "role": "intent routing"},
+                {"name": "LeadAgent", "role": "intent routing"}, # 主导Agent
                 {"name": "RiskGuardianAgent", "role": "risk assessment and response safety review"},
                 {"name": "KnowledgeAgent", "role": "RAG and standard skill context"},
                 {"name": "CounselorAgent", "role": "support response planning"},
                 {"name": "CompanionAgent", "role": "low-risk companion response planning"},
             ],
-            "memory": store.memory_backend_status(),
+            "memory":store.memory_backend_status(),
             "models": orchestrator.model_registry.status(),
             "toolBackend": tool_gateway.backend,
             "toolQueue": {
@@ -213,6 +213,7 @@ def create_app(runtime_settings: Settings | None = None) -> FastAPI:
             "role": principal.role,
         }
 
+# 与 /api/health 的区别：health 只判断进程存活，readiness 判断依赖是否就绪。	
     @app.get("/api/readiness")
     def readiness() -> dict:
         checks = {
@@ -235,8 +236,8 @@ def create_app(runtime_settings: Settings | None = None) -> FastAPI:
             key=settings.auth_session_cookie,
             value=auth_session["session_token"],
             max_age=settings.auth_session_ttl_hours * 3600,
-            httponly=True,
-            samesite="lax",
+            httponly=True, # Cookie 不能被 JavaScript 读取，防止 XSS 窃取令牌
+            samesite="lax",# Cookie 在跨站请求中不会被发送，防止 CSRF 攻击
         )
         return {"user": auth_session["user"], "expires_at": auth_session["expires_at"]}
 

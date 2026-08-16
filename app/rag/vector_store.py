@@ -180,15 +180,7 @@ class ChromaVectorBackend(VectorSearchBackend):
         self._available = True
 
     def _init_remote_collection(self) -> None:
-        try:
-            import chromadb  # noqa: F401 - 仅探测依赖是否安装
-        except ImportError as exc:
-            message = f"缺少 chromadb 依赖，Chroma + {self.settings.openai_embedding_model} 不可用，已回退到{FALLBACK_RETRIEVAL_LABEL}"
-            if self.settings.vector_required:
-                raise VectorStoreUnavailable("缺少 chromadb 依赖，无法启用 Chroma + OpenAI embeddings 主检索方案") from exc
-            self.last_error = message
-            return
-
+        # chromadb 依赖探测与使用统一在 _open_collection 内完成,避免重复导入
         try:
             self._open_collection()
         except Exception as exc:

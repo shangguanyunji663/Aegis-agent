@@ -19,7 +19,6 @@ from app.agents.langgraph_runtime import LangGraphRuntime
 from app.agents.orchestrator import PsychOrchestrator
 from app.database import Base
 from app.llm import MockLLMClient
-from app.models import RiskLevel
 from app.repository import DatabaseStore
 from app.skills import SkillRegistry
 

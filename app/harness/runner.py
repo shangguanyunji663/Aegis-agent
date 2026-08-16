@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from app.agents.orchestrator import PsychOrchestrator
-from app.evaluation import evaluate_scaled_benchmark, evaluate_skills, run_runtime_ab
+from app.evaluation import evaluate_scaled_benchmark, evaluate_skills, render_report, run_runtime_ab
 from app.harness.factory import KNOWLEDGE_DIR, ROOT, build_harness_orchestrator
 from app.models import ReportStatus
 

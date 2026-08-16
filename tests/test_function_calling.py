@@ -1,7 +1,6 @@
 """Function Calling 技能自主选择测试:白名单兜底,模型在白名单内挑选。"""
 from pathlib import Path
 
-from app.agents.classic import RiskGuardianAgent
 from app.agents.skill_selection import select_response_skills
 from app.llm import MockLLMClient
 from app.models import Intent, RiskLevel

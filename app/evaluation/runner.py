@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from app.evaluation.datasets import generated_benchmark_cases
+from app.evaluation.judge import evaluate_reply_quality
 from app.evaluation.report_html import render_html
 from app.rag_eval.runner import evaluate as evaluate_rag_eval
 
@@ -24,6 +25,7 @@ def run_evaluation(orchestrator, store, fixtures_dir: Path, output_dir: Path) ->
         "safety": evaluate_safety(orchestrator, fixtures_dir),
         "multi_turn": evaluate_multi_turn(orchestrator, fixtures_dir),
         "scaled_benchmark": evaluate_scaled_benchmark(orchestrator),
+        "judge": evaluate_judge(orchestrator, fixtures_dir),
     }
     results["rag_eval"]["passed"] = sum(1 for item in results["rag_eval"]["results"] if item["hit"])
     results["rag_eval"]["total"] = results["rag_eval"]["totalCases"]
@@ -198,6 +200,18 @@ def evaluate_multi_turn(orchestrator, fixtures_dir: Path) -> dict:
     return with_accuracy(rows)
 
 
+def evaluate_judge(orchestrator, fixtures_dir: Path) -> dict | None:
+    """LLM-as-Judge:对 routing+multi-turn 的回复抽样评分;mock/失败返回 None。"""
+    cases = read_cases(fixtures_dir / "routing.json")
+    cases += read_cases(fixtures_dir / "multi-turn.json")
+    samples = []
+    for case in cases[:6]:
+        message = case["message"] if "message" in case else case["turns"][-1]
+        response = orchestrator.handle(message)
+        samples.append({"message": message, "reply": response.answer})
+    return evaluate_reply_quality(orchestrator.llm_client, samples)
+
+
 def with_accuracy(rows: list[dict[str, Any]]) -> dict:
     passed = sum(1 for row in rows if row["passed"])
     total = len(rows)
@@ -225,6 +239,7 @@ def summarize(results: dict) -> dict:
         "scaled_benchmark_accuracy": results["scaled_benchmark"]["accuracy"],
         "scaled_benchmark_total": results["scaled_benchmark"]["total"],
         "scaled_high_recall": results["scaled_benchmark"].get("high_recall", 0.0),
+        "judge_avg": (results.get("judge") or {}).get("avg"),
         "all_passed": all(
             results[name]["passed"] == results[name]["total"]
             for name in ["routing", "risk", "retrieval", "rag_eval", "skills", "safety", "multi_turn", "scaled_benchmark"]

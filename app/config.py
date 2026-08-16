@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     llm_thinking_enabled: bool = False
     risk_llm_channel_enabled: bool = True
     function_calling_enabled: bool = True
+    langgraph_checkpoint_enabled: bool = True
+    langgraph_checkpoint_path: str = "data/langgraph-checkpoints.sqlite"
     knowledge_dir: str = "knowledge"
     max_knowledge_upload_bytes: int = 1_000_000
     knowledge_top_k: int = 4

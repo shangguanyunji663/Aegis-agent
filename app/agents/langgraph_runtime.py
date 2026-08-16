@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import operator
+import sqlite3
 from typing import Annotated, Callable, TypedDict
 
 from langgraph.graph import END, START, StateGraph
@@ -94,7 +95,34 @@ class LangGraphRuntime:
         self.companion_agent = CompanionAgent()
         # 低风险直播回调:run() 时注入,finalize 节点读取
         self._on_reply_token: Callable[[str], None] | None = None
+        self.checkpointer = self._build_checkpointer()
         self.graph = self._build_graph()
+
+    def _build_checkpointer(self):
+        """按配置挂 SqliteSaver,实现跨进程断点恢复;关闭或依赖缺失时返回 None(零开销)。"""
+        if not bool(getattr(self.settings, "langgraph_checkpoint_enabled", False)):
+            return None
+        try:
+            from langgraph.checkpoint.sqlite import SqliteSaver
+        except ImportError:
+            return None
+        path = self.settings.resolve_path(self.settings.langgraph_checkpoint_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(str(path), check_same_thread=False)
+        checkpointer = SqliteSaver(conn)
+        checkpointer.setup()
+        self._checkpoint_conn = conn  # 持有连接,防止被 GC 关闭
+        return checkpointer
+
+    def get_state(self, session_id: str) -> dict | None:
+        """读取某会话的最近检查点终态(供断点恢复/观测);无检查点时返回 None。"""
+        if self.checkpointer is None:
+            return None
+        snapshot = self.checkpointer.get({"configurable": {"thread_id": session_id}})
+        if not snapshot:
+            return None
+        values = snapshot.get("channel_values", {})
+        return dict(values) if values else None
 
     # ---------------- 图构建 ----------------
     def _build_graph(self):
@@ -117,7 +145,10 @@ class LangGraphRuntime:
         builder.add_edge("report", "compose")
         builder.add_edge("compose", "finalize")
         builder.add_edge("finalize", END)
-        return builder.compile()
+        graph = builder.compile()
+        if self.checkpointer is not None:
+            graph = builder.compile(checkpointer=self.checkpointer)
+        return graph
 
     # ---------------- 节点实现(复用单轮 Agent,逻辑与 ordered 路径一致) ----------------
     def _node_load_memory(self, state: GraphState) -> dict:
@@ -209,8 +240,12 @@ class LangGraphRuntime:
     # ---------------- 对外入口 ----------------
     def run(self, session_id: str, message: str, on_reply_token: Callable[[str], None] | None = None) -> AutonomousRunOutcome:
         self._on_reply_token = on_reply_token
+        invoke_config = {"configurable": {"thread_id": session_id}}
+        if self.checkpointer is not None:
+            invoke_config = {**invoke_config}
         final: GraphState = self.graph.invoke(
-            {"session_id": session_id, "message": message, "skills": [], "trace": []}
+            {"session_id": session_id, "message": message, "skills": [], "trace": []},
+            config=invoke_config,
         )
         self._on_reply_token = None
         intent = final.get("intent", Intent.COMPANION)

@@ -29,6 +29,8 @@ class AutonomousRuntimeServices:
     session_id: str
     llm_client: Any
     model_registry: Any
+    # 低风险回复的直播回调:token 边生成边推给 SSE;中高风险不传(须先过安全复核)
+    on_reply_token: Any = None
 
 
 class BaseAutonomousAgent:
@@ -344,7 +346,8 @@ class CounselorAutonomousAgent(BaseAutonomousAgent):
             context.get("grounding"),
             context.get("standard_context", ""),
         )
-        answer, trace = self.agent.finalize_plan(response_plan)
+        live_cb = self.services.on_reply_token if risk is RiskLevel.LOW else None
+        answer, trace = self.agent.finalize_plan(response_plan, on_token=live_cb)
         payload = {
             "answer": answer,
             "trace": trace.detail,
@@ -396,7 +399,8 @@ class CompanionAutonomousAgent(BaseAutonomousAgent):
             "",
         )
         response_plan.response_agent = self.name
-        answer, trace = self.counselor_agent.finalize_plan(response_plan)
+        # Companion 路径仅在 intent=companion 且 risk=low 时被认领,可安全直播
+        answer, trace = self.counselor_agent.finalize_plan(response_plan, on_token=self.services.on_reply_token)
         payload = {
             "answer": answer,
             "trace": trace.detail,

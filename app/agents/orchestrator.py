@@ -41,9 +41,15 @@ class PsychOrchestrator:
     def handle(self, message: str, session_id: str | None = None) -> ChatResponse:
         return self._run(message, session_id)
 
-    def handle_stream(self, message: str, session_id: str | None = None) -> list[StreamEvent]:
+    def handle_stream(self, message: str, session_id: str | None = None, emit: Callable[[StreamEvent], None] | None = None) -> list[StreamEvent]:
         events: list[StreamEvent] = []
-        self._run(message, session_id, emit=events.append)
+
+        def forward(event: StreamEvent) -> None:
+            events.append(event)
+            if emit is not None:
+                emit(event)
+
+        self._run(message, session_id, emit=forward)
         return events
 
     def _run(
@@ -166,15 +172,25 @@ class PsychOrchestrator:
         trace.append(plan_trace)
         self._emit_agent_trace(runtime_events, emit, plan_trace)
 
+        ordered_live_tokens = {"count": 0}
+
+        def on_ordered_token(delta: str) -> None:
+            ordered_live_tokens["count"] += 1
+            self._record_runtime(runtime_events, emit, RuntimeEventType.TOKEN_EMITTED, {"content": delta})
+
         answer, answer_trace = self.runtime_runner.run_step(
             "counselor",
             "finalize_plan",
-            lambda agent: agent.finalize_plan(response_plan),
+            lambda agent: agent.finalize_plan(
+                response_plan,
+                on_token=on_ordered_token if risk_level is RiskLevel.LOW else None,
+            ),
         )
         trace.append(answer_trace)
         self._emit_agent_trace(runtime_events, emit, answer_trace)
-        for chunk in self._token_chunks(answer):
-            self._record_runtime(runtime_events, emit, RuntimeEventType.TOKEN_EMITTED, {"content": chunk})
+        if not ordered_live_tokens["count"]:
+            for chunk in self._token_chunks(answer):
+                self._record_runtime(runtime_events, emit, RuntimeEventType.TOKEN_EMITTED, {"content": chunk})
         self.store.append_message(session_id, "assistant", answer)
         updated_memory, memory_update_trace = self.runtime_runner.run_step(
             "memory",
@@ -214,7 +230,13 @@ class PsychOrchestrator:
         self.runtime_runner.reset()
         self._record_runtime(runtime_events, emit, RuntimeEventType.RUN_STARTED, {"session_id": session_id, "message_id": message_id})
         self.store.append_message(session_id, "user", message)
-        outcome = self.autonomous_runtime.run(session_id, message)
+        live_tokens = {"count": 0}
+
+        def on_reply_token(delta: str) -> None:
+            live_tokens["count"] += 1
+            self._record_runtime(runtime_events, emit, RuntimeEventType.TOKEN_EMITTED, {"content": delta})
+
+        outcome = self.autonomous_runtime.run(session_id, message, on_reply_token=on_reply_token)
         self.runtime_runner.event_history = [
             RuntimeEvent(type=RuntimeEventType.AGENT_STARTED, data={"agent_id": event.actor, "action": event.type.value})
             for event in outcome.board.events
@@ -274,8 +296,9 @@ class PsychOrchestrator:
                 RuntimeEventType.REPORT_CREATED,
                 {"report_id": outcome.pending_report.id, "status": outcome.pending_report.status.value},
             )
-        for chunk in self._token_chunks(outcome.answer):
-            self._record_runtime(runtime_events, emit, RuntimeEventType.TOKEN_EMITTED, {"content": chunk})
+        if not live_tokens["count"]:  # 已直播过真实 token 就不再补发假切块
+            for chunk in self._token_chunks(outcome.answer):
+                self._record_runtime(runtime_events, emit, RuntimeEventType.TOKEN_EMITTED, {"content": chunk})
         self.store.add_trace(session_id, message_id, outcome.intent.value, outcome.risk_level.value, outcome.trace, outcome.skills, outcome.answer)
         response = ChatResponse(
             session_id=session_id,

@@ -256,4 +256,24 @@ $("#run-tool-worker").addEventListener("click", async () => {
 $("#run-eval").addEventListener("click", async () => { showDetail("Eval run", await (await api("/api/admin/eval-results/run", { method: "POST" })).json()); await loadEvalAndAudit(); });
 document.body.addEventListener("click", handleClick);
 
+function initCollapsible() {
+  document.querySelectorAll(".panel-card[data-panel]").forEach((card) => {
+    const id = card.dataset.panel;
+    const btn = card.querySelector(".collapse-btn");
+    if (!btn) return;
+    const stored = localStorage.getItem(`aegis:panel:${id}`);
+    // 默认仅 Agent Trace 收起(条目多、占空间大),用户选择记入 localStorage
+    const collapsed = stored !== null ? stored === "1" : id === "traces";
+    card.classList.toggle("collapsed", collapsed);
+    const toggle = () => {
+      const now = card.classList.toggle("collapsed");
+      localStorage.setItem(`aegis:panel:${id}`, now ? "1" : "0");
+    };
+    btn.addEventListener("click", toggle);
+    const heading = card.querySelector(".section-title h2");
+    if (heading) heading.addEventListener("click", toggle);
+  });
+}
+initCollapsible();
+
 loadMe().then(refreshAll).catch(() => window.location.replace("/"));

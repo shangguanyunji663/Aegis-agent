@@ -46,13 +46,14 @@ class AutonomousAgentRuntime:
         self.model_registry = model_registry
         self.last_board: CollaborationBlackboard | None = None
 
-    def run(self, session_id: str, message: str) -> AutonomousRunOutcome:
+    def run(self, session_id: str, message: str, on_reply_token=None) -> AutonomousRunOutcome:
         services = AutonomousRuntimeServices(
             store=self.store,
             registry=self.registry,
             session_id=session_id,
             llm_client=self.llm_client,
             model_registry=self.model_registry,
+            on_reply_token=on_reply_token,
         )
         agents = [
             MemoryAutonomousAgent(services),

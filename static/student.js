@@ -118,6 +118,10 @@ async function sendMessage(event) {
   setPill(els.streamStatus, "streaming", "secondary");
   addMessage("user", text);
   const assistant = addMessage("assistant", "");
+  assistant.innerHTML = '<span class="typing-dots"><span></span><span></span><span></span></span>';
+  const meta = document.createElement("div");
+  meta.className = "stream-meta";
+  assistant.parentElement.append(meta);
   let answer = "";
   try {
     const response = await api("/api/chat/stream", {
@@ -134,13 +138,32 @@ async function sendMessage(event) {
       buffer += decoder.decode(value, { stream: true });
       buffer = parseSse(buffer, (payload) => {
         if (payload.event === "start") state.sessionId = payload.session_id;
+        if (payload.event === "route") {
+          meta.textContent = `风险评估：${{ low: "低", medium: "中", high: "高" }[payload.risk_level] || payload.risk_level} · 正在准备回复`;
+        }
+        if (payload.event === "skill" && payload.name === "search_knowledge") {
+          meta.textContent = "已检索心理知识库，正在组织回复";
+        }
+        if (payload.event === "report") {
+          meta.textContent = "已生成安全报告，等待管理员跟进";
+        }
         if (payload.event === "token") {
           answer += payload.content || "";
           assistant.textContent = answer;
           els.messages.scrollTop = els.messages.scrollHeight;
         }
+        if (payload.event === "error") {
+          setPill(els.streamStatus, "重试中", "secondary");
+        }
         if (payload.event === "done") {
           state.sessionId = payload.response?.session_id || state.sessionId;
+          const finalAnswer = payload.response?.answer;
+          if (finalAnswer) {
+            // 终稿覆盖:低风险直播内容以安全复核后的最终回复为准
+            answer = finalAnswer;
+            assistant.textContent = finalAnswer;
+          }
+          meta.remove();
           setPill(els.sessionBadge, "DONE");
         }
       });
@@ -149,6 +172,7 @@ async function sendMessage(event) {
     await loadSessions();
   } catch (error) {
     assistant.textContent = `发送失败：${error.message}`;
+    meta.remove();
     setPill(els.streamStatus, "error", "secondary");
   } finally {
     state.sending = false;

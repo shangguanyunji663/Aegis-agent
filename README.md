@@ -56,7 +56,7 @@ flowchart LR
 ### 学生端
 
 - 登录、退出、会话创建、会话重命名和会话删除。
-- SSE 流式心理支持回复，兼容非流式 `/api/chat`。
+- SSE 流式心理支持回复，兼容非流式 `/api/chat`。低风险对话在生成的同时逐字直播(真流式),中/高风险回复经安全复核通过后再输出。
 - 低风险陪伴、心理咨询建议、高风险安全回应三类回复路径。
 - 会话级记忆摘要，支持多轮上下文连续表达。
 - 高风险内容不向学生暴露内部报告字段，避免造成二次伤害或信息泄露。
@@ -233,6 +233,7 @@ python -m app.mcp_tools.server --list
 | 变量 | 说明 |
 | --- | --- |
 | `AI_PROVIDER` | `mock`、`openai` 或 `ollama`。默认支持无密钥本地演示 |
+| `LLM_THINKING_ENABLED` | 是否启用深度思考型模型的内部推理,默认 `false`(显著降低响应延迟;接入智谱 GLM-4.x 系列时推荐保持关闭) |
 | `DATABASE_URL` | 默认 `sqlite:///data/aegis.sqlite`，可切换 PostgreSQL |
 | `VECTOR_ENABLED` | 是否启用向量检索 |
 | `VECTOR_BACKEND` | 向量后端，支持本地或 Chroma 配置 |

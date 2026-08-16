@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import queue
+import threading
 from dataclasses import asdict
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -10,6 +12,7 @@ from fastapi.responses import StreamingResponse
 from app.api.deps import assert_session_owner, current_principal
 from app.api.schemas import ChatRequest, SessionCreateRequest, SessionRenameRequest
 from app.core.auth import AuthPrincipal
+from app.models import StreamEvent
 
 router = APIRouter()
 
@@ -59,17 +62,32 @@ def chat_stream(request: ChatRequest, http_request: Request, principal: AuthPrin
     # 预解析归属会话:SSE 异常时的兜底回退路径也需要它
     owned_session_id = store.ensure_session(request.session_id, message, owner_user_public_id=principal.user_id)
 
+    def sse_frame(event: str, data: dict) -> str:
+        return f"event: {event}\ndata: {json.dumps({'event': event, **data}, ensure_ascii=False)}\n\n"
+
     def event_stream():
-        try:
-            for item in agent_harness.stream(message, owned_session_id, principal.user_id)[0]:
-                payload = json.dumps({"event": item.event, **item.data}, ensure_ascii=False)
-                yield f"event: {item.event}\ndata: {payload}\n\n"
-        except Exception as exc:
-            fallback_response = orchestrator.handle(message, owned_session_id)
-            error_payload = json.dumps({"event": "error", "message": str(exc)}, ensure_ascii=False)
-            done_payload = json.dumps({"event": "done", "response": asdict(fallback_response)}, ensure_ascii=False)
-            yield f"event: error\ndata: {error_payload}\n\n"
-            yield f"event: done\ndata: {done_payload}\n\n"
+        frames: queue.Queue = queue.Queue()
+
+        def emit(item: StreamEvent) -> None:
+            frames.put(sse_frame(item.event, item.data))
+
+        def run_pipeline() -> None:
+            try:
+                agent_harness.stream(message, owned_session_id, principal.user_id, emit=emit)
+            except Exception as exc:
+                fallback_response = orchestrator.handle(message, owned_session_id)
+                frames.put(sse_frame("error", {"event": "error", "message": str(exc)}))
+                frames.put(sse_frame("done", {"event": "done", "response": asdict(fallback_response)}))
+            finally:
+                frames.put(None)
+
+        # 管线在后台线程执行,事件经队列实时推给响应——避免"跑完才倾泻"
+        threading.Thread(target=run_pipeline, daemon=True).start()
+        while True:
+            frame = frames.get()
+            if frame is None:
+                break
+            yield frame
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 

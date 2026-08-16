@@ -44,10 +44,8 @@ class AegisAgentHarness:
         emit: Callable[[StreamEvent], None] | None = None,
     ) -> tuple[list[StreamEvent], None]:
         original_input, model_input, owned_session_id = self._prepare(message, session_id, owner_user_public_id)
-        events = self.orchestrator.handle_stream(model_input, owned_session_id)
-        for event in events:
-            if emit is not None:
-                emit(event)
+        # emit 直通 orchestrator:事件(含直播 token)产生即回调,而非跑完再倾泻
+        events = self.orchestrator.handle_stream(model_input, owned_session_id, emit=emit)
         # Streaming callers already receive the serialized response inside the
         # done event; the non-streaming outcome is intentionally omitted to
         # avoid rebuilding dataclasses from JSON-compatible dicts.

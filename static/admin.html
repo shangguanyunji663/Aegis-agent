@@ -37,16 +37,21 @@
 
       <section class="admin-columns">
         <div class="admin-stack">
-          <section class="panel-card">
-            <div class="section-title"><div><p class="eyebrow">AGENT RUNTIME</p><h2>自治协作状态</h2></div></div>
-            <div id="agent-status-box" class="stack empty">正在读取</div>
+          <section class="panel-card" data-panel="runtime">
+            <div class="section-title"><div><p class="eyebrow">AGENT RUNTIME</p><h2>自治协作状态</h2></div><button class="collapse-btn" type="button" aria-label="展开或收起">▾</button></div>
+            <div class="card-body">
+<div id="agent-status-box" class="stack empty">正在读取</div>
+            </div>
           </section>
-          <section class="panel-card">
-            <div class="section-title"><div><p class="eyebrow">CASES</p><h2>风险个案闭环</h2></div></div>
-            <div id="cases-list" class="stack empty">暂无个案</div>
+          <section class="panel-card" data-panel="cases">
+            <div class="section-title"><div><p class="eyebrow">CASES</p><h2>风险个案闭环</h2></div><button class="collapse-btn" type="button" aria-label="展开或收起">▾</button></div>
+            <div class="card-body">
+<div id="cases-list" class="stack empty">暂无个案</div>
+            </div>
           </section>
-          <section class="panel-card">
-            <div class="section-title"><div><p class="eyebrow">KNOWLEDGE</p><h2>RAG 知识库维护</h2></div></div>
+          <section class="panel-card" data-panel="knowledge">
+            <div class="section-title"><div><p class="eyebrow">KNOWLEDGE</p><h2>RAG 知识库维护</h2></div><button class="collapse-btn" type="button" aria-label="展开或收起">▾</button></div>
+            <div class="card-body">
             <div class="knowledge-tools">
               <div class="tool-line">
                 <input id="knowledge-query" type="text" placeholder="检索知识库" />
@@ -64,37 +69,50 @@
               </div>
             </div>
             <div id="knowledge-status" class="stack empty">正在加载</div>
+            </div>
           </section>
         </div>
 
         <div class="admin-stack">
-          <section class="panel-card">
-            <div class="section-title"><div><p class="eyebrow">REPORTS</p><h2>心理风险与咨询报告</h2></div></div>
-            <div id="reports-list" class="stack empty">暂无报告</div>
+          <section class="panel-card" data-panel="reports">
+            <div class="section-title"><div><p class="eyebrow">REPORTS</p><h2>心理风险与咨询报告</h2></div><button class="collapse-btn" type="button" aria-label="展开或收起">▾</button></div>
+            <div class="card-body">
+<div id="reports-list" class="stack empty">暂无报告</div>
+            </div>
           </section>
-          <section class="panel-card">
-            <div class="section-title"><div><p class="eyebrow">TRACES</p><h2>Agent Trace</h2></div></div>
-            <div id="trace-list" class="stack empty">暂无 trace</div>
+          <section class="panel-card" data-panel="traces">
+            <div class="section-title"><div><p class="eyebrow">TRACES</p><h2>Agent Trace</h2></div><button class="collapse-btn" type="button" aria-label="展开或收起">▾</button></div>
+            <div class="card-body">
+<div id="trace-list" class="stack empty">暂无 trace</div>
+            </div>
           </section>
         </div>
 
         <aside class="admin-detail">
-          <section class="panel-card">
-            <div class="section-title"><h2>详情</h2><span id="detail-title">未选择</span></div>
-            <pre id="detail-json" class="detail-json">选择报告、个案、trace、工具任务或审计查看详情。</pre>
+          <section class="panel-card" data-panel="detail">
+            <div class="section-title"><h2>详情</h2><span id="detail-title">未选择</span><button class="collapse-btn" type="button" aria-label="展开或收起">▾</button></div>
+            <div class="card-body">
+<pre id="detail-json" class="detail-json">选择报告、个案、trace、工具任务或审计查看详情。</pre>
+            </div>
           </section>
-          <section class="panel-card">
-            <div class="section-title"><h2>Tool Jobs</h2><button id="run-tool-worker" class="ghost-btn" type="button">Dispatch</button></div>
-            <div id="tool-jobs-list" class="stack empty">暂无任务</div>
+          <section class="panel-card" data-panel="tool-jobs">
+            <div class="section-title"><h2>Tool Jobs</h2><button id="run-tool-worker" class="ghost-btn" type="button">Dispatch</button><button class="collapse-btn" type="button" aria-label="展开或收起">▾</button></div>
+            <div class="card-body">
+<div id="tool-jobs-list" class="stack empty">暂无任务</div>
+            </div>
           </section>
-          <section class="panel-card">
-            <div class="section-title"><h2>Tool Records</h2><span id="tool-worker-state">worker</span></div>
-            <div id="tool-records-list" class="stack empty">暂无记录</div>
+          <section class="panel-card" data-panel="tool-records">
+            <div class="section-title"><h2>Tool Records</h2><span id="tool-worker-state">worker</span><button class="collapse-btn" type="button" aria-label="展开或收起">▾</button></div>
+            <div class="card-body">
+<div id="tool-records-list" class="stack empty">暂无记录</div>
+            </div>
           </section>
-          <section class="panel-card">
-            <div class="section-title"><h2>Eval / Audit</h2><button id="run-eval" class="ghost-btn" type="button">Run Eval</button></div>
-            <div id="eval-results" class="stack empty">暂无评测</div>
-            <div id="audit-list" class="stack empty">暂无审计</div>
+          <section class="panel-card" data-panel="eval-audit">
+            <div class="section-title"><h2>Eval / Audit</h2><button id="run-eval" class="ghost-btn" type="button">Run Eval</button><button class="collapse-btn" type="button" aria-label="展开或收起">▾</button></div>
+            <div class="card-body">
+<div id="eval-results" class="stack empty">暂无评测</div>
+              <div id="audit-list" class="stack empty">暂无审计</div>
+            </div>
           </section>
         </aside>
       </section>

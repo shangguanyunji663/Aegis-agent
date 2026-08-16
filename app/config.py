@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "qwen2.5:7b"
     llm_timeout_seconds: float = 15.0
+    llm_thinking_enabled: bool = False
     knowledge_dir: str = "knowledge"
     max_knowledge_upload_bytes: int = 1_000_000
     knowledge_top_k: int = 4

@@ -297,7 +297,8 @@ class LLMClient(Protocol):
 三个实现:
 
 - `MockLLMClient`:两个方法都返回 `None`——**None 就代表"请走本地模板兜底"**。这让无 key 环境下整条链路(含高风险处置)照常可测。
-- `OpenAICompatibleClient`:urllib 裸调 `{base_url}/chat/completions`,回复温度 0.2、查询改写温度 0.0。
+- `llm/client.py`:urllib 裸调 `{base_url}/chat/completions`,回复温度 0.2、查询改写温度 0.0。支持智谱等 OpenAI 兼容端点的 `thinking:{"type":"disabled"}` 参数(默认关闭深度思考,大幅降低延迟)。
+- **真流式**:`stream_support_reply(context, on_token)` 以 `stream:true` 请求并逐 delta 回调——OpenAI 兼容端解析 SSE 行(`post_json_stream`),Ollama 解析 ndjson(`post_ndjson_stream`);中途异常返回已积累的部分(用户已看到的内容不回退)。
 - `OllamaClient`:调 `/api/chat`,本地模型零成本。
 
 `build_llm_client(settings)` 按配置三选一。`post_json()` 把一切网络/解析异常吞成 `{}`——**失败永远退化为模板回复**,学生端绝不因模型故障而白屏(代价是错误被隐藏,生产可加日志)。
@@ -463,7 +464,7 @@ if getattr(self.settings, "agent_runtime", "autonomous") == "autonomous":
 
 有序路径(`agent_runtime="ordered"`)同样值得读一遍:load memory → assess risk → route → (companion 跳过检索!) → search_knowledge → grounding → HIGH 则 create_report → 选标准 Skill → compose_plan → finalize_plan → 存消息/更新记忆/落 trace。每步都经 `runtime_runner.run_step()` 包裹(记录 AGENT_STARTED/RUN_FAILED 事件)。
 
-两条路径最终都汇成 `ChatResponse`。`_run_autonomous` 额外把黑板事件流翻译成 RuntimeEvent 发给 `emit`——这就是 SSE 流式输出的来源。`_token_chunks()` 把答案按 48 字符切段模拟逐 token 输出。
+两条路径最终都汇成 `ChatResponse`。`_run_autonomous` 额外把黑板事件流翻译成 RuntimeEvent 发给 `emit`——这就是 SSE 流式输出的来源。**低风险对话支持真流式**:回复生成的 token 经回调链(services.on_reply_token → finalize_plan → stream_support_reply)实时推给 SSE,首字延迟≈模型首 token 延迟;中/高风险不直播,必须等 RiskGuardian 安全复核通过后输出。直播过真实 token 后,结尾的模拟切块 `_token_chunks()` 会自动跳过,避免重复。
 
 ### 8.2 harness.py — AegisAgentHarness
 

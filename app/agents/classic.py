@@ -145,7 +145,7 @@ class CounselorAgent:
         )
         return plan, AgentTrace(self.name, "compose_plan", f"mode={mode}; snippets={len(knowledge_snippets)}; grounding={len(grounding_steps)}")
 
-    def finalize_plan(self, plan: ResponsePlan) -> tuple[str, AgentTrace]:
+    def finalize_plan(self, plan: ResponsePlan, on_token=None) -> tuple[str, AgentTrace]:
         fallback = self._fallback_answer(
             Intent(plan.intent),
             RiskLevel(plan.risk_level),
@@ -167,7 +167,12 @@ class CounselorAgent:
             grounding_steps=plan.grounding_steps,
             response_skill_context=plan.skill_context,
         )
-        generated = self.llm_client.generate_support_reply(context)
+        generated = None
+        if on_token is not None:
+            # 流式生成:token 边生成边回调(调用方仅在低风险时传入回调)
+            generated = self.llm_client.stream_support_reply(context, on_token)
+        if not generated:
+            generated = self.llm_client.generate_support_reply(context)
         if generated:
             return generated.strip(), AgentTrace(self.name, "compose_answer", f"llm:{self.llm_client.provider}/{self.llm_client.model}")
         return fallback, AgentTrace(self.name, "compose_answer", f"fallback:{self.llm_client.provider}")

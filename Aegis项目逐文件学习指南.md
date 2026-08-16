@@ -761,4 +761,4 @@ uvicorn app.main:app --host 127.0.0.1 --port 8091
 
 ---
 
-*本指南对应 2026-08 的 `improve-code` 分支模块化重构后结构;重构的动机、映射与去重细节见 [REFACTORING.md](REFACTORING.md)。*
+*本指南对应 2026-08 的 `improve-code` 分支模块化重构后结构;重构的动机、映射与去重细节见 [REFACTORING.md](docs/records/REFACTORING.md)。*

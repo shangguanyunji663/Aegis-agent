@@ -218,7 +218,7 @@ python -m app.mcp_tools.server --list
 ├── scripts/                      # 本地与 Compose 启动脚本
 ├── docs/                         # 架构、安全和演示文档
 ├── Aegis项目逐文件学习指南.md      # 从零构建式逐模块学习指南
-├── REFACTORING.md                # 第一次模块化重构方案与变更记录
+├── docs/records/                 # 四轮迭代记录(重构/提速/注册MySQL/LangGraph)
 ├── Dockerfile
 └── docker-compose.yml
 ```
@@ -268,10 +268,10 @@ python -m app.mcp_tools.server --list
 - [安全设计](docs/safety-design.md)
 - [演示脚本](docs/demo-script.md)
 - [逐文件学习指南](Aegis项目逐文件学习指南.md)
-- [第一次重构方案](REFACTORING.md)
-- [第二次优化方案(提速与流式)](OPTIMIZATION.md)
-- [第三次功能说明(注册与 MySQL)](AUTH-MYSQL.md)
-- [第四次功能说明(LangGraph 与全栈激活)](LANGGRAPH-DOCKER.md)
+- [第一次重构方案](docs/records/REFACTORING.md)
+- [第二次优化方案(提速与流式)](docs/records/OPTIMIZATION.md)
+- [第三次功能说明(注册与 MySQL)](docs/records/AUTH-MYSQL.md)
+- [第四次功能说明(LangGraph 与全栈激活)](docs/records/LANGGRAPH-DOCKER.md)
 
 ## License
 

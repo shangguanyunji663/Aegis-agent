@@ -291,10 +291,16 @@ class LLMClient(Protocol):
     model: str
     def status(self) -> dict: ...
     def generate_support_reply(self, context: LLMContext) -> str | None: ...
+    def stream_support_reply(self, context, on_token) -> str | None: ...      # 真流式直播
     def rewrite_knowledge_query(self, message: str, memory_summary: str = "") -> str | None: ...
+    def assess_risk(self, text: str) -> dict | None: ...                      # 风险双通道(第五轮)
+    def chat_with_tools(self, system, user, tools) -> list[str] | None: ...   # Function Calling(第五轮)
+    def judge_reply(self, message, reply) -> dict | None: ...                 # LLM-as-Judge(第五轮)
 ```
 
 `LLMContext` 是喂给模型的**结构化上下文包**:用户消息、意图、风险等级、记忆摘要、知识片段、稳定练习、技能约束——回复生成所需的一切都显式传入,模型不自己"想"。
+
+协议从最初的"一问一答"长成了**五通道客户端**:回复生成(阻塞)、回复直播(流式)、查询改写(RAG)、风险复核(双通道)、技能选择(FC)、质量评审(Judge)。新增通道全部遵守同一条铁律:**失败/超时/mock 返回 None,调用方优雅降级**——这正是全系统"LLM 永远不是安全关键路径"的落点。
 
 三个实现:
 
@@ -331,7 +337,7 @@ system = (
 | Agent | 方法 | 职责 |
 | --- | --- | --- |
 | `MemoryAgent` | `load / update` | 读写会话记忆摘要 |
-| `RiskGuardianAgent` | `assess / create_report` | 调 assess_risk 技能;HIGH 时建待审报告 |
+| `RiskGuardianAgent` | `assess / create_report` | 调 assess_risk 技能(**规则∪LLM 双通道取并集**,详见第 3 站);HIGH 时建待审报告 |
 | `LeadAgent` | `route` | 关键词路由:高危→RISK;资料词→RESEARCH;咨询词或 MEDIUM→COUNSELING;否则 COMPANION |
 | `KnowledgeAgent` | `search / rewrite_query` | LLM 改写检索词(失败退化原文前 60 字)+ 检索 |
 | `CounselorAgent` | `grounding / compose_plan / finalize_plan` | 组装 ResponsePlan 并生成最终回复 |
@@ -532,8 +538,12 @@ new_line = f"用户提到：{compact_sentence(user_message, 120)}；系统回应
 ### 9.5 vector_store.py — 向量后端
 
 `build_vector_backend(settings)` 按配置返回:
-- `ChromaVectorBackend`:OpenAI 兼容 `/embeddings` 取向量 + chromadb 持久化(cosine 空间),支持快照。
-- `LocalVectorBackend`:**哈希 bigram 伪向量** + 本地余弦——没有任何外部依赖时的降级路径,保证"向量开关关掉/服务挂掉"检索仍可用。
+- `ChromaVectorBackend`:真向量库,chromadb 持久化(cosine 空间),支持快照。嵌入有两种来源,由 `EMBEDDING_PROVIDER` 决定:
+  - `local`(默认推荐):chromadb 内置 **MiniLM 本地嵌入**——离线、零 KEY、零费用;中文语义主要靠 BM25 主导、向量补充
+  - `openai`:OpenAI 兼容 `/embeddings` API(需向量模型额度)
+- `LocalVectorBackend`:**哈希 bigram 伪向量** + 本地余弦——向量开关关掉时的降级路径,保证检索始终可用。
+
+> 取舍实录:本项目接入真实 GLM 聊天模型但**没有向量模型额度**,于是把 Chroma 的嵌入源切到本地 MiniLM——向量库是真的、嵌入是离线的,检索质量经实测命中正确(考试→exam/sleep、关系→relationships)。
 
 `store.search_knowledge`(第 10 站)把 9.1–9.5 串成完整流水线:改写查询 → 向量候选(可选)→ 元数据过滤 → BM25 → 双路归一融合 → 重排 → 邻块扩展 → 截 top_k。
 

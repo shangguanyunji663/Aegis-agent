@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from app.agents.harness import AegisAgentHarness
 from app.agents.orchestrator import PsychOrchestrator
 from app.api import admin, auth_routes, chat, pages, system
+from app.api.errors import register_exception_handlers
 from app.api.middleware import attach_request_context
 from app.config import Settings, get_settings
 from app.core.runtime import RuntimeServices
@@ -73,6 +74,7 @@ def create_app(runtime_settings: Settings | None = None) -> FastAPI:
     app.state.knowledge_dir = knowledge_dir
 
     app.middleware("http")(attach_request_context)
+    register_exception_handlers(app)
     app.include_router(pages.router)
     app.include_router(system.router)
     app.include_router(auth_routes.router)

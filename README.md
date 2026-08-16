@@ -55,6 +55,7 @@ flowchart LR
 
 ### 学生端
 
+- 注册与登录:学生自由注册;教师凭邀请码注册(默认 `aegis-teacher`,经 `AUTH_TEACHER_INVITE_CODE` 配置)后进入咨询后台。
 - 登录、退出、会话创建、会话重命名和会话删除。
 - SSE 流式心理支持回复，兼容非流式 `/api/chat`。低风险对话在生成的同时逐字直播(真流式),中/高风险回复经安全复核通过后再输出。
 - 低风险陪伴、心理咨询建议、高风险安全回应三类回复路径。
@@ -116,6 +117,14 @@ cp .env.example .env
 python -m app.init_db
 uvicorn app.main:app --host 127.0.0.1 --port 8091
 ```
+
+默认使用 SQLite,零外部依赖即可运行。**使用本地 MySQL 8.0 时**,在 `.env` 中设置:
+
+```bash
+DATABASE_URL=mysql+pymysql://root:你的密码@localhost:3306/aegis?charset=utf8mb4
+```
+
+首次启动会自动建库建表(utf8mb4);已有 SQLite 数据可用 `python -m scripts.migrate_sqlite_to_mysql` 一键迁移(旧文件保留为备份)。
 
 打开浏览器访问：
 
@@ -218,7 +227,7 @@ python -m app.mcp_tools.server --list
 
 | 类型 | 接口 |
 | --- | --- |
-| 认证 | `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` |
+| 认证 | `POST /api/auth/register`(注册), `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` |
 | 学生会话 | `GET /api/sessions`, `POST /api/sessions`, `GET /api/sessions/{id}`, `PATCH /api/sessions/{id}` |
 | 聊天 | `POST /api/chat`, `POST /api/chat/stream` |
 | 管理端报告 | `GET /api/admin/reports`, `PATCH /api/admin/reports/{report_id}` |
@@ -243,6 +252,7 @@ python -m app.mcp_tools.server --list
 | `SMTP_*` | 邮件预警发送配置 |
 | `ALERT_EMAIL_*` | 高风险预警邮件投递配置 |
 | `AUTH_DEFAULT_*` | 默认学生和管理员账号 |
+| `AUTH_TEACHER_INVITE_CODE` | 教师注册邀请码(默认 `aegis-teacher`,生产环境务必修改) |
 
 ## 设计取舍
 
@@ -258,6 +268,8 @@ python -m app.mcp_tools.server --list
 - [演示脚本](docs/demo-script.md)
 - [逐文件学习指南](Aegis项目逐文件学习指南.md)
 - [第一次重构方案](REFACTORING.md)
+- [第二次优化方案(提速与流式)](OPTIMIZATION.md)
+- [第三次功能说明(注册与 MySQL)](AUTH-MYSQL.md)
 
 ## License
 

@@ -30,8 +30,12 @@ def current_principal(request: Request) -> AuthPrincipal:
     )
 
 
+STAFF_ROLES = {UserRole.ADMIN.value, UserRole.TEACHER.value}
+
+
 def require_admin(principal: AuthPrincipal = Depends(current_principal)) -> AuthPrincipal:
-    if principal.role != UserRole.ADMIN.value:
+    # 管理端工作台:超管(admin)与教师(teacher)均可访问
+    if principal.role not in STAFF_ROLES:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="admin access required")
     return principal
 

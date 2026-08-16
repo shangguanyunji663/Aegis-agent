@@ -230,6 +230,25 @@ class DatabaseStore:
             db.commit()
             return {"id": row.public_id, "username": row.username, "role": row.role}
 
+    def register_user(self, username: str, password: str, role: str) -> dict:
+        """注册新账号:用户名已存在时抛 ValueError(与 create_user 的静默语义区分)。"""
+        with self.db_factory() as db:
+            existing = db.query(AuthUser).filter(AuthUser.username == username).first()
+            if existing is not None:
+                raise ValueError("username already exists")
+            salt, password_hash = make_password_hash(password)
+            row = AuthUser(
+                public_id=random_id("usr"),
+                username=username,
+                password_salt=salt,
+                password_hash=password_hash,
+                role=role,
+                is_active="true",
+            )
+            db.add(row)
+            db.commit()
+            return {"id": row.public_id, "username": row.username, "role": row.role}
+
     def get_auth_session(self, token: str) -> dict | None:
         with self.db_factory() as db:
             session = db.query(AuthSession).filter(AuthSession.session_token == token).first()

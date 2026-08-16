@@ -10,3 +10,5 @@ pypdf
 httpx
 mcp>=1.0,<2
 openpyxl>=3.1.0
+pymysql
+cryptography

@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     auth_default_admin_password: str = "admin123!"
     auth_default_student_username: str = "student"
     auth_default_student_password: str = "student123!"
+    auth_teacher_invite_code: str = "aegis-teacher"
     slow_request_threshold_ms: int = 800
     tool_backend: str = "internal"
     tool_output_dir: str = "data/tool-outputs"

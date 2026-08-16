@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Aegis 登录</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="/static/styles.css?v=0.3.0" />
   </head>
   <body class="portal-page">
     <header class="role-topbar">
@@ -33,9 +33,28 @@
           <input id="login-password" type="password" value="student123!" autocomplete="current-password" placeholder="请输入密码" />
           <button id="login-submit" type="submit" class="primary-btn">登录并进入</button>
         </form>
+        <form id="register-form" class="auth-form hidden">
+          <label for="reg-username">用户名</label>
+          <input id="reg-username" type="text" autocomplete="username" placeholder="2-32 位字母、数字、下划线或中文" />
+          <label for="reg-password">密码</label>
+          <input id="reg-password" type="password" autocomplete="new-password" placeholder="至少 6 位" />
+          <label for="reg-role">注册身份</label>
+          <select id="reg-role">
+            <option value="student" selected>学生</option>
+            <option value="teacher">教师(需邀请码)</option>
+          </select>
+          <div id="invite-line" class="hidden">
+            <label for="reg-invite">教师邀请码</label>
+            <input id="reg-invite" type="password" placeholder="请输入学校发放的邀请码" />
+          </div>
+          <button id="register-submit" type="submit" class="primary-btn">注册并进入</button>
+        </form>
         <div id="auth-error" class="callout error hidden"></div>
         <div class="auth-hint">
-          <span>student / student123!</span>
+          <span id="toggle-auth" role="button" tabindex="0">没有账号?注册一个</span>
+        </div>
+        <div class="auth-hint">
+          <span>演示账号 student / student123!</span>
           <span>admin / admin123!</span>
         </div>
       </section>
@@ -54,6 +73,6 @@
       </section>
     </main>
 
-    <script src="/static/login.js"></script>
+    <script src="/static/login.js?v=0.3.0"></script>
   </body>
 </html>

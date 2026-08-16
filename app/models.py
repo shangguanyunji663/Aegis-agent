@@ -40,6 +40,7 @@ class ToolJobStatus(str, Enum):
 
 class UserRole(str, Enum):
     ADMIN = "admin"
+    TEACHER = "teacher"
     STUDENT = "student"
 
 

@@ -44,3 +44,10 @@ class KnowledgeUploadRequest(BaseModel):
 class LoginRequest(BaseModel):
     username: str
     password: str
+
+
+class RegisterRequest(BaseModel):
+    username: str
+    password: str
+    role: str = "student"
+    invite_code: str = ""

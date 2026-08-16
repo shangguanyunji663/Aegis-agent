@@ -120,7 +120,9 @@ SQLAlchemy 2.0 声明式实体,和 `models.py` 的关系是:**models 是"怎么�
 - 时间字段统一用 `now()` 工厂生成**不带时区的 UTC**——和历史行为保持一致(数据库里已存的是 naive 时间)。
 - `KnowledgeChunk` 同时存 `content`(原文)、`metadata_json`(元数据)、`embedding_json`(本地降级用的向量)——一个表兼容"有无向量库"两种部署。
 
-### 1.4 app/database.py — 引擎与会话工厂
+### 1.4 app/database.py — 引擎与会话工厂(支持 SQLite / MySQL 双后端)
+
+`DATABASE_URL` 形如 `mysql+pymysql://user:pass@host:3306/aegis?charset=utf8mb4` 时走 MySQL:pymysql 驱动、`pool_recycle=3600` 防闲置断连、首次启动自动 `CREATE DATABASE IF NOT EXISTS`(utf8mb4)。SQLite 则是零依赖本地模式,两套后端共享同一套 ORM 实体。
 
 ```python
 def _engine_kwargs(database_url: str) -> dict:
@@ -658,7 +660,7 @@ async def attach_request_context(request, call_next):
 
 - `schemas.py`:9 个请求模型集中定义。
 - `pages.py`(3 个 HTML)、`system.py`(health/readiness/agent-status/skills)。
-- `auth_routes.py`:login(httpOnly + samesite=lax Cookie,防 XSS/CSRF)/logout/me。
+- `auth_routes.py`:register(注册即登录:学生自由注册,教师须凭 `AUTH_TEACHER_INVITE_CODE` 邀请码,防自助获取工作台权限)/login(httpOnly + samesite-lax Cookie,防 XSS/CSRF)/logout/me。`api/errors.py` 提供全局异常处理:治理拒绝→403、ValueError→400、参数校验→422、未知异常→500(日志留完整堆栈,响应不泄露内部细节)。
 - `chat.py`:`POST /api/chat`(限流→归属校验→harness.run)、`/api/chat/stream`(SSE,含异常兜底:流中出错也补发 error+done 事件)、会话 CRUD。
 - `admin.py`:约 20 个后台接口。值得注意 `safe_knowledge_filename`(白名单后缀+字符清洗,防路径穿越)与上传接口的 PDF 解析分支(pypdf 惰性导入)。
 

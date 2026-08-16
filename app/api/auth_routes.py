@@ -1,13 +1,53 @@
-"""认证路由:登录 / 登出 / 当前身份。"""
+"""认证路由:登录 / 注册 / 登出 / 当前身份。"""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+import re
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from app.api.deps import current_principal
-from app.api.schemas import LoginRequest
+from app.api.schemas import LoginRequest, RegisterRequest
 from app.core.auth import AuthPrincipal
+from app.models import UserRole
 
 router = APIRouter(prefix="/api/auth")
+
+_USERNAME_RE = re.compile(r"^[a-zA-Z0-9_\u4e00-\u9fff]{2,32}$")
+
+
+@router.post("/register", status_code=status.HTTP_201_CREATED)
+def register(request: RegisterRequest, http_request: Request, response: Response) -> dict:
+    state = http_request.app.state
+    settings = state.settings
+    store = state.store
+    username = request.username.strip()
+    password = request.password
+    if not _USERNAME_RE.fullmatch(username):
+        raise HTTPException(status_code=400, detail="用户名需为 2-32 位字母、数字、下划线或中文")
+    if len(password) < 6:
+        raise HTTPException(status_code=400, detail="密码至少 6 位")
+    role = request.role.strip().lower()
+    if role not in {UserRole.STUDENT.value, UserRole.TEACHER.value}:
+        raise HTTPException(status_code=400, detail="注册角色仅支持 student 或 teacher")
+    # 教师角色可进入管理端,必须凭邀请码注册,防止任意人自助获取工作台权限
+    if role == UserRole.TEACHER.value and request.invite_code != settings.auth_teacher_invite_code:
+        raise HTTPException(status_code=403, detail="教师注册需要正确的邀请码")
+    try:
+        store.register_user(username, password, role)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail="用户名已被注册") from exc
+    # 注册即登录:直接签发会话并种 Cookie
+    auth_session = store.authenticate_user(username, password)
+    if auth_session is None:
+        raise HTTPException(status_code=500, detail="注册成功但自动登录失败,请手动登录")
+    response.set_cookie(
+        key=settings.auth_session_cookie,
+        value=auth_session["session_token"],
+        max_age=settings.auth_session_ttl_hours * 3600,
+        httponly=True,
+        samesite="lax",
+    )
+    return {"user": auth_session["user"], "expires_at": auth_session["expires_at"]}
 
 
 @router.post("/login")

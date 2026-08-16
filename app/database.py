@@ -14,7 +14,36 @@ def _engine_kwargs(database_url: str) -> dict:
     kwargs = {"pool_pre_ping": True}
     if database_url.startswith("sqlite"):
         kwargs["connect_args"] = {"check_same_thread": False}
+    if database_url.startswith("mysql"):
+        # MySQL 闲置 wait_timeout(默认 8h)后会断连,定期回收避免 "server has gone away"
+        kwargs["pool_recycle"] = 3600
     return kwargs
+
+
+def _ensure_mysql_database(database_url: str) -> None:
+    """mysql URL 时自动创建目标库(utf8mb4),首次启动免手工建库。"""
+    import pymysql
+    from urllib.parse import urlparse
+
+    parsed = urlparse(database_url)
+    dbname = (parsed.path or "/").lstrip("/").split("?")[0]
+    if not dbname:
+        return
+    conn = pymysql.connect(
+        host=parsed.hostname or "localhost",
+        port=parsed.port or 3306,
+        user=parsed.username or "root",
+        password=parsed.password or "",
+        charset="utf8mb4",
+    )
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                f"CREATE DATABASE IF NOT EXISTS `{dbname}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+            )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 settings = get_settings()
@@ -31,6 +60,8 @@ def resolve_database_url(runtime_settings=None) -> str:
 
 def build_engine(runtime_settings=None):
     resolved_url = resolve_database_url(runtime_settings)
+    if resolved_url.startswith("mysql"):
+        _ensure_mysql_database(resolved_url)
     return create_engine(resolved_url, **_engine_kwargs(resolved_url))
 
 

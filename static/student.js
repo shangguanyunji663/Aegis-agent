@@ -36,7 +36,7 @@ function setPill(el, text, tone = "secondary") {
 
 async function loadMe() {
   const data = await (await api("/api/auth/me")).json();
-  if (data.user.role === "admin") {
+  if (data.user.role === "admin" || data.user.role === "teacher") {
     window.location.replace("/admin");
     return;
   }

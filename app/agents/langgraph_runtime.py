@@ -28,6 +28,7 @@ from app.agents.classic import (
     RiskGuardianAgent,
 )
 from app.agents.model_profiles import AgentModelRegistry
+from app.agents.skill_selection import select_response_skills
 from app.llm import LLMClient, MockLLMClient
 from app.models import (
     AgentTrace,
@@ -176,7 +177,10 @@ class LangGraphRuntime:
         }
 
     def _node_compose(self, state: GraphState) -> dict:
-        standard_skills = self.registry.response_skill_names(state["intent"], state["risk_level"], state["message"])
+        standard_skills, skill_mode = select_response_skills(
+            self.knowledge_agent.llm_client, self.registry, state["intent"], state["risk_level"], state["message"],
+            enabled=bool(getattr(self.settings, "function_calling_enabled", False)),
+        )
         standard_context = self.registry.standard_context(standard_skills)
         plan, plan_trace = self.counselor_agent.compose_plan(
             state["message"],
@@ -187,12 +191,12 @@ class LangGraphRuntime:
             state.get("grounding"),
             standard_context,
         )
+        skill_traces = [AgentTrace("SkillRegistry", "select_standard_skills", ",".join(standard_skills) or "none")]
+        if skill_mode != "rules":
+            skill_traces.append(AgentTrace("SkillRegistry", "skill_selection_mode", f"function-calling({skill_mode})"))
         return {
             "response_plan": plan,
-            "trace": [
-                plan_trace,
-                AgentTrace("SkillRegistry", "select_standard_skills", ",".join(standard_skills) or "none"),
-            ],
+            "trace": [plan_trace, *skill_traces],
         }
 
     def _node_finalize(self, state: GraphState) -> dict:

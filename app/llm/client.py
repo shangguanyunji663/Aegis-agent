@@ -93,6 +93,9 @@ class MockLLMClient:
     def assess_risk(self, text: str) -> dict | None:
         return None
 
+    def chat_with_tools(self, system: str, user: str, tools: list[dict]) -> list[str] | None:
+        return None
+
 
 class OpenAICompatibleClient:
     provider = "openai"
@@ -169,6 +172,36 @@ class OpenAICompatibleClient:
         content = data.get("choices", [{}])[0].get("message", {}).get("content")
         return _parse_risk_json(content)
 
+    def chat_with_tools(self, system: str, user: str, tools: list[dict]) -> list[str] | None:
+        if not self.api_key:
+            return None
+        payload = {
+            "model": self.model,
+            "temperature": 0.0,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            "tools": tools,
+            "tool_choice": "auto",
+        }
+        if self.disable_thinking:
+            payload["thinking"] = {"type": "disabled"}
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.api_key}",
+        }
+        data = post_json(f"{self.base_url}/chat/completions", payload, headers, min(self.timeout, 8.0))
+        if not data:
+            return None
+        message = data.get("choices", [{}])[0].get("message", {})
+        names = []
+        for call in message.get("tool_calls") or []:
+            function = call.get("function") or {}
+            if function.get("name"):
+                names.append(function["name"])
+        return names
+
     def stream_support_reply(self, context: LLMContext, on_token: Callable[[str], None]) -> str | None:
         if not self.api_key:
             return None
@@ -235,6 +268,27 @@ class OllamaClient:
         data = post_json(f"{self.base_url}/api/chat", payload, {"Content-Type": "application/json"}, min(self.timeout, 8.0))
         content = data.get("message", {}).get("content")
         return _parse_risk_json(content)
+
+    def chat_with_tools(self, system: str, user: str, tools: list[dict]) -> list[str] | None:
+        payload = {
+            "model": self.model,
+            "stream": False,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            "tools": tools,
+        }
+        data = post_json(f"{self.base_url}/api/chat", payload, {"Content-Type": "application/json"}, min(self.timeout, 8.0))
+        if not data:
+            return None
+        message = data.get("message", {})
+        names = []
+        for call in message.get("tool_calls") or []:
+            function = call.get("function") or {}
+            if function.get("name"):
+                names.append(function["name"])
+        return names
 
     def stream_support_reply(self, context: LLMContext, on_token: Callable[[str], None]) -> str | None:
         payload = {

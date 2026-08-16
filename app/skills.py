@@ -99,6 +99,10 @@ class SkillRegistry:
             for item in sorted(self._standard_skills.values(), key=lambda item: item.name)
         ]
 
+    def standard_skill_description(self, name: str) -> str:
+        doc = self._standard_skills.get(name)
+        return doc.description if doc else name
+
     def standard_context(self, names: list[str]) -> str:
         return "\n\n".join(
             self._standard_skills[name].prompt_context()

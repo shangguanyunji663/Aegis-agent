@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     llm_timeout_seconds: float = 15.0
     llm_thinking_enabled: bool = False
     risk_llm_channel_enabled: bool = True
+    function_calling_enabled: bool = True
     knowledge_dir: str = "knowledge"
     max_knowledge_upload_bytes: int = 1_000_000
     knowledge_top_k: int = 4

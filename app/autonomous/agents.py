@@ -16,6 +16,7 @@ from app.autonomous.events import (
     CollaborationBlackboard,
     TaskPriority,
 )
+from app.agents.skill_selection import select_response_skills
 from app.autonomous.registry import AgentCapability, AgentDecision, AgentProfile
 from app.models import Intent, RiskLevel, SkillResult
 from app.core.privacy import contains_internal_response_leak
@@ -294,7 +295,11 @@ class KnowledgeAutonomousAgent(BaseAutonomousAgent):
         if risk in {RiskLevel.MEDIUM, RiskLevel.HIGH}:
             grounding, _ = self.counselor_agent.grounding(board.user_input)
             skills.append(grounding)
-        standard_skills = self.services.registry.response_skill_names(intent, risk, board.user_input)
+        fc_client = self.services.model_registry.client_for("KnowledgeAgent") if self.services.model_registry else None
+        standard_skills, _skill_mode = select_response_skills(
+            fc_client, self.services.registry, intent, risk, board.user_input,
+            enabled=bool(getattr(self.services.settings, "function_calling_enabled", False)),
+        )
         standard_context = self.services.registry.standard_context(standard_skills)
         payload = {
             "memory_summary": memory_summary,

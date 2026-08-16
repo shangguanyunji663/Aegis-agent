@@ -4,6 +4,7 @@ from dataclasses import asdict
 from typing import Callable
 
 from app.agents.runtime import AgentRegistry, AgentRuntimeRunner
+from app.agents.skill_selection import select_response_skills
 from app.agents.model_profiles import AgentModelRegistry
 from app.agents.classic import CompanionAgent, CounselorAgent, KnowledgeAgent, LeadAgent, MemoryAgent, RiskGuardianAgent
 from app.autonomous.runtime import AutonomousAgentRuntime
@@ -165,10 +166,15 @@ class PsychOrchestrator:
                 {"report_id": report_result.output["report_id"], "status": report_result.output.get("status", "pending")},
             )
 
-        standard_skills = self.registry.response_skill_names(intent, risk_level, message)
+        standard_skills, skill_mode = select_response_skills(
+            self.llm_client, self.registry, intent, risk_level, message,
+            enabled=bool(getattr(self.settings, "function_calling_enabled", False)),
+        )
         standard_skill_context = self.registry.standard_context(standard_skills)
         skill_trace = AgentTrace("SkillRegistry", "select_standard_skills", ",".join(standard_skills) or "none")
         trace.append(skill_trace)
+        if skill_mode != "rules":
+            trace.append(AgentTrace("SkillRegistry", "skill_selection_mode", f"function-calling({skill_mode})"))
         self._record_runtime(
             runtime_events,
             emit,

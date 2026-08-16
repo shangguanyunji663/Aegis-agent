@@ -63,7 +63,9 @@ flowchart TD
 | `app/tools/contracts.py` | 工具契约:角色、风险等级、审批要求、脱敏字段和重试限制 |
 | `app/tools/gateway.py` / `app/tools/mcp_client.py` / `app/mcp_tools/server.py` | internal/FastMCP 工具边界 |
 | `app/services/` | 报告个案、工具执行、工具治理、队列 worker、记录表等服务层 |
-| `app/llm/` | 模型后端:client(Mock/OpenAI/Ollama)+ prompts(提示词模板) |
+| `app/llm/` | 模型后端:client(Mock/OpenAI/Ollama)+ prompts;含 assess_risk(风险通道)、chat_with_tools(FC)、judge_reply(LLM 评审)三通道 |
+| `app/evaluation/` | 评测:runner(八套指标)、datasets、report_html、runtime_ab(三运行时 A/B)、judge(LLM-as-Judge) |
+| `app/agents/skill_selection.py` | Function Calling 技能选择:规则白名单 + 模型自主挑选 |
 | `app/core/` | 横切原语:auth(认证)、privacy(脱敏)、runtime(Redis 限流/锁)、utils |
 | `skills/*/SKILL.md` | 标准化心理支持 Skill 规范 |
 
@@ -125,4 +127,5 @@ flowchart TD
 - 慢请求日志
 - Agent trace 落库
 - ToolJob、ToolAudit、ExcelRecord、AlertRecord、DeadLetter 独立记录
-- 评测结果 JSON/HTML 输出
+- 评测结果 JSON/HTML 输出(含 LLM-as-Judge 评分段)
+- 三运行时 A/B 对比报告(`--suite runtime-ab`)

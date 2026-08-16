@@ -21,7 +21,8 @@
 | Agentic RAG | 所有消息都检索知识库会增加噪声，尤其普通陪伴类对话容易被知识文档带偏 | 通过 CHAT / CONSULT / RISK 意图路由决定是否检索，混合 BM25 + 向量检索，并支持元数据过滤和 rerank |
 | 工具治理与 MCP | 高风险预警、Excel 记录、邮件通知不能由模型越权直接执行 | 工具调用先生成 `ToolJob`，经角色、风险等级、审批、脱敏和审计后进入队列；支持 internal 和 FastMCP 两种后端 |
 | 后台 Tool Queue | 外部工具慢、失败或限流时，不应阻塞学生端流式回复 | 独立 worker 支持依赖调度、重试延迟、邮件限流、dead letter、ExcelRecord 和 AlertRecord 持久化 |
-| Engineering Harness | Agent 项目只看 demo 容易高估完成度，需要可重复验证 | 提供 pytest、RAG eval、综合 eval 和 harness runner，覆盖路由、风险、安全、RAG、API、工具队列等链路 |
+| Engineering Harness | Agent 项目只看 demo 容易高估完成度，需要可重复验证 | pytest 63 项、RAG eval、综合 eval(含 LLM-as-Judge)、harness 8 套件、三运行时 A/B 对比评测，覆盖路由、风险、安全、RAG、API、工具队列与编排器链路 |
+| 风险双通道 | 关键词规则召回有限，单靠模型又不可控 | 规则 ∪ 轻量 LLM 二次评估取并集，任一通道判高危即高危；LLM 失败/超时自动回退纯规则，安全边界不变 |
 
 ## 架构概览
 
@@ -178,10 +179,11 @@ python -m app.mcp_tools.server --list
 
 | 验证项 | 覆盖内容 | 最近验证结果 |
 | --- | --- | --- |
-| 单元与接口测试 | API、认证、风险识别、Agent runtime、MCP tools、评测 runner | `43 passed` |
+| 单元与接口测试 | API、认证、风险双通道、Function Calling、Agent runtime、LangGraph checkpoint、MCP tools、评测 runner | `63 passed` |
 | RAG 独立评测 | 66 条多主题心理支持检索样本，包含 expected source 和 expected terms | `HitRate 1.0000`, `MRR 0.9924`, `NDCG@K 0.9722` |
-| 综合评测 | 路由、风险、安全、Skill、multi-turn、RAG summary、scaled benchmark | `all_passed=true`, `scaled_benchmark_total=150` |
-| Harness 验证 | Risk Safety、Agent Routing、Standard Skills、RAG、API、Tool Queue 等链路 | `7/7 passed` |
+| 综合评测 | 路由、风险、安全、Skill、multi-turn、RAG summary、scaled benchmark、LLM-as-Judge 回复质量评分 | `all_passed=true`, `scaled_benchmark_total=150` |
+| 三运行时 A/B | langgraph / autonomous / ordered 同数据集对比延迟、trace 步数、LLM 调用数与判定一致性 | `判定 100% 一致` |
+| Harness 验证 | Risk Safety、Agent Routing、Standard Skills、RAG、API、Tool Queue、Runtime A/B 等链路 | `8/8 passed` |
 
 > 评测数据用于工程回归和能力展示，不等同于临床有效性评估。
 
@@ -218,7 +220,7 @@ python -m app.mcp_tools.server --list
 ├── scripts/                      # 本地与 Compose 启动脚本
 ├── docs/                         # 架构、安全和演示文档
 ├── Aegis项目逐文件学习指南.md      # 从零构建式逐模块学习指南
-├── docs/records/                 # 四轮迭代记录(重构/提速/注册MySQL/LangGraph)
+├── docs/records/                 # 五轮迭代记录(重构→提速→注册MySQL→LangGraph→深度增强)
 ├── Dockerfile
 └── docker-compose.yml
 ```
@@ -246,6 +248,9 @@ python -m app.mcp_tools.server --list
 | `DATABASE_URL` | 默认 `sqlite:///data/aegis.sqlite`，可切换 PostgreSQL |
 | `VECTOR_ENABLED` | 是否启用向量检索 |
 | `EMBEDDING_PROVIDER` | 嵌入提供方:`local`(chromadb 内置 MiniLM,零依赖零费用,默认推荐)或 `openai`(OpenAI 兼容 /embeddings API) |
+| `RISK_LLM_CHANNEL_ENABLED` | 风险评估双通道:规则 ∪ 轻量 LLM 取并集,任一判高危即高危,规则兜底 |
+| `FUNCTION_CALLING_ENABLED` | 技能选择:模型 function calling 在白名单内自主挑选,规则兜底 |
+| `LANGGRAPH_CHECKPOINT_ENABLED` | LangGraph SqliteSaver 检查点持久化(长对话跨进程可恢复) |
 | `VECTOR_BACKEND` | 向量后端，支持本地或 Chroma 配置 |
 | `TOOL_BACKEND` | `internal` 或 `mcp` |
 | `MCP_ENABLED` | 是否启用 MCP 工具路径 |

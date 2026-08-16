@@ -52,6 +52,14 @@ python -m pytest -q
 python -m app.rag_eval.runner
 python -m eval.run_eval
 python -m app.harness.runner --suite all --output data/harness/latest.json
+python -m app.harness.runner --suite runtime-ab   # 三运行时 A/B 对比报告
 ```
 
 4. 说明评测用于工程回归和能力展示，不等同于临床有效性评估。
+
+## 7. 深度能力演示(第五轮)
+
+1. **风险双通道**:发送"我觉得自己是家人的负担，活着没什么意思"(规则词表未覆盖)——系统仍判 high 并生成报告;管理端 trace 的 `risk_channels` 显示 `rules=low, llm=high`。
+2. **Function Calling**:咨询消息回复后,trace 中 `skill_selection_mode` 显示 `function-calling`,技能列表是模型自主挑选的白名单子集;断网/失败时自动回退规则全量。
+3. **LLM-as-Judge**:管理端触发综合评测,报告中出现 judge 段(共情/安全/结构三维均分);mock 环境下该段自动省略。
+4. **LangGraph Checkpoint**:`data/langgraph-checkpoints.sqlite` 记录每会话最近检查点;重启服务后同一会话继续对话,`get_state(session_id)` 可读回上一轮终态。

@@ -234,7 +234,7 @@ ANXIETY_TERMS = ["焦虑", "压力", "考试", "睡不着", "失眠", "panic", "
 
 `as_skill_output()` 把结果转成扁平 dict,供技能层透传。
 
-**学习要点**:
+**学习要点**(风险双通道,第五轮新增):`assess_message` 是规则通道;`RiskGuardianAgent` 会再用轻量 LLM 通道(`llm.assess_risk`,严格 JSON、8s 短超时)复核,两通道**取并集**——任一判 high 即 high,弥补关键词召回不足;LLM 失败/超时/mock 一律回退纯规则,输出 `risk_channels` 溯源。
 - `HIGH_TERMS` 是**单一事实来源**——重构后 `autonomous/board.py` 的 `hard_high_risk()` 也引用它,改关键词只改一处。
 - 规则评估可解释(命中了哪个词一目了然)、可单测、零成本零延迟。代价是召回有限——所以它被定位为"下限保障"而非"上限智能"。
 
@@ -277,7 +277,7 @@ SkillRegistry(knowledge_dir, store.add_report, store.search_knowledge)
 
 `_split_frontmatter` 手写解析 YAML 头——不引入 yaml 依赖的取舍(知识文档的 frontmatter 解析在 `rag/chunking.py`,两者格式相似但容错策略不同:技能解析遇到坏文档直接跳过,知识解析静默忽略坏行)。
 
-**学习要点**:`side_effect` 标记让"哪些技能会改变世界"一眼可见,后续审计/评测都依赖它;把 LLM 工具描述(`openai_schema`)作为技能的一等公民,意味着这套注册表未来可直接接入 function calling。
+**学习要点**:`side_effect` 标记让"哪些技能会改变世界"一眼可见,后续审计/评测都依赖它;把 LLM 工具描述(`openai_schema`)作为技能的一等公民——第五轮已接真 function calling(`agents/skill_selection.py`):规则先定白名单(安全边界不变),模型在白名单内自主挑选技能与顺序,失败/幻觉名回退整个白名单。
 
 ---
 
@@ -488,7 +488,7 @@ def _prepare(self, message, session_id, owner_user_public_id):
 
 ### 8.4 langgraph_runtime.py — LangGraph StateGraph(主推运行时)
 
-`LangGraphRuntime` 用 LangGraph 的声明式状态图编排同一批单轮 Agent:`START → load_memory → assess_risk → route_intent →(条件边:companion+low 直接跳 compose,否则)→ context → report(仅 HIGH) → compose → finalize → END`。状态 `GraphState` 是 TypedDict,`trace/skills` 字段用 `Annotated[list, operator.add]` 让节点返回增量自动合并;图只编译一次,每次对话 invoke 新状态,天然线程安全;finalize 仅低风险传 `on_token` 直播回调,安全门控与另两个运行时一致。`AGENT_RUNTIME=langgraph|autonomous|ordered` 三档切换,是"同一业务、三种编排"的活教材。
+`LangGraphRuntime` 用 LangGraph 的声明式状态图编排同一批单轮 Agent:`START → load_memory → assess_risk → route_intent →(条件边:companion+low 直接跳 compose,否则)→ context → report(仅 HIGH) → compose → finalize → END`。状态 `GraphState` 是 TypedDict,`trace/skills` 字段用 `Annotated[list, operator.add]` 让节点返回增量自动合并;图只编译一次,每次对话 invoke 新状态,天然线程安全;finalize 仅低风险传 `on_token` 直播回调,安全门控与另两个运行时一致。`AGENT_RUNTIME=langgraph|autonomous|ordered` 三档切换,是"同一业务、三种编排"的活教材。图还挂了 SqliteSaver 检查点(thread_id=会话 ID,`LANGGRAPH_CHECKPOINT_ENABLED`),`get_state(session_id)` 可读取最近终态——长对话跨进程断点可恢复。
 
 ### 8.5 runtime.py — AgentRegistry / AgentRuntimeRunner
 
@@ -681,14 +681,14 @@ async def attach_request_context(request, call_next):
 - `app/harness/runner.py` + `factory.py`:工程级场景回放——7 套套件(risk/routing/skills/rag/api/tool-queue/scaled)断言**端到端行为**(如"审批后 5 个工具任务全部 success""死信被正确创建"),失败退出码 1,可接 CI。`factory.py` 是重构产物:harness 与 `eval/run_eval.py` 共用一个装配工厂,消除两份漂移的样板。
 - `eval/fixtures/*.json`:路由/风险/检索/安全/多轮的小型金标集。
 
-**学习要点**:评测三层——单元(pytest 43 项)/能力(eval runner)/链路(harness 套件);mock LLM 保证全链评测确定性,测的是**系统**不是模型运气。
+**学习要点**:评测三层——单元(pytest 63 项)/能力(eval runner)/链路(harness 8 套件);mock LLM 保证全链评测确定性,测的是**系统**不是模型运气。三运行时 A/B(`--suite runtime-ab`)对比编排器延迟/trace/调用数,LLM-as-Judge(`evaluation/judge.py`)给回复打共情/安全/结构分——评测从"分对错"升级到"评质量"。
 
 ---
 
 ## 第 14 站 收尾 — static/ + tests/
 
 - `static/index.html + login.js`:登录页;`student.html/js`:会话列表 + SSE 流式对话;`admin.html/js`:报告/个案/trace/知识库/工具/评测/审计七大面板。原生 JS,零构建。
-- `tests/` 七个文件 43 项:orchestrator(提供 `build_orchestrator` 给其他测试复用)、api(TestClient 全链)、agent_runtime、retrieval_eval、mcp_tools、harness、assessment。测试间复用构造器而非 conftest fixture 是历史选择,能工作但不优雅。
+- `tests/` 十三个文件 63 项:orchestrator(提供 `build_orchestrator` 给其他测试复用)、api(TestClient 全链)、agent_runtime、retrieval_eval、mcp_tools、harness、assessment,以及第五轮新增的 risk_dual_channel(双通道)、function_calling(FC)、runtime_ab(A/B)、judge(LLM 评审)、langgraph_runtime、langgraph_checkpoint(跨进程恢复)。
 
 ---
 
@@ -755,7 +755,7 @@ python -m app.init_db
 uvicorn app.main:app --host 127.0.0.1 --port 8091
 ```
 
-当前验证状态:`pytest 43/43 通过`,`python -m app.harness.runner --suite all` 7/7 套件通过。
+当前验证状态:`pytest 63/63 通过`,`python -m app.harness.runner --suite all` 8/8 套件通过。
 
 > 免责声明:本项目用于心理支持工程学习与展示,不提供医学诊断,不能替代专业心理咨询或危机干预服务。
 

@@ -93,7 +93,7 @@ flowchart LR
 | 层级 | 技术 |
 | --- | --- |
 | 后端 API | Python, FastAPI, Pydantic, SQLAlchemy |
-| Agent Runtime | 自研 blackboard runtime, Agent claim loop, artifact acceptance, runtime trace |
+| Agent Runtime | LangGraph StateGraph(主推)+ 自研 blackboard runtime(认领制兜底)+ ordered 流水线,三档可切换 |
 | RAG | BM25, vector retrieval, Chroma optional backend, metadata filter, rerank |
 | 工具协议 | FastMCP, governed ToolJob, background worker |
 | 存储 | SQLite local mode, optional PostgreSQL, optional Redis lock |
@@ -245,6 +245,7 @@ python -m app.mcp_tools.server --list
 | `LLM_THINKING_ENABLED` | 是否启用深度思考型模型的内部推理,默认 `false`(显著降低响应延迟;接入智谱 GLM-4.x 系列时推荐保持关闭) |
 | `DATABASE_URL` | 默认 `sqlite:///data/aegis.sqlite`，可切换 PostgreSQL |
 | `VECTOR_ENABLED` | 是否启用向量检索 |
+| `EMBEDDING_PROVIDER` | 嵌入提供方:`local`(chromadb 内置 MiniLM,零依赖零费用,默认推荐)或 `openai`(OpenAI 兼容 /embeddings API) |
 | `VECTOR_BACKEND` | 向量后端，支持本地或 Chroma 配置 |
 | `TOOL_BACKEND` | `internal` 或 `mcp` |
 | `MCP_ENABLED` | 是否启用 MCP 工具路径 |
@@ -256,7 +257,7 @@ python -m app.mcp_tools.server --list
 
 ## 设计取舍
 
-- 不使用 LangGraph：为了更清楚地展示 Agent 协作机制，本项目采用自研 blackboard runtime。每个 Agent 都通过 claim 和 artifact 参与协作，trace 可落库回放。
+- 三档运行时可切换(`AGENT_RUNTIME`)：LangGraph StateGraph 为主推编排(声明式状态图+条件边)；自研认领制黑板 runtime 作为兜底与对照(SAFETY_OVERRIDE 一票否销、不可变快照、认领调度)；ordered 流水线为最简链路。三者复用同一批 Agent 与安全规则。
 - 不让工具直连学生端：高风险工具执行全部走 ToolJob，避免模型在流式回复中直接触发外部动作。
 - 不对所有输入做 RAG：先做意图路由，只有咨询和风险类场景触发知识检索，普通陪伴类对话更强调倾听和情绪支持。
 - 默认可本地运行：没有外部 API key 时也能完成端到端演示；接入 OpenAI、Ollama、Chroma、Redis、SMTP 后可以切换到更接近生产的配置。
@@ -270,6 +271,7 @@ python -m app.mcp_tools.server --list
 - [第一次重构方案](REFACTORING.md)
 - [第二次优化方案(提速与流式)](OPTIMIZATION.md)
 - [第三次功能说明(注册与 MySQL)](AUTH-MYSQL.md)
+- [第四次功能说明(LangGraph 与全栈激活)](LANGGRAPH-DOCKER.md)
 
 ## License
 

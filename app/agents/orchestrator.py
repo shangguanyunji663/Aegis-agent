@@ -36,6 +36,11 @@ class PsychOrchestrator:
         self.agent_registry.register("safety_planner", self.risk_agent)
         self.runtime_runner = AgentRuntimeRunner(self.agent_registry)
         self.autonomous_runtime = AutonomousAgentRuntime(store, registry, self.llm_client, self.settings, self.model_registry)
+        self.langgraph_runtime = None
+        if str(getattr(self.settings, "agent_runtime", "")).lower() == "langgraph":
+            from app.agents.langgraph_runtime import LangGraphRuntime
+
+            self.langgraph_runtime = LangGraphRuntime(registry, store, self.llm_client, self.settings, self.model_registry)
         self.last_runtime_events: list[RuntimeEvent] = []
 
     def handle(self, message: str, session_id: str | None = None) -> ChatResponse:
@@ -58,7 +63,10 @@ class PsychOrchestrator:
         session_id: str | None = None,
         emit: Callable[[StreamEvent], None] | None = None,
     ) -> ChatResponse:
-        if getattr(self.settings, "agent_runtime", "autonomous") == "autonomous":
+        runtime_mode = str(getattr(self.settings, "agent_runtime", "autonomous")).lower()
+        if runtime_mode == "langgraph" and self.langgraph_runtime is not None:
+            return self._run_langgraph(message, session_id, emit)
+        if runtime_mode == "autonomous":
             return self._run_autonomous(message, session_id, emit)
         session_id = self.store.ensure_session(session_id, message)
         message_id = ChatResponse.new_id()
@@ -213,6 +221,65 @@ class PsychOrchestrator:
             memory_summary=updated_memory["summary"],
             memory_used=bool(memory_summary),
             response_plan=response_plan,
+        )
+        self._record_runtime(runtime_events, emit, RuntimeEventType.RUN_COMPLETED, {"response": asdict(response)})
+        self.last_runtime_events = runtime_events
+        return response
+
+    def _run_langgraph(
+        self,
+        message: str,
+        session_id: str | None = None,
+        emit: Callable[[StreamEvent], None] | None = None,
+    ) -> ChatResponse:
+        session_id = self.store.ensure_session(session_id, message)
+        message_id = ChatResponse.new_id()
+        runtime_events: list[RuntimeEvent] = []
+        self._record_runtime(runtime_events, emit, RuntimeEventType.RUN_STARTED, {"session_id": session_id, "message_id": message_id})
+        self.store.append_message(session_id, "user", message)
+        live_tokens = {"count": 0}
+
+        def on_reply_token(delta: str) -> None:
+            live_tokens["count"] += 1
+            self._record_runtime(runtime_events, emit, RuntimeEventType.TOKEN_EMITTED, {"content": delta})
+
+        outcome = self.langgraph_runtime.run(session_id, message, on_reply_token=on_reply_token)
+        for trace_item in outcome.trace:
+            self._emit_agent_trace(runtime_events, emit, trace_item)
+        self._record_runtime(
+            runtime_events, emit, RuntimeEventType.ROUTE_DECIDED,
+            {"intent": outcome.intent.value, "risk_level": outcome.risk_level.value, "runtime": self.langgraph_runtime.framework_name},
+        )
+        self._record_runtime(
+            runtime_events, emit, RuntimeEventType.RISK_ASSESSED,
+            {"agent": "RiskGuardianAgent", "action": "langgraph_risk", "detail": f"risk={outcome.risk_level.value}"},
+        )
+        for skill in outcome.skills:
+            self._emit_skill(runtime_events, emit, skill)
+        if outcome.pending_report is not None:
+            self._record_runtime(
+                runtime_events, emit, RuntimeEventType.REPORT_CREATED,
+                {"report_id": outcome.pending_report.id, "status": outcome.pending_report.status.value},
+            )
+        if not live_tokens["count"]:  # 高/中风险未直播时,事后切块保持打字机观感
+            for chunk in self._token_chunks(outcome.answer):
+                self._record_runtime(runtime_events, emit, RuntimeEventType.TOKEN_EMITTED, {"content": chunk})
+        self.store.append_message(session_id, "assistant", outcome.answer)
+        memory_agent = MemoryAgent()
+        updated_memory, _ = memory_agent.update(self.store, session_id, message, outcome.answer)
+        self.store.add_trace(session_id, message_id, outcome.intent.value, outcome.risk_level.value, outcome.trace, outcome.skills, outcome.answer)
+        response = ChatResponse(
+            session_id=session_id,
+            message_id=message_id,
+            intent=outcome.intent,
+            risk_level=outcome.risk_level,
+            answer=outcome.answer,
+            skills=outcome.skills,
+            trace=outcome.trace,
+            pending_report=outcome.pending_report,
+            memory_summary=updated_memory.get("summary", ""),
+            memory_used=outcome.memory_used,
+            response_plan=outcome.response_plan,
         )
         self._record_runtime(runtime_events, emit, RuntimeEventType.RUN_COMPLETED, {"response": asdict(response)})
         self.last_runtime_events = runtime_events

@@ -18,7 +18,7 @@ Aegis 是一个"学生倾诉 + 风险识别 + 管理员处置"的完整闭环系
 第 5 站   模型后端      llm/(client + prompts)                  — 让"大脑"可插拔
 第 6 站   单轮智能体    agents/classic.py                        — 六个各司其职的角色
 第 7 站   自治协作      autonomous/(黑板 + 认领制)              — 多 Agent 真正的协作机制
-第 8 站   编排与 Harness agents/orchestrator + harness          — 把一切串成一次对话
+第 8 站   编排与 Harness agents/orchestrator + langgraph + harness — 把一切串成一次对话(三档运行时)
 第 9 站   RAG 检索      rag/(分词/打分/切块/向量)                — 知识库如何被"检索"出来
 第 10 站  持久化仓储    repository/store.py                      — 所有表的读写总闸
 第 11 站  工具治理      tools/ + services/                       — 高风险动作必须被管住
@@ -486,7 +486,11 @@ def _prepare(self, message, session_id, owner_user_public_id):
 
 `DEFAULT_AGENT_MODEL_PROFILES` 为六个 Agent 声明默认温度(记忆/路由/安全 0.0、知识 0.1、咨询 0.2、陪伴 0.3)与系统提示词,启动时写入 `agent_model_profiles` 表。`client_for(agent_name)`:档案是 `inherit` 就返回全局客户端,否则按档案的 provider/model 现造一个——**让"安全评估用小模型、回复生成用大模型"成为一行配置**。
 
-### 8.4 runtime.py — AgentRegistry / AgentRuntimeRunner
+### 8.4 langgraph_runtime.py — LangGraph StateGraph(主推运行时)
+
+`LangGraphRuntime` 用 LangGraph 的声明式状态图编排同一批单轮 Agent:`START → load_memory → assess_risk → route_intent →(条件边:companion+low 直接跳 compose,否则)→ context → report(仅 HIGH) → compose → finalize → END`。状态 `GraphState` 是 TypedDict,`trace/skills` 字段用 `Annotated[list, operator.add]` 让节点返回增量自动合并;图只编译一次,每次对话 invoke 新状态,天然线程安全;finalize 仅低风险传 `on_token` 直播回调,安全门控与另两个运行时一致。`AGENT_RUNTIME=langgraph|autonomous|ordered` 三档切换,是"同一业务、三种编排"的活教材。
+
+### 8.5 runtime.py — AgentRegistry / AgentRuntimeRunner
 
 有序路径的执行骨架:`run_step(agent_id, action, call)` 统一包裹"取 Agent → 执行 → 记事件 → 异常记 RUN_FAILED 再抛"。仅 60 行,却让有序路径的每一步都可观测。
 

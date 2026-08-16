@@ -17,7 +17,7 @@ from app.skills import SkillRegistry
 
 def build_orchestrator(tmp_path: Path) -> PsychOrchestrator:
     knowledge_dir = tmp_path / "knowledge"
-    knowledge_dir.mkdir()
+    knowledge_dir.mkdir(parents=True, exist_ok=True)  # 可重复调用:同一目录多次构建不报错
     (knowledge_dir / "crisis.md").write_text("自杀 轻生 危机干预 联系可信任的人", encoding="utf-8")
     (knowledge_dir / "exam.md").write_text("考试压力 睡不着 焦虑 可以先稳定身体反应并拆分任务", encoding="utf-8")
     engine = create_engine(f"sqlite:///{tmp_path / 'test.sqlite'}", connect_args={"check_same_thread": False})
@@ -28,6 +28,10 @@ def build_orchestrator(tmp_path: Path) -> PsychOrchestrator:
         tool_output_dir=str(tmp_path / "tool-outputs"),
         excel_path=str(tmp_path / "tool-outputs" / "aegis-risk-ledger.xlsx"),
         alert_email_delivery_mode="log",
+        # 测试密封:不受开发者本机 .env 的运行时/Redis/向量配置影响
+        agent_runtime="autonomous",
+        redis_url="",
+        vector_enabled=False,
     )
     store = DatabaseStore(session_factory, settings=settings)
     store.seed_knowledge_dir(knowledge_dir)

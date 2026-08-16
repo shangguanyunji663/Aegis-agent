@@ -110,7 +110,7 @@ class LocalVectorBackend(VectorSearchBackend):
 
 
 class ChromaVectorBackend(VectorSearchBackend):
-    """Primary RAG path: OpenAI embeddings stored and queried in persistent Chroma."""
+    """Primary RAG path: OpenAI-compatible or local embeddings stored and queried in persistent Chroma."""
 
     backend_name = "chroma"
 
@@ -122,10 +122,15 @@ class ChromaVectorBackend(VectorSearchBackend):
         self.client = None
         self.collection = None
         self.persist_dir: Path | None = None
-        self.embedding_model = settings.openai_embedding_model
+        self._local_ef = None
+        self.use_local_embedding = settings.embedding_provider.strip().lower() == "local"
+        self.embedding_model = "local-minilm" if self.use_local_embedding else settings.openai_embedding_model
 
         if not settings.vector_enabled:
             self.last_error = "Chroma 向量库未启用"
+            return
+        if self.use_local_embedding:
+            self._init_local_embedding()
             return
         if not settings.openai_api_key.strip():
             message = f"缺少 OPENAI_API_KEY，Chroma + {settings.openai_embedding_model} 不可用，已回退到{FALLBACK_RETRIEVAL_LABEL}"
@@ -135,34 +140,60 @@ class ChromaVectorBackend(VectorSearchBackend):
                 )
             self.last_error = message
             return
+        self._init_remote_collection()
+
+    def _init_local_embedding(self) -> None:
+        """本地嵌入模式:chromadb 自带 MiniLM 嵌入函数,离线可用、无需 API key。"""
         try:
-            import chromadb
+            from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
+
+            self._local_ef = DefaultEmbeddingFunction()
+            # 预热一次,触发模型下载/加载失败时走降级
+            self._local_ef(["warmup"])
+            self._open_collection()
+        except Exception as exc:
+            message = f"本地嵌入初始化失败: {exc}"
+            if self.settings.vector_required:
+                raise VectorStoreUnavailable(message) from exc
+            self.last_error = message
+            self._available = False
+
+    def _open_collection(self) -> None:
+        """建立 chroma 客户端与集合(本地持久化或远程服务)。"""
+        import chromadb
+
+        settings = self.settings
+        if settings.chroma_host.strip():
+            self.client = chromadb.HttpClient(host=settings.chroma_host, port=settings.chroma_port)
+            self.persist_dir = None
+        else:
+            path = settings.resolve_path(settings.chroma_dir)
+            path.mkdir(parents=True, exist_ok=True)
+            self.persist_dir = path
+            self.client = chromadb.PersistentClient(path=str(path))
+        self.collection = self.client.get_or_create_collection(
+            name=settings.chroma_collection_name,
+            embedding_function=None,
+            metadata={"hnsw:space": "cosine", "embedding_model": self.embedding_model},
+        )
+        self.can_embed = True
+        self._available = True
+
+    def _init_remote_collection(self) -> None:
+        try:
+            import chromadb  # noqa: F401 - 仅探测依赖是否安装
         except ImportError as exc:
-            message = f"缺少 chromadb 依赖，Chroma + {settings.openai_embedding_model} 不可用，已回退到{FALLBACK_RETRIEVAL_LABEL}"
-            if settings.vector_required:
+            message = f"缺少 chromadb 依赖，Chroma + {self.settings.openai_embedding_model} 不可用，已回退到{FALLBACK_RETRIEVAL_LABEL}"
+            if self.settings.vector_required:
                 raise VectorStoreUnavailable("缺少 chromadb 依赖，无法启用 Chroma + OpenAI embeddings 主检索方案") from exc
             self.last_error = message
             return
 
         try:
-            if settings.chroma_host.strip():
-                self.client = chromadb.HttpClient(host=settings.chroma_host, port=settings.chroma_port)
-                self.persist_dir = None
-            else:
-                path = settings.resolve_path(settings.chroma_dir)
-                path.mkdir(parents=True, exist_ok=True)
-                self.persist_dir = path
-                self.client = chromadb.PersistentClient(path=str(path))
-            self.collection = self.client.get_or_create_collection(
-                name=settings.chroma_collection_name,
-                embedding_function=None,
-                metadata={"hnsw:space": "cosine", "embedding_model": settings.openai_embedding_model},
-            )
-            self.can_embed = True
-            self._available = True
+            self._open_collection()
         except Exception as exc:
             message = str(exc)
-            if settings.vector_required:
+            if self.settings.vector_required:
                 raise VectorStoreUnavailable(message) from exc
             self.last_error = message
             self._available = False
@@ -256,7 +287,13 @@ class ChromaVectorBackend(VectorSearchBackend):
 
     def embed_texts(self, texts: list[str]) -> list[list[float]]:
         if not self.can_embed:
-            raise VectorStoreUnavailable(self.last_error or "Chroma + OpenAI embeddings 主检索方案不可用")
+            raise VectorStoreUnavailable(self.last_error or "Chroma 向量检索不可用")
+        if self._local_ef is not None:
+            vectors = self._local_ef([text if text.strip() else " " for text in texts])
+            if len(vectors) != len(texts):
+                raise VectorStoreUnavailable("本地嵌入返回向量数量不匹配")
+            return [[float(value) for value in vector] for vector in vectors]
+
         import httpx
 
         payload = {

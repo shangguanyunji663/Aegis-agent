@@ -53,6 +53,7 @@ def test_chroma_without_api_key_degrades_to_local(tmp_path: Path):
         vector_backend="chroma",
         vector_required=False,
         openai_api_key="",
+        embedding_provider="openai",
         chroma_dir=str(tmp_path / "chroma"),
     )
     backend = build_vector_backend(settings)
@@ -61,7 +62,7 @@ def test_chroma_without_api_key_degrades_to_local(tmp_path: Path):
 
 
 def test_chroma_required_without_api_key_raises():
-    settings = Settings(vector_enabled=True, vector_backend="chroma", vector_required=True, openai_api_key="")
+    settings = Settings(vector_enabled=True, vector_backend="chroma", vector_required=True, openai_api_key="", embedding_provider="openai")
     try:
         build_vector_backend(settings)
         assert False, "expected VectorStoreUnavailable"

@@ -11,6 +11,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.agents.orchestrator import PsychOrchestrator
+from app.config import Settings
 from app.database import create_schema
 from app.llm import MockLLMClient
 from app.repository import DatabaseStore
@@ -27,7 +28,13 @@ def build_harness_orchestrator(data_dir: Path | None = None, knowledge_dir: Path
     engine = create_engine(f"sqlite:///{data_dir / 'harness.sqlite'}", connect_args={"check_same_thread": False})
     create_schema(engine)
     session_factory = sessionmaker(bind=engine, autoflush=False, autocommit=False)
-    store = DatabaseStore(session_factory)
+    hermetic = Settings(
+        database_url=f"sqlite:///{data_dir / 'harness.sqlite'}",
+        redis_url="",
+        vector_enabled=False,
+        agent_runtime="autonomous",
+    )
+    store = DatabaseStore(session_factory, settings=hermetic)
     knowledge_dir = knowledge_dir or KNOWLEDGE_DIR
     store.rebuild_knowledge_dir(knowledge_dir)
     registry = SkillRegistry(knowledge_dir, store.add_report, store.search_knowledge)

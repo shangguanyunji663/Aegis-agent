@@ -19,6 +19,10 @@ def build_client(tmp_path: Path, chat_rate_limit_per_minute: int = 40) -> TestCl
         auth_default_student_username="student",
         auth_default_student_password="student123!",
         chat_rate_limit_per_minute=chat_rate_limit_per_minute,
+        # 测试密封:固定自治运行时与本地依赖,断言不受 .env 影响
+        agent_runtime="autonomous",
+        redis_url="",
+        vector_enabled=False,
     )
     app = create_app(settings)
     app.state.store.create_user("student2", "student234!", UserRole.STUDENT.value)

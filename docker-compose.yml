@@ -4,7 +4,8 @@ services:
     ports:
       - "8091:8091"
     environment:
-      DATABASE_URL: postgresql+psycopg://aegis:aegis@postgres:5432/aegis
+      DATABASE_URL: mysql+pymysql://root:123456@mysql:3306/aegis?charset=utf8mb4
+      EMBEDDING_PROVIDER: local
       REDIS_URL: redis://redis:6379/0
       VECTOR_ENABLED: "true"
       VECTOR_REQUIRED: "false"
@@ -21,22 +22,22 @@ services:
       AUTH_DEFAULT_STUDENT_USERNAME: student
       AUTH_DEFAULT_STUDENT_PASSWORD: student123!
     depends_on:
-      - postgres
+      - mysql
       - redis
       - chroma
     volumes:
       - ./data:/app/data
 
-  postgres:
-    image: postgres:16
+  mysql:
+    image: mysql:8.0
     environment:
-      POSTGRES_DB: aegis
-      POSTGRES_USER: aegis
-      POSTGRES_PASSWORD: aegis
+      MYSQL_ROOT_PASSWORD: "123456"
+      MYSQL_DATABASE: aegis
     ports:
-      - "5432:5432"
+      - "3306:3306"
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - mysql-data:/var/lib/mysql
 
   redis:
     image: redis:7
@@ -53,6 +54,6 @@ services:
       - chroma-data:/chroma/chroma
 
 volumes:
-  postgres-data:
+  mysql-data:
   redis-data:
   chroma-data:

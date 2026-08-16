@@ -40,12 +40,22 @@ def agent_status(request: Request, principal: AuthPrincipal = Depends(current_pr
         },
         "agentFramework": {
             "requested": settings.agent_runtime,
-            "active": orchestrator.autonomous_runtime.framework_name if settings.agent_runtime == "autonomous" else "ordered_runtime",
-            "scheduler": "claim-based-actor-runtime" if settings.agent_runtime == "autonomous" else "ordered-runtime",
-            "langgraph": "disabled_by_request",
+            "active": (
+                (orchestrator.langgraph_runtime.framework_name if orchestrator.langgraph_runtime else "langgraph_unavailable")
+                if settings.agent_runtime == "langgraph"
+                else (orchestrator.autonomous_runtime.framework_name if settings.agent_runtime == "autonomous" else "ordered_runtime")
+            ),
+            "scheduler": {
+                "langgraph": "langgraph-state-graph",
+                "autonomous": "claim-based-actor-runtime",
+            }.get(settings.agent_runtime, "ordered-runtime"),
+            "langgraph": "enabled" if settings.agent_runtime == "langgraph" else "disabled_by_request",
             "maxRounds": settings.agent_max_rounds,
             "maxClaimsPerRound": settings.agent_max_claims_per_round,
-            "state": "append-only-blackboard",  # 只追加不修改。Agent 的产出(artifact)以追加方式写入 blackboard
+            "state": {
+                "langgraph": "typed-state-graph",
+                "autonomous": "append-only-blackboard",  # Agent 的产出(artifact)以追加方式写入 blackboard
+            }.get(settings.agent_runtime, "shared-context"),
         },
         "agents": [
             {"name": "MemoryAgent", "role": "session and private memory"},

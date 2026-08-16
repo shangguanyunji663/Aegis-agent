@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     openai_base_url: str = "https://api.openai.com/v1"
     openai_model: str = "gpt-4o-mini"
     openai_embedding_model: str = "text-embedding-3-small"
+    embedding_provider: str = "openai"  # openai(兼容API) | local(chromadb 本地嵌入,零外部依赖)
     embedding_timeout_seconds: float = 30.0
     ollama_base_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "qwen2.5:7b"

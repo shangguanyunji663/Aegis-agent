@@ -78,7 +78,12 @@ class LangGraphRuntime:
         self.settings = settings
         self.model_registry = model_registry
         self.memory_agent = MemoryAgent()
-        self.risk_agent = RiskGuardianAgent(registry)
+        risk_client = model_registry.client_for("RiskGuardianAgent") if model_registry else None
+        self.risk_agent = RiskGuardianAgent(
+            registry,
+            llm_client=risk_client,
+            llm_channel_enabled=bool(getattr(settings, "risk_llm_channel_enabled", False)),
+        )
         self.lead_agent = LeadAgent()
         # Counselor/Knowledge 使用档案化模型客户端(与自治运行时一致)
         counselor_client = model_registry.client_for("CounselorAgent") if model_registry else self.llm_client

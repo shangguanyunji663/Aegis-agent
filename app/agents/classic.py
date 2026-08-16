@@ -23,13 +23,38 @@ class MemoryAgent:
 class RiskGuardianAgent:
     name = "RiskGuardianAgent"
 
-    def __init__(self, registry: SkillRegistry):
+    def __init__(self, registry: SkillRegistry, llm_client=None, llm_channel_enabled: bool = False):
         self.registry = registry
+        self.llm_client = llm_client
+        self.llm_channel_enabled = llm_channel_enabled
 
     def assess(self, message: str) -> tuple[SkillResult, RiskLevel, AgentTrace]:
         result = self.registry.get("assess_risk").handler(message)
         risk_level = RiskLevel(result.output["risk_level"])
-        detail = "; ".join(result.output["rationale"])
+        rationale = list(result.output["rationale"])
+        channels = {"rules": risk_level.value, "llm": "skipped"}
+        # 双通道融合:规则 ∪ LLM,任一通道判 HIGH 即 HIGH(安全优先取并集);
+        # LLM 失败/超时/mock 一律回退纯规则结果
+        if self.llm_channel_enabled and self.llm_client is not None:
+            try:
+                llm_out = self.llm_client.assess_risk(message)
+            except Exception:
+                llm_out = None
+            if llm_out is not None:
+                llm_level = RiskLevel(llm_out["risk_level"])
+                channels["llm"] = llm_level.value
+                order = {RiskLevel.LOW: 1, RiskLevel.MEDIUM: 2, RiskLevel.HIGH: 3}
+                if order[llm_level] > order[risk_level]:
+                    risk_level = llm_level
+                    rationale.append(f"LLM通道({llm_out.get('reason', '')})")
+                    result.output["report_eligible"] = risk_level is RiskLevel.HIGH or result.output.get("report_eligible", False)
+                    if risk_level is RiskLevel.HIGH:
+                        result.output["escalation_policy"] = "create_pending_report_and_require_admin_review"
+                elif llm_level is risk_level and llm_level is not RiskLevel.LOW:
+                    rationale.append(f"双通道一致确认({llm_out.get('reason', '')})")
+        result.output["rationale"] = rationale
+        result.output["risk_channels"] = channels
+        detail = "; ".join(rationale)
         return result, risk_level, AgentTrace(self.name, "assess_risk", detail)
 
     def create_report(self, message: str, session_id: str, risk_level: RiskLevel, intent: Intent, risk: SkillResult) -> tuple[SkillResult, AgentTrace]:

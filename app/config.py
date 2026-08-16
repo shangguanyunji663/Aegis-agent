@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     ollama_model: str = "qwen2.5:7b"
     llm_timeout_seconds: float = 15.0
     llm_thinking_enabled: bool = False
+    risk_llm_channel_enabled: bool = True
     knowledge_dir: str = "knowledge"
     max_knowledge_upload_bytes: int = 1_000_000
     knowledge_top_k: int = 4

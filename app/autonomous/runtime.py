@@ -53,6 +53,7 @@ class AutonomousAgentRuntime:
             session_id=session_id,
             llm_client=self.llm_client,
             model_registry=self.model_registry,
+            settings=self.settings,
             on_reply_token=on_reply_token,
         )
         agents = [

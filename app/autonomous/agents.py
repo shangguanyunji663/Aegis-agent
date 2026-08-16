@@ -29,6 +29,7 @@ class AutonomousRuntimeServices:
     session_id: str
     llm_client: Any
     model_registry: Any
+    settings: Any = None
     # 低风险回复的直播回调:token 边生成边推给 SSE;中高风险不传(须先过安全复核)
     on_reply_token: Any = None
 
@@ -161,7 +162,12 @@ class RiskGuardianAutonomousAgent(BaseAutonomousAgent):
 
     def __init__(self, services: AutonomousRuntimeServices):
         super().__init__(services)
-        self.agent = RiskGuardianAgent(services.registry)
+        risk_client = services.model_registry.client_for("RiskGuardianAgent") if services.model_registry else None
+        self.agent = RiskGuardianAgent(
+            services.registry,
+            llm_client=risk_client,
+            llm_channel_enabled=bool(getattr(services.settings, "risk_llm_channel_enabled", False)),
+        )
 
     def decide(self, task: AgentTask, board: CollaborationBlackboard) -> AgentDecision:
         response = board.latest_artifact("response_proposal")

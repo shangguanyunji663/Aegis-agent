@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -39,6 +40,40 @@ class LLMClient(Protocol):
         ...
 
 
+RISK_ASSESS_SYSTEM_PROMPT = (
+    "你是校园心理支持系统的风险评估器。只依据用户消息判断心理危机风险等级:"
+    "high(自伤/自杀/伤人意图或计划)、medium(强烈痛苦、绝望、功能受损)、low(一般困扰)。"
+    "只输出一个 JSON 对象,不要输出任何其他文字:"
+    '{"risk_level": "low|medium|high", "reason": "20字以内依据"}'
+)
+
+
+def _parse_risk_json(content: str) -> dict | None:
+    """从模型输出中解析风险 JSON;容忍代码块包裹与前后杂文,失败返回 None。"""
+    if not content:
+        return None
+    text = content.strip()
+    if text.startswith("```"):
+        text = text.strip("`")
+        if text.lower().startswith("json"):
+            text = text[4:]
+        text = text.strip()
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        match = re.search(r"\{[^{}]*\}", text, re.DOTALL)
+        if not match:
+            return None
+        try:
+            data = json.loads(match.group(0))
+        except json.JSONDecodeError:
+            return None
+    level = str(data.get("risk_level", "")).strip().lower()
+    if level not in {"low", "medium", "high"}:
+        return None
+    return {"risk_level": level, "reason": str(data.get("reason", ""))[:120]}
+
+
 class MockLLMClient:
     provider = "mock"
     model = "rule-fallback"
@@ -53,6 +88,9 @@ class MockLLMClient:
         return None
 
     def rewrite_knowledge_query(self, message: str, memory_summary: str = "") -> str | None:
+        return None
+
+    def assess_risk(self, text: str) -> dict | None:
         return None
 
 
@@ -109,6 +147,28 @@ class OpenAICompatibleClient:
         content = data.get("choices", [{}])[0].get("message", {}).get("content")
         return content.strip() if content else None
 
+    def assess_risk(self, text: str) -> dict | None:
+        if not self.api_key:
+            return None
+        payload = {
+            "model": self.model,
+            "temperature": 0.0,
+            "messages": [
+                {"role": "system", "content": RISK_ASSESS_SYSTEM_PROMPT},
+                {"role": "user", "content": text},
+            ],
+        }
+        if self.disable_thinking:
+            payload["thinking"] = {"type": "disabled"}
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.api_key}",
+        }
+        # 风险通道用短超时:失败/超时立即回退规则通道,不拖慢主链路
+        data = post_json(f"{self.base_url}/chat/completions", payload, headers, min(self.timeout, 8.0))
+        content = data.get("choices", [{}])[0].get("message", {}).get("content")
+        return _parse_risk_json(content)
+
     def stream_support_reply(self, context: LLMContext, on_token: Callable[[str], None]) -> str | None:
         if not self.api_key:
             return None
@@ -161,6 +221,20 @@ class OllamaClient:
         data = post_json(f"{self.base_url}/api/chat", payload, {"Content-Type": "application/json"}, self.timeout)
         content = data.get("message", {}).get("content")
         return content.strip() if content else None
+
+    def assess_risk(self, text: str) -> dict | None:
+        payload = {
+            "model": self.model,
+            "stream": False,
+            "format": "json",
+            "messages": [
+                {"role": "system", "content": RISK_ASSESS_SYSTEM_PROMPT},
+                {"role": "user", "content": text},
+            ],
+        }
+        data = post_json(f"{self.base_url}/api/chat", payload, {"Content-Type": "application/json"}, min(self.timeout, 8.0))
+        content = data.get("message", {}).get("content")
+        return _parse_risk_json(content)
 
     def stream_support_reply(self, context: LLMContext, on_token: Callable[[str], None]) -> str | None:
         payload = {

@@ -21,7 +21,11 @@ class PsychOrchestrator:
         self.model_registry = AgentModelRegistry(self.settings, self.store, self.llm_client)
         self.model_registry.ensure_defaults()
         self.memory_agent = MemoryAgent()
-        self.risk_agent = RiskGuardianAgent(registry)
+        self.risk_agent = RiskGuardianAgent(
+            registry,
+            llm_client=self.model_registry.client_for("RiskGuardianAgent"),
+            llm_channel_enabled=bool(getattr(self.settings, "risk_llm_channel_enabled", False)),
+        )
         self.lead_agent = LeadAgent()
         self.knowledge_agent = KnowledgeAgent(registry, self.llm_client)
         self.counselor_agent = CounselorAgent(registry, self.llm_client)

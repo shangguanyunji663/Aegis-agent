@@ -8,7 +8,7 @@ from app.config import get_settings
 from app.database import build_session_factory, create_schema
 from app.repository import DatabaseStore
 
-from app.tool_contracts import list_tool_contracts
+from app.tools.contracts import list_tool_contracts
 
 try:
     from mcp.server.fastmcp import FastMCP

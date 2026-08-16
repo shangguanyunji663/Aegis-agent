@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
 from app.entities import CaseNote, PsychologicalReport, RiskCase, ToolJob
 from app.models import CaseStatus, ReportStatus, RiskLevel, ToolJobStatus, UserRole
-from app.tool_contracts import governed_payload, normalize_tool_kind
+from app.tools.contracts import governed_payload, normalize_tool_kind
+from app.core.utils import loads_or, now_utc_naive
 
 
 class ReportCaseService:
@@ -24,7 +24,7 @@ class ReportCaseService:
         if row is None:
             return None
         row.status = status.value
-        row.updated_at = _now()
+        row.updated_at = now_utc_naive()
         self.db.add(row)
         if status is ReportStatus.APPROVED and row.risk_level in {RiskLevel.MEDIUM.value, RiskLevel.HIGH.value}:
             self.ensure_case(row)
@@ -50,7 +50,7 @@ class ReportCaseService:
         if case is None:
             return None
         self.db.add(CaseNote(case_public_id=case.public_id, actor=actor, note=note))
-        case.updated_at = _now()
+        case.updated_at = now_utc_naive()
         self.db.add(case)
         self.db.commit()
         self.db.refresh(case)
@@ -61,7 +61,7 @@ class ReportCaseService:
         if case is None:
             return None
         case.status = status.value
-        case.updated_at = _now()
+        case.updated_at = now_utc_naive()
         self.db.add(case)
         self.db.commit()
         self.db.refresh(case)
@@ -73,7 +73,7 @@ class ReportCaseService:
             return None
         case.status = CaseStatus.ACKNOWLEDGED.value
         case.owner = actor.strip() or case.owner or "admin"
-        case.updated_at = _now()
+        case.updated_at = now_utc_naive()
         self.db.add(case)
         self.db.add(CaseNote(case_public_id=case.public_id, actor=actor.strip() or "admin", note=note.strip() or "已确认接手该个案"))
         self.db.commit()
@@ -126,7 +126,7 @@ class ReportCaseService:
                     report_public_id=report.public_id,
                     case_public_id=case.public_id,
                     payload_json=json.dumps(job_payload, ensure_ascii=False),
-                    run_after=_now(),
+                    run_after=now_utc_naive(),
                 )
             )
 
@@ -141,7 +141,7 @@ def report_dict(row: PsychologicalReport) -> dict:
         "emotion_score": row.emotion_score,
         "risk_level": row.risk_level,
         "confidence": row.confidence,
-        "rationale": _loads(row.rationale_json, []),
+        "rationale": loads_or(row.rationale_json, []),
         "summary": row.summary,
         "status": row.status,
         "created_at": row.created_at.isoformat(),
@@ -197,12 +197,3 @@ def follow_up_suggestion(report: PsychologicalReport, case: RiskCase, kind: str)
     return "等待管理员确认后执行对应后置任务。"
 
 
-def _loads(raw: str, default):
-    try:
-        return json.loads(raw or "")
-    except Exception:
-        return default
-
-
-def _now() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)

@@ -3,8 +3,6 @@ from __future__ import annotations
 import json
 import math
 from datetime import datetime, timezone
-from pathlib import Path
-
 from app.config import Settings, get_settings
 from app.database import build_session_factory, create_schema
 from app.repository import DatabaseStore

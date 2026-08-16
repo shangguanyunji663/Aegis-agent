@@ -126,6 +126,19 @@ class PendingReport:
     status: ReportStatus = ReportStatus.PENDING
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "PendingReport":
+        """从仓储层返回的报告字典重建 PendingReport(统一各处重复的转换逻辑)。"""
+        return cls(
+            id=data["id"],
+            session_id=data["session_id"],
+            message=data["message"],
+            risk_level=RiskLevel(data["risk_level"]),
+            rationale=list(data["rationale"]),
+            status=ReportStatus(data["status"]),
+            created_at=data["created_at"],
+        )
+
 
 @dataclass
 class ChatResponse:

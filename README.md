@@ -148,7 +148,7 @@ python -m app.init_db
 python -m pytest -q
 
 # 前端脚本语法检查
-node --check static/app.js static/student.js static/admin.js
+node --check static/login.js static/student.js static/admin.js
 
 # 综合评测
 python -m eval.run_eval
@@ -181,18 +181,35 @@ python -m app.mcp_tools.server --list
 ```text
 .
 ├── app/
-│   ├── agent_harness.py          # Runtime Harness 入口
-│   ├── autonomous_runtime.py     # blackboard Agent 协作运行时
-│   ├── autonomous_agents.py      # Memory / Lead / Risk / Knowledge / Counselor / Companion
-│   ├── mcp_tools/server.py       # FastMCP 工具服务
-│   ├── rag_eval/                 # RAG 独立评测数据与 runner
-│   ├── services/                 # report/case, tool executor, queue, audit records
-│   └── knowledge/                # 内置心理支持知识库
-├── eval/                         # 路由、风险、安全、多轮、检索评测
-├── skills/                       # 标准化心理支持 Skill 规范
-├── static/                       # 学生端和管理员端页面
+│   ├── main.py                   # 应用入口:create_app 装配 + 路由注册
+│   ├── config.py                 # pydantic-settings 全局配置
+│   ├── models.py                 # 领域模型:Intent/RiskLevel/ChatResponse 等
+│   ├── entities.py               # SQLAlchemy ORM 实体
+│   ├── database.py               # 引擎/会话工厂/建表/迁移/就绪检查
+│   ├── assessment.py             # 规则式风险评估(高危/中危关键词单一来源)
+│   ├── skills.py                 # SkillRegistry:技能注册与 OpenAI 工具 schema
+│   ├── core/                     # 横切原语:auth(认证) privacy(脱敏) runtime(Redis 限流锁) utils
+│   ├── llm/                      # 模型后端:client(Mock/OpenAI/Ollama) prompts(提示词模板)
+│   ├── agents/                   # 智能体层:classic(六单轮) model_profiles runtime harness orchestrator
+│   ├── autonomous/               # 自治协作:events registry board coordinator agents runtime
+│   ├── rag/                      # 检索子系统:text scoring(BM25/rerank) chunking memory vector_store
+│   ├── repository/               # 持久化仓储:DatabaseStore
+│   ├── tools/                    # 工具治理:contracts(契约) gateway(网关) mcp_client
+│   ├── services/                 # 业务服务:report_case tool_executor tool_queue tool_records tool_governance
+│   ├── api/                      # HTTP 路由:schemas deps middleware pages system auth_routes chat admin
+│   ├── evaluation/               # 评测:runner datasets report_html
+│   ├── harness/                  # 工程 Harness:factory(装配工厂) runner(场景回放 CLI)
+│   ├── mcp_tools/                # FastMCP 工具服务(可选)
+│   └── rag_eval/                 # RAG 独立评测 runner
+├── knowledge/                    # 内置心理支持知识库(12 篇 .md)
+├── eval/                         # 评测 CLI 与 fixtures(路由/风险/安全/多轮/检索/RAG 数据集)
+├── skills/                       # 标准化心理支持 Skill 规范(SKILL.md)
+├── static/                       # 学生端和管理员端页面(login/student/admin)
 ├── tests/                        # pytest 测试
+├── scripts/                      # 本地与 Compose 启动脚本
 ├── docs/                         # 架构、安全和演示文档
+├── Aegis项目逐文件学习指南.md      # 从零构建式逐模块学习指南
+├── REFACTORING.md                # 第一次模块化重构方案与变更记录
 ├── Dockerfile
 └── docker-compose.yml
 ```
@@ -238,6 +255,8 @@ python -m app.mcp_tools.server --list
 - [架构说明](docs/architecture.md)
 - [安全设计](docs/safety-design.md)
 - [演示脚本](docs/demo-script.md)
+- [逐文件学习指南](Aegis项目逐文件学习指南.md)
+- [第一次重构方案](REFACTORING.md)
 
 ## License
 

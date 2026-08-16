@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy import create_engine, inspect, text
-from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from app.config import get_settings
 
@@ -18,12 +18,6 @@ def _engine_kwargs(database_url: str) -> dict:
 
 
 settings = get_settings()
-database_path = settings.resolve_path(settings.database_url.removeprefix("sqlite:///"))
-if settings.database_url.startswith("sqlite:///"):
-    database_path.parent.mkdir(parents=True, exist_ok=True)
-    database_url = f"sqlite:///{database_path}"
-else:
-    database_url = settings.database_url
 
 
 def resolve_database_url(runtime_settings=None) -> str:
@@ -44,32 +38,16 @@ def build_session_factory(runtime_settings=None):
     return sessionmaker(bind=build_engine(runtime_settings), autoflush=False, autocommit=False)
 
 
-engine = build_engine(settings)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
-
-
 def create_schema(bind_engine=None) -> None:
     from app import entities  # noqa: F401
 
-    runtime_engine = bind_engine or engine
+    runtime_engine = bind_engine or build_engine()
     Base.metadata.create_all(bind=runtime_engine)
     migrate_legacy_schema(runtime_engine)
 
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-def session_scope() -> Session:
-    return SessionLocal()
-
-
 def readiness_check(bind_engine=None) -> bool:
-    runtime_engine = bind_engine or engine
+    runtime_engine = bind_engine or build_engine()
     with runtime_engine.connect() as connection:
         connection.execute(text("SELECT 1"))
     return True

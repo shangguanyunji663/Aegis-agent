@@ -49,17 +49,22 @@ flowchart TD
 
 | 模块 | 说明 |
 | --- | --- |
-| `app/main.py` | FastAPI 应用工厂、鉴权、SSE、学生端和管理端 API |
-| `app/agent_harness.py` | Runtime Harness，统一编排 Agent 调用、报告、trace 和工具计划 |
-| `app/autonomous_runtime.py` | 自治 Agent runtime 适配层，将 blackboard 协作结果转回聊天响应 |
-| `app/autonomous_events.py` | 任务、消息、产物、事件和共享 blackboard 数据结构 |
-| `app/autonomous_coordinator.py` | 基于 claim 的有限轮次协调器，控制任务认领、产物验收和安全复核 |
-| `app/autonomous_agents.py` | Memory、Lead、RiskGuardian、Knowledge、Counselor、Companion 等 Agent |
-| `app/repository.py` | 会话、消息、知识库、报告、个案、工具任务和审计持久化 |
-| `app/vector_store.py` | Chroma 向量检索、embedding 路径和本地降级 |
-| `app/tool_contracts.py` | 工具契约：角色、风险等级、审批要求、脱敏字段和重试限制 |
-| `app/tool_gateway.py` / `app/mcp_client.py` / `app/mcp_tools/server.py` | internal/FastMCP 工具边界 |
+| `app/main.py` | FastAPI 应用工厂:依赖装配、中间件与路由注册(路由实现位于 `app/api/`) |
+| `app/api/` | HTTP 路由层:schemas(请求模型)、deps(鉴权依赖)、middleware(请求/追踪 ID)、pages/system/auth_routes/chat/admin |
+| `app/agents/harness.py` | Runtime Harness,统一编排 Agent 调用、报告和 trace |
+| `app/agents/orchestrator.py` | PsychOrchestrator:装配六类 Agent 并在有序/自治双运行时之间切换 |
+| `app/autonomous/runtime.py` | 自治 Agent runtime 适配层,将 blackboard 协作结果转回聊天响应 |
+| `app/autonomous/events.py` | 任务、消息、产物、事件和共享 blackboard 数据结构 |
+| `app/autonomous/board.py` | 黑板共享读取:意图/风险推断与硬高危词判断的单一实现 |
+| `app/autonomous/coordinator.py` | 基于 claim 的有限轮次协调器,控制任务认领、产物验收和安全复核 |
+| `app/autonomous/agents.py` | Memory、Lead、RiskGuardian、Knowledge、Counselor、Companion 等 Agent |
+| `app/repository/store.py` | 会话、消息、知识库、报告、个案、工具任务和审计持久化(DatabaseStore) |
+| `app/rag/` | 检索子系统:text(分词)、scoring(BM25/重排/融合)、chunking(切块)、memory(会话摘要)、vector_store(Chroma 向量与本地降级) |
+| `app/tools/contracts.py` | 工具契约:角色、风险等级、审批要求、脱敏字段和重试限制 |
+| `app/tools/gateway.py` / `app/tools/mcp_client.py` / `app/mcp_tools/server.py` | internal/FastMCP 工具边界 |
 | `app/services/` | 报告个案、工具执行、工具治理、队列 worker、记录表等服务层 |
+| `app/llm/` | 模型后端:client(Mock/OpenAI/Ollama)+ prompts(提示词模板) |
+| `app/core/` | 横切原语:auth(认证)、privacy(脱敏)、runtime(Redis 限流/锁)、utils |
 | `skills/*/SKILL.md` | 标准化心理支持 Skill 规范 |
 
 ## 4. Agent 协作模型

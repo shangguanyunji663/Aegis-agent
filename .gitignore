@@ -10,3 +10,5 @@ data/*.sqlite
 data/*.sqlite-*
 data/**/*.sqlite
 data/**/*.sqlite-*
+.conda/
+.zcode/

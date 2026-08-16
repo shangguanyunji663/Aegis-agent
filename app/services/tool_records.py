@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-import json
-from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
 from app.entities import AlertRecord, ExcelRecord
-from app.privacy import redacted_payload
+from app.core.privacy import redacted_payload
+from app.core.utils import dumps, loads_dict, now_utc
 
 
 class ToolRecordService:
@@ -34,8 +33,8 @@ class ToolRecordService:
             file_path=str(result.get("path") or ""),
             status=status,
             message=message or str(result.get("message") or "Excel ledger write completed"),
-            payload_json=_json({"payload": redacted_payload(payload), "result": result}),
-            updated_at=_now(),
+            payload_json=dumps({"payload": redacted_payload(payload), "result": result}),
+            updated_at=now_utc(),
         )
         self.db.add(row)
         self.db.flush()
@@ -57,8 +56,8 @@ class ToolRecordService:
             recipient=str(result.get("recipient") or payload.get("recipient") or ""),
             status=status,
             message=message or str(result.get("message") or "Alert delivery completed"),
-            payload_json=_json({"payload": redacted_payload(payload), "result": result}),
-            updated_at=_now(),
+            payload_json=dumps({"payload": redacted_payload(payload), "result": result}),
+            updated_at=now_utc(),
         )
         self.db.add(row)
         self.db.flush()
@@ -81,7 +80,7 @@ def excel_record_dict(row: ExcelRecord) -> dict[str, Any]:
         "file_path": row.file_path,
         "status": row.status,
         "message": row.message,
-        "payload": _loads(row.payload_json),
+        "payload": loads_dict(row.payload_json),
         "created_at": row.created_at.isoformat(),
         "updated_at": row.updated_at.isoformat(),
     }
@@ -96,23 +95,9 @@ def alert_record_dict(row: AlertRecord) -> dict[str, Any]:
         "recipient": row.recipient,
         "status": row.status,
         "message": row.message,
-        "payload": _loads(row.payload_json),
+        "payload": loads_dict(row.payload_json),
         "created_at": row.created_at.isoformat(),
         "updated_at": row.updated_at.isoformat(),
     }
 
 
-def _json(value: Any) -> str:
-    return json.dumps(value, ensure_ascii=False, default=str)
-
-
-def _loads(value: str) -> dict[str, Any]:
-    try:
-        data = json.loads(value or "{}")
-        return data if isinstance(data, dict) else {}
-    except json.JSONDecodeError:
-        return {}
-
-
-def _now() -> datetime:
-    return datetime.now(timezone.utc)

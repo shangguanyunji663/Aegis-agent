@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session
 
 from app.entities import ToolAuditRecord, ToolJob
 from app.models import UserRole
-from app.privacy import redacted_payload
-from app.tool_contracts import get_tool_contract, normalize_tool_kind
+from app.core.privacy import redacted_payload
+from app.tools.contracts import get_tool_contract, normalize_tool_kind
 
 
 class ToolGovernanceService:

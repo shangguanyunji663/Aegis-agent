@@ -9,7 +9,7 @@ from app.config import Settings
 from app.database import Base
 from app.llm import MockLLMClient
 from app.models import ReportStatus, RiskLevel, RuntimeEventType
-from app.orchestrator import PsychOrchestrator
+from app.agents.orchestrator import PsychOrchestrator
 from app.repository import DatabaseStore
 from app.services.tool_queue import ToolQueueWorker
 from app.skills import SkillRegistry

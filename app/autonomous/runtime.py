@@ -4,8 +4,8 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
-from app.agents import MemoryAgent
-from app.autonomous_agents import (
+from app.agents.classic import MemoryAgent
+from app.autonomous.agents import (
     AutonomousRuntimeServices,
     CompanionAutonomousAgent,
     CounselorAutonomousAgent,
@@ -14,9 +14,10 @@ from app.autonomous_agents import (
     MemoryAutonomousAgent,
     RiskGuardianAutonomousAgent,
 )
-from app.autonomous_coordinator import AutonomousCoordinator
-from app.autonomous_events import AgentEvent, AgentEventType, CollaborationBlackboard
-from app.autonomous_registry import AutonomousAgentRegistry
+from app.autonomous.board import intent_from_board, risk_from_board
+from app.autonomous.coordinator import AutonomousCoordinator
+from app.autonomous.events import AgentEvent, AgentEventType, CollaborationBlackboard
+from app.autonomous.registry import AutonomousAgentRegistry
 from app.models import AgentTrace, Intent, PendingReport, ResponsePlan, RiskLevel, SkillResult
 
 
@@ -100,8 +101,8 @@ class AutonomousAgentRuntime:
         trace = self._trace_from_board(board)
         trace.append(memory_trace)
         return AutonomousRunOutcome(
-            intent=self._intent_from_board(board),
-            risk_level=self._risk_from_board(board),
+            intent=intent_from_board(board, use_hard_terms=False),
+            risk_level=risk_from_board(board),
             answer=answer,
             skills=self._skills_from_board(board),
             trace=trace,
@@ -111,31 +112,6 @@ class AutonomousAgentRuntime:
             board=board,
             response_plan=self._response_plan_from_board(board),
         )
-
-    def _intent_from_board(self, board: CollaborationBlackboard) -> Intent:
-        if self._risk_from_board(board) is RiskLevel.HIGH:
-            return Intent.RISK
-        artifact = board.latest_artifact("intent")
-        if artifact:
-            try:
-                return Intent(str(artifact.payload.get("intent", Intent.COMPANION.value)))
-            except ValueError:
-                return Intent.COMPANION
-        return Intent.COMPANION
-
-    def _risk_from_board(self, board: CollaborationBlackboard) -> RiskLevel:
-        highest = RiskLevel.LOW
-        order = {RiskLevel.LOW: 1, RiskLevel.MEDIUM: 2, RiskLevel.HIGH: 3}
-        for artifact in board.artifacts_by_kind("risk"):
-            try:
-                risk = RiskLevel(str(artifact.payload.get("risk_level", RiskLevel.LOW.value)))
-            except ValueError:
-                risk = RiskLevel.LOW
-            if order[risk] > order[highest]:
-                highest = risk
-        if any(event.type == AgentEventType.SAFETY_OVERRIDE for event in board.events):
-            return RiskLevel.HIGH
-        return highest
 
     def _skills_from_board(self, board: CollaborationBlackboard) -> list[SkillResult]:
         skills: list[SkillResult] = []
@@ -159,17 +135,7 @@ class AutonomousAgentRuntime:
         report = artifact.payload.get("report")
         if not report:
             return None
-        from app.models import ReportStatus
-
-        return PendingReport(
-            id=report["id"],
-            session_id=report["session_id"],
-            message=report["message"],
-            risk_level=RiskLevel(report["risk_level"]),
-            rationale=list(report["rationale"]),
-            status=ReportStatus(report["status"]),
-            created_at=report["created_at"],
-        )
+        return PendingReport.from_dict(report)
 
     def _response_plan_from_board(self, board: CollaborationBlackboard) -> ResponsePlan | None:
         response = board.accepted_artifact() or board.latest_artifact("response_proposal")
@@ -189,7 +155,7 @@ class AutonomousAgentRuntime:
                     f"covered_messages={memory.payload.get('covered_message_count', 0)}",
                 )
             )
-        if self._intent_from_board(board) is Intent.COMPANION and board.latest_artifact("context") is None:
+        if intent_from_board(board, use_hard_terms=False) is Intent.COMPANION and board.latest_artifact("context") is None:
             trace.append(AgentTrace("KnowledgeAgent", "skip_knowledge", "intent=companion; chat-style turns do not retrieve RAG"))
         response = board.accepted_artifact() or board.latest_artifact("response_proposal")
         if response is not None:

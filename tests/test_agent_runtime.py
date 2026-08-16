@@ -1,6 +1,6 @@
 import pytest
 
-from app.agent_runtime import AgentRegistry, AgentRuntimeRunner
+from app.agents.runtime import AgentRegistry, AgentRuntimeRunner
 from app.models import RuntimeEventType
 from tests.test_orchestrator import build_orchestrator
 

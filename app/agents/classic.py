@@ -110,20 +110,6 @@ class CounselorAgent:
         result = self.registry.get("grounding_exercise").handler(message)
         return result, AgentTrace(self.name, "grounding_exercise", result.output["title"])
 
-    def compose(
-        self,
-        message: str,
-        intent: Intent,
-        risk_level: RiskLevel,
-        memory_summary: str,
-        knowledge: SkillResult | None,
-        grounding: SkillResult | None,
-        response_skill_context: str = "",
-    ) -> tuple[str, AgentTrace]:
-        plan, _ = self.compose_plan(message, intent, risk_level, memory_summary, knowledge, grounding, response_skill_context)
-        answer, trace = self.finalize_plan(plan)
-        return answer, trace
-
     def compose_plan(
         self,
         message: str,

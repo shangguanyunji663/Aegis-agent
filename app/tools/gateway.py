@@ -5,9 +5,9 @@ from typing import Any, Protocol
 import asyncio
 
 from app.config import Settings
-from app.mcp_client import AegisMcpToolClient
+from app.tools.mcp_client import AegisMcpToolClient
 from app.mcp_tools.server import read_resource
-from app.tool_contracts import normalize_tool_kind
+from app.tools.contracts import normalize_tool_kind
 
 
 class ToolGateway(Protocol):

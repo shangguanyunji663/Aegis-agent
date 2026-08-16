@@ -1,18 +1,21 @@
+"""持久化仓储:DatabaseStore 封装全部 SQLAlchemy 读写与 Redis 缓存。
+
+会话/消息/认证/审计/记忆/知识库/工具任务/模型档案/追踪等表操作集中于此;
+检索算法在 app.rag 中实现,报告与工单的服务逻辑在 app.services 中实现。
+"""
 from __future__ import annotations
 
 import json
-import math
-import re
 from dataclasses import asdict
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Hashable
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
-from app.auth import expires_after, make_password_hash, new_session_token, random_id, utcnow, verify_password
 from app.config import get_settings
+from app.core.auth import expires_after, make_password_hash, new_session_token, random_id, utcnow, verify_password
+from app.core.privacy import redacted_payload
+from app.core.utils import loads_or, now_utc_naive
 from app.entities import (
     AdminAuditLog,
     AgentModelProfile,
@@ -20,31 +23,30 @@ from app.entities import (
     AgentRunTrace,
     AuthSession,
     AuthUser,
-    CaseNote,
     ChatMessage,
     ChatSession,
     DeadLetterRecord,
     KnowledgeChunk,
     PsychologicalReport,
-    RiskCase,
     SessionMemory,
     ToolAuditRecord,
     ToolJob,
 )
-from app.models import AgentTrace, CaseStatus, PendingReport, ReportStatus, RiskLevel, SkillResult, ToolJobStatus, UserRole
-from app.privacy import redacted_payload
-from app.services.tool_executor import ToolExecutionService
-from app.services.tool_queue import ToolQueueService
-from app.services.tool_records import ToolRecordService
-from app.services.report_case import ReportCaseService
-from app.tool_contracts import governed_payload, normalize_tool_kind
-from app.vector_store import (
+from app.models import AgentTrace, CaseStatus, PendingReport, ReportStatus, SkillResult, ToolJobStatus, UserRole
+from app.rag.chunking import chunk_text, knowledge_metadata_summary, metadata_matches, parse_knowledge_document, rewrite_query
+from app.rag.memory import build_memory_summary
+from app.rag.scoring import bm25_scores, expand_best_hit, fused_score, normalize_scores, rerank_score
+from app.rag.vector_store import (
     FALLBACK_RETRIEVAL_LABEL,
     PRIMARY_RETRIEVAL_LABEL,
     VectorStoreUnavailable,
     build_vector_backend,
     embed_text,
 )
+from app.services.report_case import ReportCaseService
+from app.services.tool_queue import ToolQueueService
+from app.services.tool_records import ToolRecordService
+from app.tools.contracts import governed_payload, normalize_tool_kind
 
 
 class DatabaseStore:
@@ -152,13 +154,6 @@ class DatabaseStore:
             db.add(session)
             db.commit()
             return True
-
-    def session_belongs_to_user(self, public_id: str, owner_user_public_id: str) -> bool:
-        with self.db_factory() as db:
-            session = self._get_session(db, public_id)
-            if session is None:
-                return False
-            return session.owner_user_public_id == owner_user_public_id
 
     def append_message(self, session_id: str, role: str, content: str) -> None:
         with self.db_factory() as db:
@@ -290,28 +285,6 @@ class DatabaseStore:
             rows = db.query(AdminAuditLog).order_by(AdminAuditLog.created_at.desc(), AdminAuditLog.id.desc()).limit(200).all()
             return [self._audit_log_dict(row) for row in rows]
 
-    def recent_messages(self, public_id: str, limit: int | None = None) -> list[dict]:
-        max_items = limit or self.settings.memory_recent_messages
-        with self.db_factory() as db:
-            session = self._get_session(db, public_id)
-            if session is None:
-                return []
-            rows = (
-                db.query(ChatMessage)
-                .filter(ChatMessage.session_id == session.id)
-                .order_by(ChatMessage.created_at.desc(), ChatMessage.id.desc())
-                .limit(max_items)
-                .all()
-            )
-            return [
-                {
-                    "role": row.role,
-                    "content": row.content,
-                    "created_at": row.created_at.isoformat(),
-                }
-                for row in reversed(rows)
-            ]
-
     def get_memory(self, public_id: str) -> dict:
         cached = self._redis_get_session_memory(public_id)
         if cached is not None:
@@ -330,7 +303,7 @@ class DatabaseStore:
                 memory = SessionMemory(session_public_id=public_id, summary="")
             memory.summary = build_memory_summary(memory.summary, user_message, assistant_answer, self.settings.memory_summary_max_chars)
             memory.covered_message_count = message_count
-            memory.updated_at = _now()
+            memory.updated_at = now_utc_naive()
             db.add(memory)
             db.commit()
             db.refresh(memory)
@@ -420,7 +393,7 @@ class DatabaseStore:
                 return None
             row.status = ToolJobStatus.PENDING.value
             row.last_error = ""
-            row.updated_at = _now()
+            row.updated_at = now_utc_naive()
             db.add(row)
             db.commit()
             db.refresh(row)
@@ -515,7 +488,7 @@ class DatabaseStore:
         if self.redis_client is None:
             return None
         raw = self.redis_client.get(f"aegis:session-memory:{public_id}")
-        return _loads(raw, None) if raw else None
+        return loads_or(raw, None) if raw else None
 
     def _redis_set_session_memory(self, public_id: str, memory: dict) -> None:
         if self.redis_client is None:
@@ -535,7 +508,7 @@ class DatabaseStore:
             return []
         key = f"aegis:agent-memory:{agent_name}:{session_id}"
         rows = self.redis_client.lrange(key, -max(1, limit), -1)
-        return [_loads(row, {}) for row in rows if row]
+        return [loads_or(row, {}) for row in rows if row]
 
     def ensure_agent_model_profiles(self, profiles: list[dict]) -> None:
         with self.db_factory() as db:
@@ -640,11 +613,11 @@ class DatabaseStore:
 
     def backup_knowledge_dir(self, output_dir: Path) -> dict:
         output_dir.mkdir(parents=True, exist_ok=True)
-        target = output_dir / f"knowledge-backup-{_now().strftime('%Y%m%d%H%M%S')}.json"
+        target = output_dir / f"knowledge-backup-{now_utc_naive().strftime('%Y%m%d%H%M%S')}.json"
         with self.db_factory() as db:
             rows = db.query(KnowledgeChunk).order_by(KnowledgeChunk.source.asc(), KnowledgeChunk.source_index.asc()).all()
             payload = [
-                {"source": row.source, "source_index": row.source_index, "content": row.content, "metadata": _loads(row.metadata_json, {})}
+                {"source": row.source, "source_index": row.source_index, "content": row.content, "metadata": loads_or(row.metadata_json, {})}
                 for row in rows
             ]
         target.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -702,7 +675,7 @@ class DatabaseStore:
             chunks = [
                 chunk
                 for chunk in db.query(KnowledgeChunk).all()
-                if metadata_matches(_loads(chunk.metadata_json, {}), topic=topic, risk_level=risk_level, audience=audience)
+                if metadata_matches(loads_or(chunk.metadata_json, {}), topic=topic, risk_level=risk_level, audience=audience)
             ]
             if not chunks:
                 return []
@@ -754,7 +727,7 @@ class DatabaseStore:
                         "source_index": chunk.source_index,
                         "content": chunk.content,
                         "snippet": chunk.content[:320],
-                        "metadata": _loads(chunk.metadata_json, {}),
+                        "metadata": loads_or(chunk.metadata_json, {}),
                         "score": f"{score:.4f}",
                     }
                 )
@@ -840,8 +813,8 @@ class DatabaseStore:
                     "message_id": row.message_id,
                     "intent": row.intent,
                     "risk_level": row.risk_level,
-                    "agent_steps": _loads(row.agent_steps_json, []),
-                    "skill_calls": _loads(row.skill_calls_json, []),
+                    "agent_steps": loads_or(row.agent_steps_json, []),
+                    "skill_calls": loads_or(row.skill_calls_json, []),
                     "answer": row.answer,
                     "created_at": row.created_at.isoformat(),
                 }
@@ -872,7 +845,7 @@ class DatabaseStore:
             "action": row.action,
             "target_type": row.target_type,
             "target_id": row.target_public_id,
-            "payload": _loads(row.payload_json, {}),
+            "payload": loads_or(row.payload_json, {}),
             "created_at": row.created_at.isoformat(),
         }
 
@@ -883,99 +856,6 @@ class DatabaseStore:
             "updated_at": memory.updated_at.isoformat(),
         }
 
-    def _report_dict(self, row: PsychologicalReport) -> dict:
-        return {
-            "id": row.public_id,
-            "session_id": row.session_public_id,
-            "message": row.message,
-            "intent": row.intent,
-            "emotion": row.emotion,
-            "emotion_score": row.emotion_score,
-            "risk_level": row.risk_level,
-            "confidence": row.confidence,
-            "rationale": _loads(row.rationale_json, []),
-            "summary": row.summary,
-            "status": row.status,
-            "created_at": row.created_at.isoformat(),
-        }
-
-    def _ensure_case(self, db: Session, report: PsychologicalReport) -> RiskCase:
-        existing = db.query(RiskCase).filter(RiskCase.report_public_id == report.public_id).first()
-        if existing is not None:
-            self._ensure_case_tool_jobs(db, report, existing)
-            return existing
-        case = RiskCase(
-            public_id=f"case-{uuid4().hex[:8]}",
-            report_public_id=report.public_id,
-            session_public_id=report.session_public_id,
-            risk_level=report.risk_level,
-            status=CaseStatus.OPEN.value,
-            summary=report.summary,
-            handoff_summary=_handoff_summary(report),
-        )
-        db.add(case)
-        db.flush()
-        self._ensure_case_tool_jobs(db, report, case)
-        return case
-
-    def _ensure_case_tool_jobs(self, db: Session, report: PsychologicalReport, case: RiskCase) -> None:
-        existing = db.query(ToolJob).filter(ToolJob.case_public_id == case.public_id).first()
-        if existing is not None:
-            return
-        payload = {
-            "report_id": report.public_id,
-            "case_id": case.public_id,
-            "session_id": report.session_public_id,
-            "risk_level": report.risk_level,
-            "summary": report.summary,
-        }
-        for kind in ["create_alert", "send_email", "write_ledger", "create_handoff_summary", "follow_up_suggestion"]:
-            job_payload = governed_payload(
-                kind,
-                payload | {"kind": kind, "suggestion": _follow_up_suggestion(report, case, kind)},
-                role=UserRole.ADMIN.value,
-                approved=True,
-            )
-            db.add(
-                ToolJob(
-                    public_id=f"job-{uuid4().hex[:8]}",
-                    kind=kind,
-                    status=ToolJobStatus.PENDING.value,
-                    report_public_id=report.public_id,
-                    case_public_id=case.public_id,
-                    payload_json=json.dumps(job_payload, ensure_ascii=False),
-                )
-            )
-
-    def _case_dict(self, db: Session, case: RiskCase) -> dict:
-        notes = (
-            db.query(CaseNote)
-            .filter(CaseNote.case_public_id == case.public_id)
-            .order_by(CaseNote.created_at.asc(), CaseNote.id.asc())
-            .all()
-        )
-        return {
-            "id": case.public_id,
-            "report_id": case.report_public_id,
-            "session_id": case.session_public_id,
-            "risk_level": case.risk_level,
-            "status": case.status,
-            "owner": case.owner,
-            "summary": case.summary,
-            "handoff_summary": case.handoff_summary,
-            "created_at": case.created_at.isoformat(),
-            "updated_at": case.updated_at.isoformat(),
-            "notes": [
-                {
-                    "id": note.id,
-                    "actor": note.actor,
-                    "note": note.note,
-                    "created_at": note.created_at.isoformat(),
-                }
-                for note in notes
-            ],
-        }
-
     def _tool_job_dict(self, row: ToolJob) -> dict:
         return {
             "id": row.public_id,
@@ -983,7 +863,7 @@ class DatabaseStore:
             "status": row.status,
             "report_id": row.report_public_id,
             "case_id": row.case_public_id,
-            "payload": _loads(row.payload_json, {}),
+            "payload": loads_or(row.payload_json, {}),
             "attempts": row.attempts,
             "max_attempts": row.max_attempts,
             "last_error": row.last_error,
@@ -1032,7 +912,7 @@ class DatabaseStore:
             "report_id": row.report_public_id,
             "case_id": row.case_public_id,
             "job_id": row.job_public_id,
-            "payload": _loads(row.payload_json, {}),
+            "payload": loads_or(row.payload_json, {}),
             "created_at": row.created_at.isoformat(),
         }
 
@@ -1042,7 +922,7 @@ class DatabaseStore:
             "job_id": row.job_public_id,
             "tool_kind": row.tool_kind,
             "reason": row.reason,
-            "payload": _loads(row.payload_json, {}),
+            "payload": loads_or(row.payload_json, {}),
             "created_at": row.created_at.isoformat(),
         }
 
@@ -1052,7 +932,7 @@ class DatabaseStore:
             "agent_name": row.agent_name,
             "session_id": row.session_public_id,
             "content": row.content,
-            "metadata": _loads(row.metadata_json, {}),
+            "metadata": loads_or(row.metadata_json, {}),
             "created_at": row.created_at.isoformat(),
         }
 
@@ -1072,308 +952,3 @@ class DatabaseStore:
 def _title(value: str) -> str:
     normalized = " ".join((value or "新对话").split())
     return normalized[:36] or "新对话"
-
-
-def _now() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
-
-
-def _loads(raw: str, default):
-    try:
-        return json.loads(raw or "")
-    except Exception:
-        return default
-
-
-def _handoff_summary(report: PsychologicalReport) -> str:
-    return (
-        f"报告 {report.public_id}，风险等级 {report.risk_level}。"
-        f"摘要：{report.summary or '暂无摘要'}。"
-        "建议确认学生当前位置、身边支持者、当前安全状态，并记录后续跟进安排。"
-    )
-
-
-def _follow_up_suggestion(report: PsychologicalReport, case: RiskCase, kind: str) -> str:
-    if kind == "follow_up_suggestion":
-        return (
-            "建议管理员优先复核该高风险报告，确认学生当前安全状态、可联系支持者、"
-            "以及是否需要辅导员介入。该建议仅供后台审核，不直接触达学生。"
-        )
-    if normalize_tool_kind(kind) == "create_handoff_summary":
-        return case.handoff_summary
-    return "等待管理员确认后执行对应后置任务。"
-
-
-def execute_tool_job(kind: str, payload: dict, attempts: int) -> dict:
-    return ToolExecutionService(get_settings()).execute(kind, payload, attempts)
-
-
-def append_tool_output(filename: str, kind: str, payload: dict, attempts: int) -> str:
-    output_dir = Path(__file__).resolve().parents[1] / "data" / "tool-outputs"
-    output_dir.mkdir(parents=True, exist_ok=True)
-    path = output_dir / filename
-    row = {
-        "created_at": _now().isoformat(),
-        "kind": kind,
-        "attempts": attempts,
-        "payload": redacted_payload(payload),
-    }
-    if filename.endswith(".csv"):
-        header = "created_at,kind,attempts,report_id,case_id,risk_level,summary\n"
-        if not path.exists():
-            path.write_text(header, encoding="utf-8")
-        values = [
-            row["created_at"],
-            kind,
-            str(attempts),
-            str(payload.get("report_id", "")),
-            str(payload.get("case_id", "")),
-            str(payload.get("risk_level", "")),
-            str(payload.get("summary", "")).replace("\n", " ").replace(",", "，"),
-        ]
-        with path.open("a", encoding="utf-8") as handle:
-            handle.write(",".join(values) + "\n")
-    else:
-        with path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
-    return str(path)
-
-
-def build_memory_summary(previous: str, user_message: str, assistant_answer: str, max_chars: int) -> str:
-    user_focus = compact_sentence(user_message, 120)
-    answer_focus = compact_sentence(assistant_answer, 160)
-    new_line = f"用户提到：{user_focus}；系统回应重点：{answer_focus}"
-    lines = [line for line in (previous.splitlines() if previous else []) if line.strip()]
-    lines.append(new_line)
-    kept: list[str] = []
-    current_length = 0
-    for line in reversed(lines):
-        extra = len(line) + (1 if kept else 0)
-        if kept and current_length + extra > max_chars:
-            break
-        if not kept and len(line) > max_chars:
-            kept.append(line[:max_chars])
-            break
-        kept.append(line)
-        current_length += extra
-    return "\n".join(reversed(kept)).strip()
-
-
-def compact_sentence(value: str, limit: int) -> str:
-    text = re.sub(r"\s+", " ", value or "").strip()
-    return text[:limit] + ("..." if len(text) > limit else "")
-
-
-def parse_knowledge_document(source: str, content: str) -> tuple[dict[str, str], str]:
-    default = {
-        "topic": Path(source).stem,
-        "audience": "student",
-        "risk_level": "low",
-        "source_type": "local_markdown",
-        "last_reviewed": "",
-    }
-    text = content or ""
-    if not text.startswith("---\n"):
-        return default, text
-    end = text.find("\n---", 4)
-    if end == -1:
-        return default, text
-    raw = text[4:end].strip()
-    body = text[end + 4:].lstrip()
-    metadata = dict(default)
-    for line in raw.splitlines():
-        if ":" not in line:
-            continue
-        key, value = line.split(":", 1)
-        normalized_key = key.strip().lower()
-        if normalized_key in metadata:
-            metadata[normalized_key] = value.strip().strip("\"'")
-    metadata["source"] = source
-    return metadata, body
-
-
-def metadata_matches(metadata: dict, topic: str | None = None, risk_level: str | None = None, audience: str | None = None) -> bool:
-    filters = {
-        "topic": topic,
-        "risk_level": risk_level,
-        "audience": audience,
-    }
-    for key, expected in filters.items():
-        value = (expected or "").strip().lower()
-        if not value:
-            continue
-        actual = str(metadata.get(key, "")).strip().lower()
-        if actual != value:
-            return False
-    return True
-
-
-def knowledge_metadata_summary(rows: list[KnowledgeChunk]) -> dict[str, list[str]]:
-    summary = {"topics": set(), "risk_levels": set(), "audiences": set(), "source_types": set()}
-    for row in rows:
-        metadata = _loads(row.metadata_json, {})
-        if metadata.get("topic"):
-            summary["topics"].add(str(metadata["topic"]))
-        if metadata.get("risk_level"):
-            summary["risk_levels"].add(str(metadata["risk_level"]))
-        if metadata.get("audience"):
-            summary["audiences"].add(str(metadata["audience"]))
-        if metadata.get("source_type"):
-            summary["source_types"].add(str(metadata["source_type"]))
-    return {key: sorted(values) for key, values in summary.items()}
-
-
-def rewrite_query(value: str) -> str:
-    text = re.sub(r"\s+", " ", value or "").strip()
-    if len(text) <= 60:
-        return text
-    return text[:60]
-
-
-def chunk_text(content: str, size: int, overlap: int) -> list[str]:
-    text = re.sub(r"\s+", " ", content or "").strip()
-    if not text:
-        return []
-    chunks = []
-    start = 0
-    step = max(1, size - overlap)
-    while start < len(text):
-        chunks.append(text[start:start + size])
-        start += step
-    return chunks
-
-
-def bm25_scores(query: str, chunks: list[KnowledgeChunk]) -> dict[int, float]:
-    query_terms = counts(tokenize(query))
-    if not query_terms or not chunks:
-        return {}
-    documents = []
-    doc_freqs: dict[str, int] = {}
-    for chunk in chunks:
-        if chunk.id is None:
-            continue
-        token_counts = counts(tokenize(chunk.content))
-        documents.append((chunk.id, token_counts, sum(token_counts.values())))
-        for term in token_counts:
-            doc_freqs[term] = doc_freqs.get(term, 0) + 1
-    total_docs = len(documents)
-    if total_docs == 0:
-        return {}
-    average_length = sum(length for _, _, length in documents) / total_docs or 1.0
-    k1 = 1.5
-    b = 0.75
-    scores: dict[int, float] = {}
-    for chunk_id, token_counts, doc_length in documents:
-        score = 0.0
-        length_norm = k1 * (1.0 - b + b * doc_length / average_length)
-        for term, query_frequency in query_terms.items():
-            term_frequency = token_counts.get(term, 0)
-            if term_frequency == 0:
-                continue
-            doc_frequency = doc_freqs.get(term, 0)
-            idf = math.log(1.0 + (total_docs - doc_frequency + 0.5) / (doc_frequency + 0.5))
-            query_boost = 1.0 + math.log(query_frequency)
-            score += idf * query_boost * (term_frequency * (k1 + 1.0)) / (term_frequency + length_norm)
-        if score > 0:
-            scores[chunk_id] = score
-    return scores
-
-
-def rerank_score(query: str, content: str, base_score: float) -> float:
-    lexical = token_cosine(query, content)
-    coverage = query_token_coverage(query, content)
-    phrase = phrase_score(query, content)
-    keyword = keyword_score(query, content)
-    hybrid = lexical * 0.75 + keyword * 0.25
-    return base_score * 0.55 + hybrid * 0.25 + coverage * 0.15 + phrase * 0.05
-
-
-def fused_score(vector_score: float, bm25_score: float, vector_weight: float, bm25_weight: float) -> float:
-    if vector_weight <= 0 and bm25_weight <= 0:
-        bm25_weight = 1.0
-    return vector_score * vector_weight + bm25_score * bm25_weight
-
-
-def normalize_scores(scores: dict[Hashable, float]) -> dict[Hashable, float]:
-    if not scores:
-        return {}
-    values = list(scores.values())
-    lo = min(values)
-    hi = max(values)
-    if hi == lo:
-        return {key: 1.0 if value > 0 else 0.0 for key, value in scores.items()}
-    return {key: (value - lo) / (hi - lo) if value > 0 else 0.0 for key, value in scores.items()}
-
-
-def query_token_coverage(query: str, content: str) -> float:
-    query_tokens = set(tokenize(query))
-    if not query_tokens:
-        return 0.0
-    content_tokens = set(tokenize(content))
-    return len(query_tokens & content_tokens) / len(query_tokens)
-
-
-def phrase_score(query: str, content: str) -> float:
-    normalized_query = re.sub(r"\s+", "", query.lower())
-    if not normalized_query:
-        return 0.0
-    return 1.0 if normalized_query in re.sub(r"\s+", "", content.lower()) else 0.0
-
-
-def keyword_score(query: str, content: str) -> float:
-    query_tokens = [token for token in tokenize(query) if len(token.strip()) >= 1]
-    if not query_tokens:
-        return 0.0
-    content_text = content.lower()
-    hits = sum(1 for token in query_tokens if token.lower() in content_text)
-    return hits / len(query_tokens)
-
-
-def expand_best_hit(ranked: list[tuple[KnowledgeChunk, float]], chunks: list[KnowledgeChunk]) -> list[tuple[KnowledgeChunk, float]]:
-    if not ranked:
-        return ranked
-    best_chunk, best_score = ranked[0]
-    neighbors = sorted(
-        [
-            chunk
-            for chunk in chunks
-            if chunk.source == best_chunk.source and abs(chunk.source_index - best_chunk.source_index) <= 1
-        ],
-        key=lambda item: item.source_index,
-    )
-    if len(neighbors) <= 1:
-        return ranked
-    expanded_content = " ".join(chunk.content for chunk in neighbors)
-    expanded = KnowledgeChunk(
-        source=best_chunk.source,
-        source_index=best_chunk.source_index,
-        content=expanded_content,
-        embedding_json=best_chunk.embedding_json,
-    )
-    return [(expanded, best_score)] + ranked[1:]
-
-
-def tokenize(text: str) -> list[str]:
-    words = re.findall(r"[a-zA-Z0-9_]+|[\u4e00-\u9fff]", text.lower())
-    grams = words[:]
-    compact = "".join(ch for ch in text.lower() if "\u4e00" <= ch <= "\u9fff")
-    grams.extend(compact[i:i + 2] for i in range(max(0, len(compact) - 1)))
-    return [item for item in grams if item.strip()]
-
-
-def token_cosine(left: str, right: str) -> float:
-    left_counts = counts(tokenize(left))
-    right_counts = counts(tokenize(right))
-    if not left_counts or not right_counts:
-        return 0.0
-    dot = sum(value * right_counts.get(key, 0) for key, value in left_counts.items())
-    left_norm = math.sqrt(sum(value * value for value in left_counts.values()))
-    right_norm = math.sqrt(sum(value * value for value in right_counts.values()))
-    return 0.0 if left_norm == 0 or right_norm == 0 else dot / (left_norm * right_norm)
-
-
-def counts(values: list[Hashable]) -> dict[Hashable, int]:
-    result: dict[Hashable, int] = {}
-    for value in values:
-        result[value] = result.get(value, 0) + 1
-    return result

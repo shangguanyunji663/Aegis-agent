@@ -6,7 +6,7 @@ import threading
 import time
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from threading import Lock
 from uuid import uuid4
 
@@ -18,7 +18,8 @@ from app.models import ToolJobStatus
 from app.services.tool_executor import ToolExecutionService
 from app.services.tool_governance import ToolGovernanceService
 from app.services.tool_records import ToolRecordService
-from app.tool_contracts import normalize_tool_kind
+from app.tools.contracts import normalize_tool_kind
+from app.core.utils import loads_dict, now_utc
 
 
 logger = logging.getLogger("aegis.tool_queue")
@@ -48,7 +49,7 @@ class ToolQueueService:
         self.executor = ToolExecutionService(settings)
 
     def run_pending(self, db: Session, limit: int = 20) -> list[str]:
-        now = _now()
+        now = now_utc()
         rows = (
             db.query(ToolJob)
             .filter(ToolJob.status == ToolJobStatus.PENDING.value)
@@ -66,13 +67,13 @@ class ToolQueueService:
         return processed
 
     def run_job(self, db: Session, row: ToolJob, email_limiter: RateLimiter | None = None) -> None:
-        payload = _loads(row.payload_json)
+        payload = loads_dict(row.payload_json)
         governance = ToolGovernanceService(db)
         ready, wait_reason = self._dependency_ready(db, row)
         if not ready:
             row.last_error = wait_reason
-            row.run_after = _now() + timedelta(seconds=max(0.0, self.settings.tool_queue_retry_delay_seconds))
-            row.updated_at = _now()
+            row.run_after = now_utc() + timedelta(seconds=max(0.0, self.settings.tool_queue_retry_delay_seconds))
+            row.updated_at = now_utc()
             governance.audit(row, "execute", "deferred", wait_reason, payload)
             db.add(row)
             return
@@ -81,14 +82,14 @@ class ToolQueueService:
             if not allowed:
                 reason = f"email rate limited, retry after {round(retry_after, 2)} seconds"
                 row.last_error = reason
-                row.run_after = _now() + timedelta(seconds=retry_after)
-                row.updated_at = _now()
+                row.run_after = now_utc() + timedelta(seconds=retry_after)
+                row.updated_at = now_utc()
                 governance.audit(row, "execute", "deferred", reason, payload)
                 db.add(row)
                 return
         row.status = ToolJobStatus.RUNNING.value
         row.attempts += 1
-        row.updated_at = _now()
+        row.updated_at = now_utc()
         db.add(row)
         governance.audit(row, "execute", "started", "tool job execution started", payload)
         try:
@@ -105,19 +106,19 @@ class ToolQueueService:
             row.last_error = reason
             row.status = ToolJobStatus.DEAD.value if row.attempts >= row.max_attempts else ToolJobStatus.PENDING.value
             if row.status == ToolJobStatus.PENDING.value:
-                row.run_after = _now() + timedelta(seconds=self.settings.tool_queue_retry_delay_seconds * max(1, row.attempts))
+                row.run_after = now_utc() + timedelta(seconds=self.settings.tool_queue_retry_delay_seconds * max(1, row.attempts))
             decision = "rejected" if row.status == ToolJobStatus.DEAD.value else "deferred"
             governance.audit(row, "execute", decision, reason, payload)
             if row.status == ToolJobStatus.DEAD.value:
                 self._record_dead_letter(db, row, reason, payload)
-        row.updated_at = _now()
+        row.updated_at = now_utc()
         db.add(row)
 
     def _dependency_ready(self, db: Session, row: ToolJob) -> tuple[bool, str]:
         kind = normalize_tool_kind(row.kind)
         if kind != "send_email":
             return True, ""
-        payload = _loads(row.payload_json)
+        payload = loads_dict(row.payload_json)
         if payload.get("risk_level") != "high" or not (row.report_public_id or row.case_public_id):
             return True, ""
         blockers = []
@@ -223,7 +224,7 @@ class ToolQueueWorker:
     def _claim_pending_jobs(self) -> list[str]:
         with self.dispatch_lock:
             with self.db_factory() as db:
-                now = _now()
+                now = now_utc()
                 rows = (
                     db.query(ToolJob)
                     .filter(ToolJob.status == ToolJobStatus.PENDING.value)
@@ -236,7 +237,7 @@ class ToolQueueWorker:
                 job_ids = []
                 for row in rows:
                     row.status = ToolJobStatus.RUNNING.value
-                    row.updated_at = _now()
+                    row.updated_at = now_utc()
                     db.add(row)
                     job_ids.append(row.public_id)
                 db.commit()
@@ -259,22 +260,10 @@ class ToolQueueWorker:
             for row in rows:
                 row.status = ToolJobStatus.PENDING.value
                 row.last_error = "service restarted before job completed"
-                row.run_after = _now()
-                row.updated_at = _now()
+                row.run_after = now_utc()
+                row.updated_at = now_utc()
                 db.add(row)
             db.commit()
-
-
-def _loads(value: str) -> dict:
-    try:
-        data = json.loads(value or "{}")
-        return data if isinstance(data, dict) else {}
-    except json.JSONDecodeError:
-        return {}
-
-
-def _now() -> datetime:
-    return datetime.now(timezone.utc)
 
 
 def _job_priority(row: ToolJob) -> tuple[int, datetime, int]:

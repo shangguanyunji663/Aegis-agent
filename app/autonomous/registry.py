@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Protocol
 
-from app.autonomous_events import AgentTask, AgentTurnResult, CollaborationBlackboard
+from app.autonomous.events import AgentTask, AgentTurnResult, CollaborationBlackboard
 
 
 class AgentCapability(str, Enum):

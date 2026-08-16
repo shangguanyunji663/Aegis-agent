@@ -34,13 +34,13 @@
 
 - 报告审批、个案备注、工具执行、知识库维护等操作都会写入 audit log。
 - 审计记录包含 actor、role、action、target 和必要 payload。
-- 敏感 payload 会经过 `app/privacy.py` 脱敏后再进入可查看记录。
+- 敏感 payload 会经过 `app/core/privacy.py` 脱敏后再进入可查看记录。
 
 ## 5. 知识库边界
 
 知识库用于辅助心理支持表达，不作为诊断依据：
 
-- 上传文件限制为 `.md` 和 `.txt`。
+- 上传文件限制为 `.md`、`.txt` 和 `.pdf`。
 - 上传大小由配置项控制。
 - 检索可使用本地 BM25，也可以启用 Chroma 向量路径。
 - 文档元数据支持 topic、audience、risk_level 等过滤，减少不相关召回。

@@ -1,10 +1,9 @@
 import asyncio
 
-from app.mcp_client import AegisMcpToolClient
+from app.tools.mcp_client import AegisMcpToolClient
 from app.mcp_tools.server import list_mcp_capabilities
 from app.config import Settings
-from app.models import ReportStatus
-from app.tool_gateway import build_tool_gateway
+from app.tools.gateway import build_tool_gateway
 from tests.test_orchestrator import build_orchestrator
 
 

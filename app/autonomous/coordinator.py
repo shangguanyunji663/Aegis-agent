@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from app.autonomous_events import (
+from app.autonomous.board import hard_high_risk, intent_from_board, risk_from_board
+from app.autonomous.events import (
     AgentEvent,
     AgentEventType,
     AgentTask,
@@ -10,7 +11,7 @@ from app.autonomous_events import (
     PRIORITY_ORDER,
     TaskPriority,
 )
-from app.autonomous_registry import AgentCapability, AutonomousAgentRegistry
+from app.autonomous.registry import AgentCapability, AutonomousAgentRegistry
 from app.models import Intent, RiskLevel
 
 
@@ -86,7 +87,7 @@ class AutonomousCoordinator:
             id="task:root",
             title="Resolve user turn",
             description=board.user_input,
-            priority=TaskPriority.CRITICAL if _hard_high_risk(board.user_input) else TaskPriority.NORMAL,
+            priority=TaskPriority.CRITICAL if hard_high_risk(board.user_input) else TaskPriority.NORMAL,
             created_by=self.name,
             metadata={"kind": "root"},
         )
@@ -119,11 +120,11 @@ class AutonomousCoordinator:
             "task:assess-safety",
             "Assess safety risk",
             AgentCapability.SAFETY,
-            TaskPriority.CRITICAL if _hard_high_risk(board.user_input) else TaskPriority.HIGH,
+            TaskPriority.CRITICAL if hard_high_risk(board.user_input) else TaskPriority.HIGH,
             board.user_input != "",
         )
-        intent = _intent_value(board)
-        risk = _risk_value(board)
+        intent = intent_from_board(board, use_board_risk=False)
+        risk = risk_from_board(board)
         needs_context = intent in {Intent.COUNSELING, Intent.RESEARCH, Intent.RISK} or risk in {RiskLevel.MEDIUM, RiskLevel.HIGH}
         board = self._ensure_task_for_missing_artifact(
             board,
@@ -255,33 +256,3 @@ class AutonomousCoordinator:
         if response.confidence < self.final_min_confidence:
             return board
         return board.accept_final(response.id, self.name, "accepted after autonomous proposal and SafetyAgent approval")
-
-
-def _hard_high_risk(text: str) -> bool:
-    lowered = (text or "").lower()
-    return any(term in lowered for term in ["自杀", "轻生", "不想活", "结束生命", "suicide", "kill myself"])
-
-
-def _intent_value(board: CollaborationBlackboard) -> Intent:
-    artifact = board.latest_artifact("intent")
-    if artifact:
-        try:
-            return Intent(str(artifact.payload.get("intent", Intent.COMPANION.value)))
-        except ValueError:
-            return Intent.COMPANION
-    return Intent.RISK if _hard_high_risk(board.user_input) else Intent.COMPANION
-
-
-def _risk_value(board: CollaborationBlackboard) -> RiskLevel:
-    highest = RiskLevel.LOW
-    order = {RiskLevel.LOW: 1, RiskLevel.MEDIUM: 2, RiskLevel.HIGH: 3}
-    for artifact in board.artifacts_by_kind("risk"):
-        try:
-            risk = RiskLevel(str(artifact.payload.get("risk_level", RiskLevel.LOW.value)))
-        except ValueError:
-            risk = RiskLevel.LOW
-        if order[risk] > order[highest]:
-            highest = risk
-    if any(event.type == AgentEventType.SAFETY_OVERRIDE for event in board.events):
-        return RiskLevel.HIGH
-    return highest

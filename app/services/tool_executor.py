@@ -13,8 +13,8 @@ from urllib import request
 from openpyxl import Workbook, load_workbook
 
 from app.config import Settings
-from app.privacy import redacted_payload
-from app.tool_contracts import normalize_tool_kind
+from app.core.privacy import redacted_payload
+from app.tools.contracts import normalize_tool_kind
 
 
 EXCEL_WRITE_LOCK = threading.Lock()

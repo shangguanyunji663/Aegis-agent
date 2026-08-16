@@ -7,10 +7,10 @@ from app.config import Settings
 from app.database import Base
 from app.evaluation import run_evaluation
 from app.llm import MockLLMClient
-from app.orchestrator import PsychOrchestrator
+from app.agents.orchestrator import PsychOrchestrator
 from app.repository import DatabaseStore
 from app.skills import SkillRegistry
-from app.vector_store import VectorStoreUnavailable, build_vector_backend
+from app.rag.vector_store import VectorStoreUnavailable, build_vector_backend
 
 
 def build_store(tmp_path: Path, vector_enabled: bool, vector_backend: str = "local") -> tuple[DatabaseStore, PsychOrchestrator]:

@@ -7,6 +7,8 @@ from app.config import Settings
 
 
 class RuntimeServices:
+    """可选 Redis 加持的运行时服务:接口限流与分布式锁,无 Redis 时退化为进程内实现。"""
+
     def __init__(self, settings: Settings):
         self.settings = settings
         self.redis_client = None

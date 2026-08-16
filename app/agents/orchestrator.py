@@ -3,12 +3,12 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Callable
 
-from app.agent_runtime import AgentRegistry, AgentRuntimeRunner
-from app.agent_models import AgentModelRegistry
-from app.agents import CompanionAgent, CounselorAgent, KnowledgeAgent, LeadAgent, MemoryAgent, RiskGuardianAgent
-from app.autonomous_runtime import AutonomousAgentRuntime
+from app.agents.runtime import AgentRegistry, AgentRuntimeRunner
+from app.agents.model_profiles import AgentModelRegistry
+from app.agents.classic import CompanionAgent, CounselorAgent, KnowledgeAgent, LeadAgent, MemoryAgent, RiskGuardianAgent
+from app.autonomous.runtime import AutonomousAgentRuntime
 from app.llm import LLMClient, MockLLMClient
-from app.models import AgentTrace, ChatResponse, Intent, RiskLevel, RuntimeEvent, RuntimeEventType, StreamEvent
+from app.models import AgentTrace, ChatResponse, Intent, PendingReport, RiskLevel, RuntimeEvent, RuntimeEventType, StreamEvent
 from app.skills import SkillRegistry
 
 
@@ -193,7 +193,7 @@ class PsychOrchestrator:
             answer=answer,
             skills=skills,
             trace=trace,
-            pending_report=None if pending_report is None else self._report_from_dict(pending_report),
+            pending_report=None if pending_report is None else PendingReport.from_dict(pending_report),
             memory_summary=updated_memory["summary"],
             memory_used=bool(memory_summary),
             response_plan=response_plan,
@@ -334,15 +334,3 @@ class PsychOrchestrator:
             return [text]
         return [text[idx:idx + 48] for idx in range(0, len(text), 48)]
 
-    def _report_from_dict(self, data: dict):
-        from app.models import PendingReport, ReportStatus
-
-        return PendingReport(
-            id=data["id"],
-            session_id=data["session_id"],
-            message=data["message"],
-            risk_level=RiskLevel(data["risk_level"]),
-            rationale=list(data["rationale"]),
-            status=ReportStatus(data["status"]),
-            created_at=data["created_at"],
-        )

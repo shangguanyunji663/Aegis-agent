@@ -5,32 +5,10 @@ import json
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
-from app.database import create_schema
+from app.agents.orchestrator import PsychOrchestrator
 from app.evaluation import evaluate_scaled_benchmark, evaluate_skills
-from app.llm import MockLLMClient
+from app.harness.factory import KNOWLEDGE_DIR, ROOT, build_harness_orchestrator
 from app.models import ReportStatus
-from app.orchestrator import PsychOrchestrator
-from app.repository import DatabaseStore
-from app.skills import SkillRegistry
-
-
-ROOT = Path(__file__).resolve().parents[2]
-
-
-def build_harness_orchestrator(data_dir: Path | None = None) -> PsychOrchestrator:
-    data_dir = data_dir or ROOT / "data" / "harness"
-    data_dir.mkdir(parents=True, exist_ok=True)
-    engine = create_engine(f"sqlite:///{data_dir / 'harness.sqlite'}", connect_args={"check_same_thread": False})
-    create_schema(engine)
-    session_factory = sessionmaker(bind=engine, autoflush=False, autocommit=False)
-    store = DatabaseStore(session_factory)
-    knowledge_dir = ROOT / "app" / "knowledge"
-    store.rebuild_knowledge_dir(knowledge_dir)
-    registry = SkillRegistry(knowledge_dir, store.add_report, store.search_knowledge)
-    return PsychOrchestrator(registry, store, MockLLMClient())
 
 
 def run_scenario(orchestrator: PsychOrchestrator, scenario: dict[str, Any], index: int = 0) -> dict[str, Any]:
@@ -207,7 +185,7 @@ def run_api_harness(orchestrator: PsychOrchestrator) -> dict[str, Any]:
     data_dir.mkdir(parents=True, exist_ok=True)
     settings = Settings(
         database_url=f"sqlite:///{data_dir / 'api.sqlite'}",
-        knowledge_dir=str(ROOT / "app" / "knowledge"),
+        knowledge_dir=str(KNOWLEDGE_DIR),
         tool_output_dir=str(data_dir / "tool-outputs"),
         excel_path=str(data_dir / "tool-outputs" / "aegis-risk-ledger.xlsx"),
         alert_email_delivery_mode="log",

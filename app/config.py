@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "qwen2.5:7b"
     llm_timeout_seconds: float = 15.0
-    knowledge_dir: str = "app/knowledge"
+    knowledge_dir: str = "knowledge"
     max_knowledge_upload_bytes: int = 1_000_000
     knowledge_top_k: int = 4
     knowledge_candidate_k: int = 16
@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     knowledge_hybrid_vector_weight: float = 0.65
     knowledge_hybrid_bm25_weight: float = 0.35
     knowledge_rerank_enabled: bool = True
-    rag_eval_dataset: str = "app/rag_eval/aegis-rag-eval.json"
+    rag_eval_dataset: str = "eval/fixtures/aegis-rag-eval.json"
     rag_eval_output: str = "data/eval/rag-eval-report.json"
     memory_recent_messages: int = 6
     memory_summary_max_chars: int = 900

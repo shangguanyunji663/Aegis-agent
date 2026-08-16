@@ -4,8 +4,9 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
-from app.agents import CompanionAgent, CounselorAgent, KnowledgeAgent, LeadAgent, MemoryAgent, RiskGuardianAgent
-from app.autonomous_events import (
+from app.agents.classic import CounselorAgent, KnowledgeAgent, LeadAgent, MemoryAgent, RiskGuardianAgent
+from app.autonomous.board import hard_high_risk, intent_from_board, risk_from_board
+from app.autonomous.events import (
     AgentArtifact,
     AgentEvent,
     AgentEventType,
@@ -15,9 +16,9 @@ from app.autonomous_events import (
     CollaborationBlackboard,
     TaskPriority,
 )
-from app.autonomous_registry import AgentCapability, AgentDecision, AgentProfile
+from app.autonomous.registry import AgentCapability, AgentDecision, AgentProfile
 from app.models import Intent, RiskLevel, SkillResult
-from app.privacy import contains_internal_response_leak
+from app.core.privacy import contains_internal_response_leak
 from app.skills import SkillRegistry
 
 
@@ -135,7 +136,7 @@ class LeadAutonomousAgent(BaseAutonomousAgent):
         return AgentDecision(False, reason="task does not need routing")
 
     def act(self, task: AgentTask, board: CollaborationBlackboard) -> AgentTurnResult:
-        risk = _risk_from_board(board)
+        risk = risk_from_board(board)
         intent, trace = self.agent.route(board.user_input, risk)
         if risk is RiskLevel.HIGH:
             intent = Intent.RISK
@@ -166,7 +167,7 @@ class RiskGuardianAutonomousAgent(BaseAutonomousAgent):
         if response and (review is None or review.metadata.get("responseArtifactId") != response.id):
             return AgentDecision(True, 0.97, "candidate response needs independent safety review")
         if not board.latest_artifact("risk") and AgentCapability.SAFETY.value in task.required_capabilities:
-            confidence = 0.98 if _hard_high_risk(board.user_input) else 0.88
+            confidence = 0.98 if hard_high_risk(board.user_input) else 0.88
             return AgentDecision(True, confidence, "user input needs risk assessment")
         return AgentDecision(False, reason="no safety work needed")
 
@@ -207,7 +208,7 @@ class RiskGuardianAutonomousAgent(BaseAutonomousAgent):
         return AgentTurnResult(artifacts=tuple(artifacts), messages=tuple(messages), events=tuple(events))
 
     def _review_response(self, task: AgentTask, board: CollaborationBlackboard, response: AgentArtifact) -> AgentTurnResult:
-        risk = _risk_from_board(board)
+        risk = risk_from_board(board)
         answer = str(response.payload.get("answer", ""))
         approved = True
         reason = "response proposal satisfies safety constraints"
@@ -272,8 +273,8 @@ class KnowledgeAutonomousAgent(BaseAutonomousAgent):
         return AgentDecision(False, reason="task does not require context")
 
     def act(self, task: AgentTask, board: CollaborationBlackboard) -> AgentTurnResult:
-        intent = _intent_from_board(board)
-        risk = _risk_from_board(board)
+        intent = intent_from_board(board)
+        risk = risk_from_board(board)
         memory_artifact = board.latest_artifact("memory")
         memory_summary = str((memory_artifact.payload if memory_artifact else {}).get("summary", ""))
         knowledge = None
@@ -322,8 +323,8 @@ class CounselorAutonomousAgent(BaseAutonomousAgent):
     def decide(self, task: AgentTask, board: CollaborationBlackboard) -> AgentDecision:
         if board.latest_artifact("response_proposal") and "revisionOf" not in task.metadata:
             return AgentDecision(False, reason="response proposal already exists")
-        intent = _intent_from_board(board)
-        risk = _risk_from_board(board)
+        intent = intent_from_board(board)
+        risk = risk_from_board(board)
         if intent is Intent.COMPANION and risk is RiskLevel.LOW:
             return AgentDecision(False, reason="companion path belongs to CompanionAgent")
         if AgentCapability.RESPONSE.value in task.required_capabilities:
@@ -331,8 +332,8 @@ class CounselorAutonomousAgent(BaseAutonomousAgent):
         return AgentDecision(False, reason="task does not require support response")
 
     def act(self, task: AgentTask, board: CollaborationBlackboard) -> AgentTurnResult:
-        intent = _intent_from_board(board)
-        risk = _risk_from_board(board)
+        intent = intent_from_board(board)
+        risk = risk_from_board(board)
         context = (board.latest_artifact("context").payload if board.latest_artifact("context") else {})
         response_plan, plan_trace = self.agent.compose_plan(
             board.user_input,
@@ -378,7 +379,7 @@ class CompanionAutonomousAgent(BaseAutonomousAgent):
             return AgentDecision(False, reason="response proposal already exists")
         if AgentCapability.RESPONSE.value not in task.required_capabilities:
             return AgentDecision(False, reason="task is not a response task")
-        if _intent_from_board(board) is Intent.COMPANION and _risk_from_board(board) is RiskLevel.LOW:
+        if intent_from_board(board) is Intent.COMPANION and risk_from_board(board) is RiskLevel.LOW:
             return AgentDecision(True, 0.82, "low-risk companion response needed")
         return AgentDecision(False, reason="not a companion response")
 
@@ -410,36 +411,3 @@ class CompanionAutonomousAgent(BaseAutonomousAgent):
             artifacts=(self._artifact("response_proposal", payload, task, 0.82),),
             messages=(self._message("RiskGuardianAgent", task, "REVIEW_REQUEST", "please review companion response"),),
         )
-
-
-def _hard_high_risk(text: str) -> bool:
-    lowered = (text or "").lower()
-    return any(term in lowered for term in ["自杀", "轻生", "不想活", "结束生命", "suicide", "kill myself"])
-
-
-def _intent_from_board(board: CollaborationBlackboard) -> Intent:
-    risk = _risk_from_board(board)
-    if risk is RiskLevel.HIGH:
-        return Intent.RISK
-    artifact = board.latest_artifact("intent")
-    if artifact:
-        try:
-            return Intent(str(artifact.payload.get("intent", Intent.COMPANION.value)))
-        except ValueError:
-            return Intent.COMPANION
-    return Intent.RISK if _hard_high_risk(board.user_input) else Intent.COMPANION
-
-
-def _risk_from_board(board: CollaborationBlackboard) -> RiskLevel:
-    highest = RiskLevel.LOW
-    order = {RiskLevel.LOW: 1, RiskLevel.MEDIUM: 2, RiskLevel.HIGH: 3}
-    for artifact in board.artifacts_by_kind("risk"):
-        try:
-            risk = RiskLevel(str(artifact.payload.get("risk_level", RiskLevel.LOW.value)))
-        except ValueError:
-            risk = RiskLevel.LOW
-        if order[risk] > order[highest]:
-            highest = risk
-    if any(event.type == AgentEventType.SAFETY_OVERRIDE for event in board.events):
-        return RiskLevel.HIGH
-    return highest

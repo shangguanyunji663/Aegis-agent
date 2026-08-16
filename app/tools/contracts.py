@@ -4,7 +4,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from app.models import RiskLevel, UserRole
-from app.privacy import redact_payload
+from app.core.privacy import redact_payload
 
 
 @dataclass(frozen=True)

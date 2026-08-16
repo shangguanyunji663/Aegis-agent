@@ -1,5 +1,6 @@
 """评测包:运行器 + 基准数据集 + HTML 报告渲染。"""
 from app.evaluation.datasets import generated_benchmark_cases
+from app.evaluation.runtime_ab import render_report, run_runtime_ab
 from app.evaluation.report_html import escape, render_html, render_section
 from app.evaluation.runner import (
     latest_evaluation,
@@ -17,6 +18,8 @@ from app.evaluation.runner import (
 
 __all__ = [
     "generated_benchmark_cases",
+    "render_report",
+    "run_runtime_ab",
     "escape",
     "render_html",
     "render_section",

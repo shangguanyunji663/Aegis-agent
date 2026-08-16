@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from app.agents.orchestrator import PsychOrchestrator
-from app.evaluation import evaluate_scaled_benchmark, evaluate_skills
+from app.evaluation import evaluate_scaled_benchmark, evaluate_skills, run_runtime_ab
 from app.harness.factory import KNOWLEDGE_DIR, ROOT, build_harness_orchestrator
 from app.models import ReportStatus
 
@@ -95,6 +95,7 @@ def _resolve_suites(suites: list[str] | None):
         ("API Harness", run_api_harness),
         ("Tool Queue Harness", run_tool_queue_harness),
         ("Scaled Benchmark Harness", run_scaled_benchmark_harness),
+        ("Runtime A/B Harness", run_runtime_ab_harness),
     ]
     if not suites or "all" in suites:
         return all_suites
@@ -106,6 +107,7 @@ def _resolve_suites(suites: list[str] | None):
         "api": "API Harness",
         "tool-queue": "Tool Queue Harness",
         "scaled": "Scaled Benchmark Harness",
+        "runtime-ab": "Runtime A/B Harness",
     }
     selected = {aliases[item] for item in suites}
     return [suite for suite in all_suites if suite[0] in selected]
@@ -241,6 +243,22 @@ def run_scaled_benchmark_harness(orchestrator: PsychOrchestrator) -> dict[str, A
     }
 
 
+
+def run_runtime_ab_harness(orchestrator: PsychOrchestrator) -> dict[str, Any]:
+    result = run_runtime_ab()
+    report = render_report(result)
+    summary = result["summary"]
+    # 三运行时判定一致性:全部一致才算通过
+    all_consistent = all(item["intent_consistent"] and item["risk_consistent"] for item in result["consistency"])
+    _expect(all_consistent, "三运行时判定不一致,见 consistency 段")
+    _expect(all(summary[r]["risk_accuracy"] == 1.0 for r in summary), "某运行时风险准确率未达 100%")
+    report_path = ROOT / "data" / "harness" / "runtime-ab-report.md"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(report, encoding="utf-8")
+    return {"summary": summary, "report": str(report_path), "all_consistent": all_consistent}
+
+
+
 def load_scenarios(path: Path) -> list[dict[str, Any]]:
     if path.is_dir():
         scenarios: list[dict[str, Any]] = []
@@ -278,7 +296,7 @@ def main() -> None:
     parser.add_argument(
         "--suite",
         action="append",
-        choices=["all", "risk", "routing", "skills", "rag", "api", "tool-queue", "scaled"],
+        choices=["all", "risk", "routing", "skills", "rag", "api", "tool-queue", "scaled", "runtime-ab"],
         help="Engineering harness suite to run. Defaults to all when --scenario is omitted.",
     )
     parser.add_argument("--output", type=Path, help="Optional path for JSON replay output.")

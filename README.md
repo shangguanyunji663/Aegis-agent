@@ -273,6 +273,39 @@ python -m app.mcp_tools.server --list
 - [第三次功能说明(注册与 MySQL)](docs/records/AUTH-MYSQL.md)
 - [第四次功能说明(LangGraph 与全栈激活)](docs/records/LANGGRAPH-DOCKER.md)
 
+## 待改进与优化(Roadmap)
+
+> 按「实现难度 × 实现意义」盘点的演进清单;带 ✅ 的已在本仓库落地,详见 [docs/records](docs/records/) 各轮说明文档。
+
+### 安全与合规(心理场景立身之本)
+- ✅ **风险评估双通道**:规则关键词 ∪ 轻量 LLM 二次评估,任一通道判高危即高危,规则兜底(`RISK_LLM_CHANNEL_ENABLED`)
+- 危机转介资源可配置化:学校心理中心/紧急联系方式从硬编码改为按校配置、管理端可编辑(低难度)
+- 对话数据字段级加密存储(中难度)
+- 账号安全补齐:登录失败锁定、密码强度策略、会话撤销列表(低难度)
+- 用户数据导出与删除(低难度)
+
+### Agent 与算法深度
+- ✅ **Function Calling 真接入**:GLM 自主选择回复技能,规则白名单兜底(`FUNCTION_CALLING_ENABLED`)
+- ✅ **三运行时 A/B 评测**:langgraph/autonomous/ordered 同数据集对比延迟/trace/LLM 调用数(`--suite runtime-ab`)
+- ✅ **LLM-as-Judge**:模型为回复打共情性/安全性/结构性分数,进入评测报告
+- ✅ **LangGraph Checkpoint**:SqliteSaver 检查点持久化,长对话跨进程可恢复
+- 记忆系统升级:滚动摘要 → 结构化记忆(用户画像+情绪轨迹+历史会话向量检索)(高难度)
+- 主动关怀闭环:高危用户 N 天未跟进自动生成提醒任务(复用工具队列)(中难度)
+- 词表外置:路由/技能触发关键词从代码抽到 YAML(低难度)
+
+### 工程化与运维
+- CI/CD:GitHub Actions 跑 pytest + node check + harness(低难度)
+- Alembic 迁移:消灭手写 DDL 与 ORM 的两份 schema 真相(中难度)
+- request_id 贯通结构化日志(低难度)
+- Prometheus 指标 + Grafana 面板(中难度)
+- Docker compose 全链路实测(待有 Docker 环境)
+
+### 产品功能
+- 心理量表接入(PHQ-9/GAD-7):定期测评→分数趋势→与风险阈值联动(中难度)
+- 群体心理态势仪表盘:全校风险分布/话题热度(中难度)
+- 教师与管理员权限细分(低难度)
+- 企业微信/钉钉 webhook 告警通道(低难度)
+
 ## License
 
 当前仓库未声明开源许可证。未经作者许可，请不要将代码用于商业分发或生产心理咨询服务。

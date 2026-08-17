@@ -35,8 +35,8 @@ class Settings(BaseSettings):
     knowledge_rerank_enabled: bool = True
     rag_eval_dataset: str = "eval/fixtures/aegis-rag-eval.json"
     rag_eval_output: str = "data/eval/rag-eval-report.json"
-    memory_recent_messages: int = 6
-    memory_summary_max_chars: int = 900
+    memory_recent_messages: int = 15
+    memory_summary_max_chars: int = 3000
     vector_enabled: bool = False
     vector_required: bool = False
     vector_backend: str = "chroma"

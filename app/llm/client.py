@@ -152,6 +152,7 @@ class OpenAICompatibleClient:
         self.model = settings.openai_model
         self.timeout = settings.llm_timeout_seconds
         self.disable_thinking = not settings.llm_thinking_enabled
+        self.support_temperature = settings.llm_support_temperature
 
     def status(self) -> dict:
         return {
@@ -166,7 +167,7 @@ class OpenAICompatibleClient:
             return None
         payload = {
             "model": self.model,
-            "temperature": 0.2,
+            "temperature": self.support_temperature,
             "messages": build_messages(context),
         }
         if self.disable_thinking:
@@ -274,7 +275,7 @@ class OpenAICompatibleClient:
             return None
         payload = {
             "model": self.model,
-            "temperature": 0.2,
+            "temperature": self.support_temperature,
             "messages": build_messages(context),
             "stream": True,
         }
@@ -294,6 +295,7 @@ class OllamaClient:
         self.base_url = settings.ollama_base_url.rstrip("/")
         self.model = settings.ollama_model
         self.timeout = settings.llm_timeout_seconds
+        self.support_temperature = settings.llm_support_temperature
 
     def status(self) -> dict:
         return {
@@ -307,6 +309,7 @@ class OllamaClient:
         payload = {
             "model": self.model,
             "stream": False,
+            "options": {"temperature": self.support_temperature},
             "messages": build_messages(context),
         }
         data = post_json(f"{self.base_url}/api/chat", payload, {"Content-Type": "application/json"}, self.timeout)
@@ -375,6 +378,7 @@ class OllamaClient:
         payload = {
             "model": self.model,
             "stream": True,
+            "options": {"temperature": self.support_temperature},
             "messages": build_messages(context),
         }
         return post_ndjson_stream(f"{self.base_url}/api/chat", payload, {"Content-Type": "application/json"}, self.timeout, on_token)
@@ -393,6 +397,19 @@ def build_llm_client(settings: Settings) -> LLMClient:
 logger = logging.getLogger("aegis.llm")
 
 
+_MAX_RETRIES = 2
+_RETRY_BACKOFF_BASE = 2.0  # 首次重试等 2s,第二次 4s
+
+
+def _is_retryable(exc: Exception) -> bool:
+    """429(限流)/5xx(服务端瞬态)/超时值得重试;其余(401/403/JSON 解析)不重试。"""
+    if isinstance(exc, TimeoutError):
+        return True
+    if isinstance(exc, urllib.error.HTTPError):
+        return exc.code in (429, 500, 502, 503, 504)
+    return False
+
+
 def post_json(url: str, payload: dict, headers: dict[str, str], timeout: float) -> dict:
     request = urllib.request.Request(
         url,
@@ -401,26 +418,33 @@ def post_json(url: str, payload: dict, headers: dict[str, str], timeout: float) 
         method="POST",
     )
     start = time.time()
-    try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            raw = response.read().decode("utf-8")
+    for attempt in range(1 + _MAX_RETRIES):
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                raw = response.read().decode("utf-8")
+                elapsed_ms = int((time.time() - start) * 1000)
+                try:
+                    data = json.loads(raw)
+                except json.JSONDecodeError:
+                    logger.debug("post_json %s returned non-json response (len=%d) elapsed=%dms", url, len(raw), elapsed_ms)
+                    return {}
+                logger.debug("post_json %s elapsed=%dms", url, elapsed_ms)
+                return data
+        except Exception as exc:
             elapsed_ms = int((time.time() - start) * 1000)
-            try:
-                data = json.loads(raw)
-            except json.JSONDecodeError:
-                logger.debug("post_json %s returned non-json response (len=%d) elapsed=%dms", url, len(raw), elapsed_ms)
-                return {}
-            logger.debug("post_json %s elapsed=%dms", url, elapsed_ms)
-            return data
-    except Exception as exc:
-        elapsed_ms = int((time.time() - start) * 1000)
-        logger.warning("post_json %s failed elapsed=%dms error=%s", url, elapsed_ms, exc)
-        return {}
+            if _is_retryable(exc) and attempt < _MAX_RETRIES:
+                wait = _RETRY_BACKOFF_BASE * (2 ** attempt)
+                logger.warning("post_json %s retryable error (attempt %d/%d), retrying in %.1fs: %s", url, attempt + 1, _MAX_RETRIES, wait, exc)
+                time.sleep(wait)
+                continue
+            logger.warning("post_json %s failed elapsed=%dms error=%s", url, elapsed_ms, exc)
+            return {}
 
 
 def post_json_stream(url: str, payload: dict, headers: dict[str, str], timeout: float, on_token: Callable[[str], None]) -> str | None:
     """OpenAI 兼容 SSE 流式请求:逐 delta 回调 on_token,返回累积全文(失败返回 None)。
 
+    连接建立阶段对 429/5xx 做指数退避重试;一旦开始接收 delta 则不再重试(用户已看到部分内容)。
     中途异常时返回已积累的部分(这些内容用户已经看到),一个字都没拿到才返回 None。
     """
     request = urllib.request.Request(
@@ -431,30 +455,38 @@ def post_json_stream(url: str, payload: dict, headers: dict[str, str], timeout: 
     )
     parts: list[str] = []
     start = time.time()
-    try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            for raw_line in response:
-                line = raw_line.decode("utf-8").strip()
-                if not line.startswith("data:"):
-                    continue
-                data = line[len("data:"):].strip()
-                if data == "[DONE]":
-                    break
-                try:
-                    chunk = json.loads(data)
-                except json.JSONDecodeError:
-                    continue
-                delta = chunk.get("choices", [{}])[0].get("delta", {}).get("content")
-                if delta:
-                    parts.append(delta)
-                    on_token(delta)
-    except Exception as exc:
-        elapsed_ms = int((time.time() - start) * 1000)
-        logger.warning("post_json_stream %s failed elapsed=%dms error=%s parts=%d", url, elapsed_ms, exc, len(parts))
-        return "".join(parts) or None
-    elapsed_ms = int((time.time() - start) * 1000)
-    logger.debug("post_json_stream %s completed elapsed=%dms parts=%d", url, elapsed_ms, len(parts))
-    return "".join(parts) or None
+    last_exc: Exception | None = None
+    for attempt in range(1 + _MAX_RETRIES):
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                for raw_line in response:
+                    line = raw_line.decode("utf-8").strip()
+                    if not line.startswith("data:"):
+                        continue
+                    data = line[len("data:"):].strip()
+                    if data == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(data)
+                    except json.JSONDecodeError:
+                        continue
+                    delta = chunk.get("choices", [{}])[0].get("delta", {}).get("content")
+                    if delta:
+                        parts.append(delta)
+                        on_token(delta)
+                elapsed_ms = int((time.time() - start) * 1000)
+                logger.debug("post_json_stream %s completed elapsed=%dms parts=%d", url, elapsed_ms, len(parts))
+                return "".join(parts) or None
+        except Exception as exc:
+            last_exc = exc
+            elapsed_ms = int((time.time() - start) * 1000)
+            if not parts and _is_retryable(exc) and attempt < _MAX_RETRIES:
+                wait = _RETRY_BACKOFF_BASE * (2 ** attempt)
+                logger.warning("post_json_stream %s retryable error (attempt %d/%d), retrying in %.1fs: %s", url, attempt + 1, _MAX_RETRIES, wait, exc)
+                time.sleep(wait)
+                continue
+            logger.warning("post_json_stream %s failed elapsed=%dms error=%s parts=%d", url, elapsed_ms, exc, len(parts))
+            return "".join(parts) or None
 
 
 def post_ndjson_stream(url: str, payload: dict, headers: dict[str, str], timeout: float, on_token: Callable[[str], None]) -> str | None:
@@ -467,26 +499,32 @@ def post_ndjson_stream(url: str, payload: dict, headers: dict[str, str], timeout
     )
     parts: list[str] = []
     start = time.time()
-    try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            for raw_line in response:
-                line = raw_line.decode("utf-8").strip()
-                if not line:
-                    continue
-                try:
-                    chunk = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                delta = chunk.get("message", {}).get("content")
-                if delta:
-                    parts.append(delta)
-                    on_token(delta)
-                if chunk.get("done"):
-                    break
-    except Exception as exc:
-        elapsed_ms = int((time.time() - start) * 1000)
-        logger.warning("post_ndjson_stream %s failed elapsed=%dms error=%s parts=%d", url, elapsed_ms, exc, len(parts))
-        return "".join(parts) or None
-    elapsed_ms = int((time.time() - start) * 1000)
-    logger.debug("post_ndjson_stream %s completed elapsed=%dms parts=%d", url, elapsed_ms, len(parts))
-    return "".join(parts) or None
+    for attempt in range(1 + _MAX_RETRIES):
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                for raw_line in response:
+                    line = raw_line.decode("utf-8").strip()
+                    if not line:
+                        continue
+                    try:
+                        chunk = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    delta = chunk.get("message", {}).get("content")
+                    if delta:
+                        parts.append(delta)
+                        on_token(delta)
+                    if chunk.get("done"):
+                        break
+                elapsed_ms = int((time.time() - start) * 1000)
+                logger.debug("post_ndjson_stream %s completed elapsed=%dms parts=%d", url, elapsed_ms, len(parts))
+                return "".join(parts) or None
+        except Exception as exc:
+            elapsed_ms = int((time.time() - start) * 1000)
+            if not parts and _is_retryable(exc) and attempt < _MAX_RETRIES:
+                wait = _RETRY_BACKOFF_BASE * (2 ** attempt)
+                logger.warning("post_ndjson_stream %s retryable error (attempt %d/%d), retrying in %.1fs: %s", url, attempt + 1, _MAX_RETRIES, wait, exc)
+                time.sleep(wait)
+                continue
+            logger.warning("post_ndjson_stream %s failed elapsed=%dms error=%s parts=%d", url, elapsed_ms, exc, len(parts))
+            return "".join(parts) or None

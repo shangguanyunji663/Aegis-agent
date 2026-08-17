@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     ollama_model: str = "qwen2.5:7b"
     llm_timeout_seconds: float = 15.0
     llm_thinking_enabled: bool = False
+    llm_support_temperature: float = 0.6  # 支持性回复采样温度(偏高更像真人);风险/改写/评审仍固定 0.0
     risk_llm_channel_enabled: bool = True
     function_calling_enabled: bool = True
     langgraph_checkpoint_enabled: bool = True

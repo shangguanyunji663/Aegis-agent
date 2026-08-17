@@ -1,9 +1,24 @@
 from __future__ import annotations
 
 from app.llm import LLMClient, LLMContext
+import logging
 import os
 from app.models import AgentTrace, Intent, ResponsePlan, RiskLevel, SkillResult
 from app.skills import SkillRegistry
+
+logger = logging.getLogger("aegis.reply")
+
+
+def _user_focus_from_memory(memory_line: str) -> str:
+    """从一行记忆摘要里提取用户原话(剥掉"用户提到：/；系统回应重点："等内部标签)。
+
+    供兜底回复自然引用用户说过的话,避免把内部记忆格式泄漏到用户可见文案;格式不符返回空串。
+    """
+    text = (memory_line or "").strip()
+    prefix = "用户提到："
+    if text.startswith(prefix):
+        text = text[len(prefix):]
+    return text.split("；系统回应重点：", 1)[0].strip()[:60]
 
 
 def format_source_label(source: str) -> str:
@@ -175,8 +190,10 @@ class CounselorAgent:
         该实现保持轻量：将检索到的文档摘录为 knowledge_snippets，保留记忆摘要与引导步骤，
         并生成基础的 prompt messages（system + user）。
         """
+        # mode 是对外暴露的语义字段(API/前端/测试依赖):高风险走安全模板,研究意图走资料支持,其余为陪伴支持
+        mode = "safety_template" if risk_level is RiskLevel.HIGH else ("research_support" if intent is Intent.RESEARCH else "support")
         plan = ResponsePlan(
-            mode="final",
+            mode=mode,
             response_agent=self.name,
             intent=intent.value,
             risk_level=risk_level.value,
@@ -224,6 +241,11 @@ class CounselorAgent:
             generated = self.llm_client.generate_support_reply(context)
         if generated:
             return generated.strip(), AgentTrace(self.name, "compose_answer", f"llm:{self.llm_client.provider}/{self.llm_client.model}")
+        logger.warning(
+            "support reply fell back to template (provider=%s, model=%s); check 'aegis.llm' logs for the failed LLM call",
+            self.llm_client.provider,
+            self.llm_client.model,
+        )
         return fallback, AgentTrace(self.name, "compose_answer", f"fallback:{self.llm_client.provider}")
 
     def _fallback_answer(self, intent: Intent, risk_level: RiskLevel, memory_summary: str, knowledge, grounding) -> str:
@@ -232,12 +254,15 @@ class CounselorAgent:
             lines.append("我很在意你刚才提到的危险信号。此刻请先把安全放在第一位：如果你已经有明确计划或身边有可伤害自己的物品，请立刻联系身边可信任的人、学校心理中心或当地紧急服务。")
         elif risk_level is RiskLevel.MEDIUM:
             lines.append("听起来你已经撑得很辛苦了。我们先把这一刻稳定下来，再一起把问题拆小。")
+        elif intent is Intent.COMPANION:
+            lines.append("我在呢。你想聊什么都可以，我听着。")
         else:
-            lines.append("我听到了你的困扰。我们可以先从最具体、最影响你的那一部分开始。")
+            lines.append("谢谢你愿意跟我说这些，我能感觉到这件事对你影响不小。")
 
-        if memory_summary:
-            latest_memory = memory_summary.splitlines()[-1][:180]
-            lines.append(f"\n我会结合你前面提到的情况继续陪你梳理：{latest_memory}")
+        if risk_level is not RiskLevel.HIGH and memory_summary:
+            focus = _user_focus_from_memory(memory_summary.splitlines()[-1])
+            if focus:
+                lines.append(f"你之前跟我提到「{focus}」，这部分我们可以接着聊。")
 
         if grounding:
             steps = grounding.output["steps"]
@@ -254,8 +279,10 @@ class CounselorAgent:
             lines.append("\n如果你愿意，我可以继续把资料整理成“原因、可尝试方法、何时求助”三段。")
         elif intent is Intent.RISK:
             lines.append("\n现在最重要的是不要一个人扛着。请尽快联系身边可信任的人，让对方陪你一起联系学校心理中心或当地紧急服务。")
+        elif intent is Intent.COMPANION:
+            lines.append("\n我在听，你想从哪儿说起都行。")
         else:
-            lines.append("\n你可以接着告诉我：这件事最难受的时刻通常发生在什么时候？")
+            lines.append("\n你愿意的话，可以跟我多说说这件事现在最让你难受的地方。")
         return "\n".join(lines)
 
 

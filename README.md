@@ -277,7 +277,7 @@ python -m app.mcp_tools.server --list
 - [第二次优化方案(提速与流式)](docs/records/OPTIMIZATION.md)
 - [第三次功能说明(注册与 MySQL)](docs/records/AUTH-MYSQL.md)
 - [第四次功能说明(LangGraph 与全栈激活)](docs/records/LANGGRAPH-DOCKER.md)
-- [第五轮深度增强(风险双通道/FC/A·B评测/Judge/Checkpoint)](docs/records/DEEP-ENHANCEMENTS.md)
+- [第五次深度增强(风险双通道/FC/A·B评测/Judge/Checkpoint)](docs/records/DEEP-ENHANCEMENTS.md)
 
 ## 待改进与优化(Roadmap)
 

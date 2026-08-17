@@ -6,6 +6,30 @@ from app.models import AgentTrace, Intent, ResponsePlan, RiskLevel, SkillResult
 from app.skills import SkillRegistry
 
 
+def format_source_label(source: str) -> str:
+    """把检索/文档 source 字段格式化为用户友好的中文标签。
+
+    规则：
+    - 特殊内部标识映射（例如 'response_plan' -> '内部建议'）。
+    - 若是文件名，去掉扩展名并做简单美化（`-`/`_` 替换为空格）；可通过映射表覆盖特定文件名。
+    - 返回不会包含方括号，供插入到用户可见文本中。
+    """
+    if not source:
+        return "来源"
+    name = os.path.basename(source)
+    name = os.path.splitext(name)[0]
+    canonical = name.lower()
+    mapping = {
+        "response_plan": "内部建议",
+        "exam-season-guidance": "考试季建议",
+    }
+    if canonical in mapping:
+        return mapping[canonical]
+    # 基本美化：替换 - 和 _ 为中文空格并首字母大写（如有英文）
+    label = name.replace("-", " ").replace("_", " ")
+    return label
+
+
 class MemoryAgent:
     name = "MemoryAgent"
 
@@ -135,68 +159,41 @@ class CounselorAgent:
     def grounding(self, message: str) -> tuple[SkillResult, AgentTrace]:
         result = self.registry.get("grounding_exercise").handler(message)
         return result, AgentTrace(self.name, "grounding_exercise", result.output["title"])
-
-
-def format_source_label(source: str) -> str:
-    """把检索/文档 source 字段格式化为用户友好的中文标签。
-
-    规则：
-    - 特殊内部标识映射（例如 'response_plan' -> '内部建议'）。
-    - 若是文件名，去掉扩展名并做简单美化（`-`/`_` 替换为空格）；可通过映射表覆盖特定文件名。
-    - 返回不会包含方括号，供插入到用户可见文本中。
-    """
-    if not source:
-        return "来源"
-    name = os.path.basename(source)
-    name = os.path.splitext(name)[0]
-    canonical = name.lower()
-    mapping = {
-        "response_plan": "内部建议",
-        "exam-season-guidance": "考试季建议",
-    }
-    if canonical in mapping:
-        return mapping[canonical]
-    # 基本美化：替换 - 和 _ 为中文空格并首字母大写（如有英文）
-    label = name.replace("-", " ").replace("_", " ")
-    return label
-
+ 
     def compose_plan(
         self,
         message: str,
         intent: Intent,
         risk_level: RiskLevel,
-        memory_summary: str,
-        knowledge: SkillResult | None,
-        grounding: SkillResult | None,
-        response_skill_context: str = "",
+        memory_summary: str = "",
+        knowledge: SkillResult | None = None,
+        grounding: SkillResult | None = None,
+        standard_skill_context: str = "",
     ) -> tuple[ResponsePlan, AgentTrace]:
-        knowledge_snippets = []
-        for item in (knowledge.output["documents"] if knowledge else []):
-            src = item.get("source", "")
-            content = item.get("content") or item.get("snippet") or ""
-            label = format_source_label(src)
-            knowledge_snippets.append(f"（来源：{label}） {content}")
-        grounding_steps = list(grounding.output["steps"] if grounding else [])
-        mode = "safety_template" if risk_level is RiskLevel.HIGH else ("research_support" if intent is Intent.RESEARCH else "support")
-        prompt_messages = [
-            {"role": "system", "content": f"mode={mode}; intent={intent.value}; risk={risk_level.value}"},
-            {"role": "system", "content": f"memory={memory_summary or 'none'}"},
-            {"role": "system", "content": f"skills={response_skill_context or 'none'}"},
-            {"role": "user", "content": message},
-        ]
+        """构造一个简单的 ResponsePlan，供后续 `finalize_plan` 使用。
+
+        该实现保持轻量：将检索到的文档摘录为 knowledge_snippets，保留记忆摘要与引导步骤，
+        并生成基础的 prompt messages（system + user）。
+        """
         plan = ResponsePlan(
-            mode=mode,
+            mode="final",
             response_agent=self.name,
             intent=intent.value,
             risk_level=risk_level.value,
-            memory_brief=memory_summary,
-            knowledge_snippets=knowledge_snippets,
-            grounding_steps=grounding_steps,
-            skill_context=response_skill_context,
-            prompt_messages=prompt_messages,
+            memory_brief=memory_summary or "",
         )
-        return plan, AgentTrace(self.name, "compose_plan", f"mode={mode}; snippets={len(knowledge_snippets)}; grounding={len(grounding_steps)}")
-
+        if knowledge and isinstance(knowledge.output, dict):
+            docs = knowledge.output.get("documents") or []
+            plan.knowledge_snippets = [d.get("content") or d.get("snippet") or "" for d in docs]
+        if grounding and isinstance(grounding.output, dict):
+            plan.grounding_steps = grounding.output.get("steps") or []
+        plan.skill_context = standard_skill_context or ""
+        plan.prompt_messages = [
+            {"role": "system", "content": "你是一个温和而负责的心理支持助手。"},
+            {"role": "user", "content": message},
+        ]
+        return plan, AgentTrace(self.name, "compose_plan", f"intent={intent.value};risk={risk_level.value};knowledge_hits={len(plan.knowledge_snippets)}")
+ 
     def finalize_plan(self, plan: ResponsePlan, on_token=None) -> tuple[str, AgentTrace]:
         fallback = self._fallback_answer(
             Intent(plan.intent),

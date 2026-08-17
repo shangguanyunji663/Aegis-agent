@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import re
+import time
+import logging
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -387,6 +389,10 @@ def build_llm_client(settings: Settings) -> LLMClient:
     return MockLLMClient()
 
 
+# logger for LLM client network diagnostics
+logger = logging.getLogger("aegis.llm")
+
+
 def post_json(url: str, payload: dict, headers: dict[str, str], timeout: float) -> dict:
     request = urllib.request.Request(
         url,
@@ -394,10 +400,21 @@ def post_json(url: str, payload: dict, headers: dict[str, str], timeout: float) 
         headers=headers,
         method="POST",
     )
+    start = time.time()
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, KeyError):
+            raw = response.read().decode("utf-8")
+            elapsed_ms = int((time.time() - start) * 1000)
+            try:
+                data = json.loads(raw)
+            except json.JSONDecodeError:
+                logger.debug("post_json %s returned non-json response (len=%d) elapsed=%dms", url, len(raw), elapsed_ms)
+                return {}
+            logger.debug("post_json %s elapsed=%dms", url, elapsed_ms)
+            return data
+    except Exception as exc:
+        elapsed_ms = int((time.time() - start) * 1000)
+        logger.warning("post_json %s failed elapsed=%dms error=%s", url, elapsed_ms, exc)
         return {}
 
 
@@ -413,6 +430,7 @@ def post_json_stream(url: str, payload: dict, headers: dict[str, str], timeout: 
         method="POST",
     )
     parts: list[str] = []
+    start = time.time()
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             for raw_line in response:
@@ -430,8 +448,12 @@ def post_json_stream(url: str, payload: dict, headers: dict[str, str], timeout: 
                 if delta:
                     parts.append(delta)
                     on_token(delta)
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, KeyError):
+    except Exception as exc:
+        elapsed_ms = int((time.time() - start) * 1000)
+        logger.warning("post_json_stream %s failed elapsed=%dms error=%s parts=%d", url, elapsed_ms, exc, len(parts))
         return "".join(parts) or None
+    elapsed_ms = int((time.time() - start) * 1000)
+    logger.debug("post_json_stream %s completed elapsed=%dms parts=%d", url, elapsed_ms, len(parts))
     return "".join(parts) or None
 
 
@@ -444,6 +466,7 @@ def post_ndjson_stream(url: str, payload: dict, headers: dict[str, str], timeout
         method="POST",
     )
     parts: list[str] = []
+    start = time.time()
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             for raw_line in response:
@@ -460,6 +483,10 @@ def post_ndjson_stream(url: str, payload: dict, headers: dict[str, str], timeout
                     on_token(delta)
                 if chunk.get("done"):
                     break
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, KeyError):
+    except Exception as exc:
+        elapsed_ms = int((time.time() - start) * 1000)
+        logger.warning("post_ndjson_stream %s failed elapsed=%dms error=%s parts=%d", url, elapsed_ms, exc, len(parts))
         return "".join(parts) or None
+    elapsed_ms = int((time.time() - start) * 1000)
+    logger.debug("post_ndjson_stream %s completed elapsed=%dms parts=%d", url, elapsed_ms, len(parts))
     return "".join(parts) or None

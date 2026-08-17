@@ -305,11 +305,11 @@ class LLMClient(Protocol):
 三个实现:
 
 - `MockLLMClient`:两个方法都返回 `None`——**None 就代表"请走本地模板兜底"**。这让无 key 环境下整条链路(含高风险处置)照常可测。
-- `llm/client.py`:urllib 裸调 `{base_url}/chat/completions`,回复温度 0.2、查询改写温度 0.0。支持智谱等 OpenAI 兼容端点的 `thinking:{"type":"disabled"}` 参数(默认关闭深度思考,大幅降低延迟)。
+- `llm/client.py`:urllib 裸调 `{base_url}/chat/completions`,支持智谱等 OpenAI 兼容端点的 `thinking:{"type":"disabled"}` 参数(默认关闭深度思考,大幅降低延迟)。第六轮起支持性回复使用独立温度 `LLM_SUPPORT_TEMPERATURE`(默认 `0.6`,偏口语更像真人;风险评估/改写/评审仍固定 `0.0`)。`post_json()` 对 429/5xx/超时做指数退避重试(最多 2 次,间隔 2s/4s);流式请求在**连接建立阶段**重试,一旦已开始接收 delta 则不再回退(避免已直播的 token 被丢掉)。`post_json` 失败后降级到模板回复,学生端不会白屏——但第六轮加了 `logger.warning`,可在日志里看到 provider/model。
 - **真流式**:`stream_support_reply(context, on_token)` 以 `stream:true` 请求并逐 delta 回调——OpenAI 兼容端解析 SSE 行(`post_json_stream`),Ollama 解析 ndjson(`post_ndjson_stream`);中途异常返回已积累的部分(用户已看到的内容不回退)。
 - `OllamaClient`:调 `/api/chat`,本地模型零成本。
 
-`build_llm_client(settings)` 按配置三选一。`post_json()` 把一切网络/解析异常吞成 `{}`——**失败永远退化为模板回复**,学生端绝不因模型故障而白屏(代价是错误被隐藏,生产可加日志)。
+`build_llm_client(settings)` 按配置三选一。
 
 ### 5.2 llm/prompts.py — 提示词模板
 
@@ -325,6 +325,8 @@ system = (
 ```
 
 四句话分别划定:能力边界 / 禁止事项 / 与规则层的分工 / 输出风格。用户消息模板把记忆、意图、风险、知识、练习、技能逐块拼装——**上下文工程就是把"该给的信息"按结构喂给模型**。
+
+第六轮把提示词从"机器人模板"改成"真人陪伴风格":不再自称"咨询回复生成器",改为"你是 Aegis,校园心理支持助手";指令从"先共情→1-3步骤→开放问题"改成灵活对话指导(短句口语、长度匹配用户消息、一次最多一个问题、建议最多两条且只在合适时给)。历史摘要/知识/练习字段仍动态注入,但加了防泄漏指示——禁止把"用户提到/系统回应重点"等内部标签原文放进回复里。
 
 **学习要点**:提示词放独立文件便于审计;`prompts.py` 与 `client.py` 互相只用类型注解引用(TYPE_CHECKING),不产生运行时循环依赖。
 
@@ -691,14 +693,14 @@ async def attach_request_context(request, call_next):
 - `app/harness/runner.py` + `factory.py`:工程级场景回放——7 套套件(risk/routing/skills/rag/api/tool-queue/scaled)断言**端到端行为**(如"审批后 5 个工具任务全部 success""死信被正确创建"),失败退出码 1,可接 CI。`factory.py` 是重构产物:harness 与 `eval/run_eval.py` 共用一个装配工厂,消除两份漂移的样板。
 - `eval/fixtures/*.json`:路由/风险/检索/安全/多轮的小型金标集。
 
-**学习要点**:评测三层——单元(pytest 63 项)/能力(eval runner)/链路(harness 8 套件);mock LLM 保证全链评测确定性,测的是**系统**不是模型运气。三运行时 A/B(`--suite runtime-ab`)对比编排器延迟/trace/调用数,LLM-as-Judge(`evaluation/judge.py`)给回复打共情/安全/结构分——评测从"分对错"升级到"评质量"。
+**学习要点**:评测三层——单元(pytest 65 项)/能力(eval runner)/链路(harness 8 套件);mock LLM 保证全链评测确定性,测的是**系统**不是模型运气。三运行时 A/B(`--suite runtime-ab`)对比编排器延迟/trace/调用数,LLM-as-Judge(`evaluation/judge.py`)给回复打共情/安全/结构分——评测从"分对错"升级到"评质量"。
 
 ---
 
 ## 第 14 站 收尾 — static/ + tests/
 
 - `static/index.html + login.js`:登录页;`student.html/js`:会话列表 + SSE 流式对话;`admin.html/js`:报告/个案/trace/知识库/工具/评测/审计七大面板。原生 JS,零构建。
-- `tests/` 十三个文件 63 项:orchestrator(提供 `build_orchestrator` 给其他测试复用)、api(TestClient 全链)、agent_runtime、retrieval_eval、mcp_tools、harness、assessment,以及第五轮新增的 risk_dual_channel(双通道)、function_calling(FC)、runtime_ab(A/B)、judge(LLM 评审)、langgraph_runtime、langgraph_checkpoint(跨进程恢复)。
+- `tests/` 十四个文件 65 项:orchestrator(提供 `build_orchestrator` 给其他测试复用)、api(TestClient 全链)、agent_runtime、retrieval_eval、mcp_tools、harness、assessment,以及第五轮新增的 risk_dual_channel(双通道)、function_calling(FC)、runtime_ab(A/B)、judge(LLM 评审)、langgraph_runtime、langgraph_checkpoint(跨进程恢复);第六轮新增 `test_reply_style.py` 守护"提示词自然人设"与"兜底模板不露内部标签"两条底线。
 
 ---
 
@@ -765,10 +767,10 @@ python -m app.init_db
 uvicorn app.main:app --host 127.0.0.1 --port 8091
 ```
 
-当前验证状态:`pytest 63/63 通过`,`python -m app.harness.runner --suite all` 8/8 套件通过。
+当前验证状态:`pytest 65/65 通过`,`python -m app.harness.runner --suite all` 8/8 套件通过。
 
 > 免责声明:本项目用于心理支持工程学习与展示,不提供医学诊断,不能替代专业心理咨询或危机干预服务。
 
 ---
 
-*本指南对应 2026-08 的 `improve-code` 分支模块化重构后结构;重构的动机、映射与去重细节见 [REFACTORING.md](docs/records/REFACTORING.md)。*
+*本指南对应 2026-08 的 `fix/source-labels` 分支第六轮改动;各轮详细变更见 [docs/records/](docs/records/) 系列文档(REFACTORING → OPTIMIZATION → AUTH-MYSQL → LANGGRAPH-DOCKER → DEEP-ENHANCEMENTS → LLM-RESPONSE-HUMANIZATION)。*

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.llm import LLMClient, LLMContext
+import os
 from app.models import AgentTrace, Intent, ResponsePlan, RiskLevel, SkillResult
 from app.skills import SkillRegistry
 
@@ -135,6 +136,30 @@ class CounselorAgent:
         result = self.registry.get("grounding_exercise").handler(message)
         return result, AgentTrace(self.name, "grounding_exercise", result.output["title"])
 
+
+def format_source_label(source: str) -> str:
+    """把检索/文档 source 字段格式化为用户友好的中文标签。
+
+    规则：
+    - 特殊内部标识映射（例如 'response_plan' -> '内部建议'）。
+    - 若是文件名，去掉扩展名并做简单美化（`-`/`_` 替换为空格）；可通过映射表覆盖特定文件名。
+    - 返回不会包含方括号，供插入到用户可见文本中。
+    """
+    if not source:
+        return "来源"
+    name = os.path.basename(source)
+    name = os.path.splitext(name)[0]
+    canonical = name.lower()
+    mapping = {
+        "response_plan": "内部建议",
+        "exam-season-guidance": "考试季建议",
+    }
+    if canonical in mapping:
+        return mapping[canonical]
+    # 基本美化：替换 - 和 _ 为中文空格并首字母大写（如有英文）
+    label = name.replace("-", " ").replace("_", " ")
+    return label
+
     def compose_plan(
         self,
         message: str,
@@ -145,10 +170,12 @@ class CounselorAgent:
         grounding: SkillResult | None,
         response_skill_context: str = "",
     ) -> tuple[ResponsePlan, AgentTrace]:
-        knowledge_snippets = [
-            f"[{item.get('source', '')}] {item.get('content') or item.get('snippet', '')}"
-            for item in (knowledge.output["documents"] if knowledge else [])
-        ]
+        knowledge_snippets = []
+        for item in (knowledge.output["documents"] if knowledge else []):
+            src = item.get("source", "")
+            content = item.get("content") or item.get("snippet") or ""
+            label = format_source_label(src)
+            knowledge_snippets.append(f"（来源：{label}） {content}")
         grounding_steps = list(grounding.output["steps"] if grounding else [])
         mode = "safety_template" if risk_level is RiskLevel.HIGH else ("research_support" if intent is Intent.RESEARCH else "support")
         prompt_messages = [
@@ -223,7 +250,8 @@ class CounselorAgent:
         if risk_level is not RiskLevel.HIGH and knowledge and knowledge.output["documents"]:
             top = knowledge.output["documents"][0]
             content = top.get("content") or top.get("snippet") or ""
-            lines.append(f"\n我也查到一个相关支持方向：[{top['source']}] {content[:240]}")
+            label = format_source_label(top.get("source", ""))
+            lines.append(f"\n我也查到一个相关支持方向：（来源：{label}） {content[:240]}")
 
         if intent is Intent.RESEARCH:
             lines.append("\n如果你愿意，我可以继续把资料整理成“原因、可尝试方法、何时求助”三段。")
@@ -245,7 +273,7 @@ def _knowledge_from_plan(plan: ResponsePlan):
         name="search_knowledge",
         output={
             "documents": [
-                {"source": "response_plan", "content": snippet, "snippet": snippet}
+                {"source": format_source_label("response_plan"), "content": snippet, "snippet": snippet}
                 for snippet in plan.knowledge_snippets
             ]
         },

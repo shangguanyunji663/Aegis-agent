@@ -1,4 +1,4 @@
-# Aegis 项目学习指南 — 从零构建一个校园心理支持多 Agent 平台
+﻿# Aegis 项目学习指南 — 从零构建一个校园心理支持多 Agent 平台
 
 > 本文档按照"如果你要从头写这个项目,你会怎么思考和编码"的顺序,逐模块拆解每个文件的设计意图与实现细节。建议按顺序阅读,每个模块读完后对照源码走一遍。
 >
@@ -773,4 +773,4 @@ uvicorn app.main:app --host 127.0.0.1 --port 8091
 
 ---
 
-*本指南对应 2026-08 的 `fix/source-labels` 分支第六轮改动;各轮详细变更见 [docs/records/](docs/records/) 系列文档(REFACTORING → OPTIMIZATION → AUTH-MYSQL → LANGGRAPH-DOCKER → DEEP-ENHANCEMENTS → LLM-RESPONSE-HUMANIZATION)。*
+*本指南对应 2026-08 的 `main` 分支第八轮改动;各轮详细变更见 [docs/records/](docs/records/) 系列文档(REFACTORING → OPTIMIZATION → AUTH-MYSQL → LANGGRAPH-DOCKER → DEEP-ENHANCEMENTS → LLM-RESPONSE-HUMANIZATION → MEMORY-ENHANCEMENT → CONFRONTATIONAL-DIALOGUE-TESTING)。*

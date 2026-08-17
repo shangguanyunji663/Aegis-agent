@@ -1,4 +1,4 @@
-## 面向校园心理支持场景的多 Agent 风险识别与干预协作平台项目简介
+﻿## 面向校园心理支持场景的多 Agent 风险识别与干预协作平台项目简介
 
 `Aegis Psych Agent` 是一个校园心理支持多 Agent 平台，围绕学生端倾诉、心理知识检索、风险识别、辅导员工作台和高风险工具执行闭环展开。项目不是简单的聊天机器人，而是把“学生侧即时支持”和“管理侧可审计干预”拆成两套独立信息架构，并通过后端 Agent Runtime Harness 统一处理意图路由、记忆注入、RAG 检索、风险报告、trace 落库和工具计划。
 
@@ -220,7 +220,7 @@ python -m app.mcp_tools.server --list
 ├── scripts/                      # 本地与 Compose 启动脚本
 ├── docs/                         # 架构、安全和演示文档
 ├── Aegis项目逐文件学习指南.md      # 从零构建式逐模块学习指南
-├── docs/records/                 # 六轮迭代记录(重构→提速→注册MySQL→LangGraph→深度增强→回复真人化)
+├── docs/records/                 # 八轮迭代记录(重构→提速→注册MySQL→LangGraph→深度增强→回复真人化→记忆增强→对抗型对话测试)
 ├── Dockerfile
 └── docker-compose.yml
 ```
@@ -279,6 +279,8 @@ python -m app.mcp_tools.server --list
 - [第四次功能说明(LangGraph 与全栈激活)](docs/records/LANGGRAPH-DOCKER.md)
 - [第五次深度增强(风险双通道/FC/A·B评测/Judge/Checkpoint)](docs/records/DEEP-ENHANCEMENTS.md)
 - [第六次回复真人化改造(提示词/兜底模板/429重试)](docs/records/LLM-RESPONSE-HUMANIZATION.md)
+- [第七次记忆系统增强(消息数/摘要容量提升)](docs/records/MEMORY-ENHANCEMENT.md)
+- [第八次对抗型对话测试(10轮配合+10轮对抗)](docs/records/CONFRONTATIONAL-DIALOGUE-TESTING.md)
 
 ## 待改进与优化(Roadmap)
 
@@ -296,7 +298,8 @@ python -m app.mcp_tools.server --list
 - ✅ **三运行时 A/B 评测**:langgraph/autonomous/ordered 同数据集对比延迟/trace/LLM 调用数(`--suite runtime-ab`)
 - ✅ **LLM-as-Judge**:模型为回复打共情性/安全性/结构性分数,进入评测报告
 - ✅ **LangGraph Checkpoint**:SqliteSaver 检查点持久化,长对话跨进程可恢复
-- 记忆系统升级:滚动摘要 → 结构化记忆(用户画像+情绪轨迹+历史会话向量检索)(高难度)
+- ✅ 记忆系统基础增强:最近消息数 6→15、摘要最大字符 900→3000(第七轮,低难度)
+- 记忆系统深度升级:滚动摘要 → 结构化记忆(用户画像+情绪轨迹+历史会话向量检索)(高难度)
 - 主动关怀闭环:高危用户 N 天未跟进自动生成提醒任务(复用工具队列)(中难度)
 - 词表外置:路由/技能触发关键词从代码抽到 YAML(低难度)
 

@@ -312,7 +312,7 @@ def test_mock_llm_boundary_uses_fallback_without_network(tmp_path: Path):
     response = orchestrator.handle("我最近考试压力很大，晚上睡不着")
 
     assert isinstance(orchestrator.llm_client, MockLLMClient)
-    assert "我听到了你的困扰" in response.answer
+    assert "谢谢你愿意跟我说这些" in response.answer
     assert any(item.action == "compose_answer" and item.detail == "fallback:mock" for item in response.trace)
 
 

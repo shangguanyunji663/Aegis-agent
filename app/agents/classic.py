@@ -1,8 +1,48 @@
 from __future__ import annotations
 
 from app.llm import LLMClient, LLMContext
+import logging
+import os
 from app.models import AgentTrace, Intent, ResponsePlan, RiskLevel, SkillResult
 from app.skills import SkillRegistry
+
+logger = logging.getLogger("aegis.reply")
+
+
+def _user_focus_from_memory(memory_line: str) -> str:
+    """从一行记忆摘要里提取用户原话(剥掉"用户提到：/；系统回应重点："等内部标签)。
+
+    供兜底回复自然引用用户说过的话,避免把内部记忆格式泄漏到用户可见文案;格式不符返回空串。
+    """
+    text = (memory_line or "").strip()
+    prefix = "用户提到："
+    if text.startswith(prefix):
+        text = text[len(prefix):]
+    return text.split("；系统回应重点：", 1)[0].strip()[:60]
+
+
+def format_source_label(source: str) -> str:
+    """把检索/文档 source 字段格式化为用户友好的中文标签。
+
+    规则：
+    - 特殊内部标识映射（例如 'response_plan' -> '内部建议'）。
+    - 若是文件名，去掉扩展名并做简单美化（`-`/`_` 替换为空格）；可通过映射表覆盖特定文件名。
+    - 返回不会包含方括号，供插入到用户可见文本中。
+    """
+    if not source:
+        return "来源"
+    name = os.path.basename(source)
+    name = os.path.splitext(name)[0]
+    canonical = name.lower()
+    mapping = {
+        "response_plan": "内部建议",
+        "exam-season-guidance": "考试季建议",
+    }
+    if canonical in mapping:
+        return mapping[canonical]
+    # 基本美化：替换 - 和 _ 为中文空格并首字母大写（如有英文）
+    label = name.replace("-", " ").replace("_", " ")
+    return label
 
 
 class MemoryAgent:
@@ -134,42 +174,43 @@ class CounselorAgent:
     def grounding(self, message: str) -> tuple[SkillResult, AgentTrace]:
         result = self.registry.get("grounding_exercise").handler(message)
         return result, AgentTrace(self.name, "grounding_exercise", result.output["title"])
-
+ 
     def compose_plan(
         self,
         message: str,
         intent: Intent,
         risk_level: RiskLevel,
-        memory_summary: str,
-        knowledge: SkillResult | None,
-        grounding: SkillResult | None,
-        response_skill_context: str = "",
+        memory_summary: str = "",
+        knowledge: SkillResult | None = None,
+        grounding: SkillResult | None = None,
+        standard_skill_context: str = "",
     ) -> tuple[ResponsePlan, AgentTrace]:
-        knowledge_snippets = [
-            f"[{item.get('source', '')}] {item.get('content') or item.get('snippet', '')}"
-            for item in (knowledge.output["documents"] if knowledge else [])
-        ]
-        grounding_steps = list(grounding.output["steps"] if grounding else [])
+        """构造一个简单的 ResponsePlan，供后续 `finalize_plan` 使用。
+
+        该实现保持轻量：将检索到的文档摘录为 knowledge_snippets，保留记忆摘要与引导步骤，
+        并生成基础的 prompt messages（system + user）。
+        """
+        # mode 是对外暴露的语义字段(API/前端/测试依赖):高风险走安全模板,研究意图走资料支持,其余为陪伴支持
         mode = "safety_template" if risk_level is RiskLevel.HIGH else ("research_support" if intent is Intent.RESEARCH else "support")
-        prompt_messages = [
-            {"role": "system", "content": f"mode={mode}; intent={intent.value}; risk={risk_level.value}"},
-            {"role": "system", "content": f"memory={memory_summary or 'none'}"},
-            {"role": "system", "content": f"skills={response_skill_context or 'none'}"},
-            {"role": "user", "content": message},
-        ]
         plan = ResponsePlan(
             mode=mode,
             response_agent=self.name,
             intent=intent.value,
             risk_level=risk_level.value,
-            memory_brief=memory_summary,
-            knowledge_snippets=knowledge_snippets,
-            grounding_steps=grounding_steps,
-            skill_context=response_skill_context,
-            prompt_messages=prompt_messages,
+            memory_brief=memory_summary or "",
         )
-        return plan, AgentTrace(self.name, "compose_plan", f"mode={mode}; snippets={len(knowledge_snippets)}; grounding={len(grounding_steps)}")
-
+        if knowledge and isinstance(knowledge.output, dict):
+            docs = knowledge.output.get("documents") or []
+            plan.knowledge_snippets = [d.get("content") or d.get("snippet") or "" for d in docs]
+        if grounding and isinstance(grounding.output, dict):
+            plan.grounding_steps = grounding.output.get("steps") or []
+        plan.skill_context = standard_skill_context or ""
+        plan.prompt_messages = [
+            {"role": "system", "content": "你是一个温和而负责的心理支持助手。"},
+            {"role": "user", "content": message},
+        ]
+        return plan, AgentTrace(self.name, "compose_plan", f"intent={intent.value};risk={risk_level.value};knowledge_hits={len(plan.knowledge_snippets)}")
+ 
     def finalize_plan(self, plan: ResponsePlan, on_token=None) -> tuple[str, AgentTrace]:
         fallback = self._fallback_answer(
             Intent(plan.intent),
@@ -200,6 +241,11 @@ class CounselorAgent:
             generated = self.llm_client.generate_support_reply(context)
         if generated:
             return generated.strip(), AgentTrace(self.name, "compose_answer", f"llm:{self.llm_client.provider}/{self.llm_client.model}")
+        logger.warning(
+            "support reply fell back to template (provider=%s, model=%s); check 'aegis.llm' logs for the failed LLM call",
+            self.llm_client.provider,
+            self.llm_client.model,
+        )
         return fallback, AgentTrace(self.name, "compose_answer", f"fallback:{self.llm_client.provider}")
 
     def _fallback_answer(self, intent: Intent, risk_level: RiskLevel, memory_summary: str, knowledge, grounding) -> str:
@@ -208,12 +254,15 @@ class CounselorAgent:
             lines.append("我很在意你刚才提到的危险信号。此刻请先把安全放在第一位：如果你已经有明确计划或身边有可伤害自己的物品，请立刻联系身边可信任的人、学校心理中心或当地紧急服务。")
         elif risk_level is RiskLevel.MEDIUM:
             lines.append("听起来你已经撑得很辛苦了。我们先把这一刻稳定下来，再一起把问题拆小。")
+        elif intent is Intent.COMPANION:
+            lines.append("我在呢。你想聊什么都可以，我听着。")
         else:
-            lines.append("我听到了你的困扰。我们可以先从最具体、最影响你的那一部分开始。")
+            lines.append("谢谢你愿意跟我说这些，我能感觉到这件事对你影响不小。")
 
-        if memory_summary:
-            latest_memory = memory_summary.splitlines()[-1][:180]
-            lines.append(f"\n我会结合你前面提到的情况继续陪你梳理：{latest_memory}")
+        if risk_level is not RiskLevel.HIGH and memory_summary:
+            focus = _user_focus_from_memory(memory_summary.splitlines()[-1])
+            if focus:
+                lines.append(f"你之前跟我提到「{focus}」，这部分我们可以接着聊。")
 
         if grounding:
             steps = grounding.output["steps"]
@@ -223,14 +272,17 @@ class CounselorAgent:
         if risk_level is not RiskLevel.HIGH and knowledge and knowledge.output["documents"]:
             top = knowledge.output["documents"][0]
             content = top.get("content") or top.get("snippet") or ""
-            lines.append(f"\n我也查到一个相关支持方向：[{top['source']}] {content[:240]}")
+            label = format_source_label(top.get("source", ""))
+            lines.append(f"\n我也查到一个相关支持方向：（来源：{label}） {content[:240]}")
 
         if intent is Intent.RESEARCH:
             lines.append("\n如果你愿意，我可以继续把资料整理成“原因、可尝试方法、何时求助”三段。")
         elif intent is Intent.RISK:
             lines.append("\n现在最重要的是不要一个人扛着。请尽快联系身边可信任的人，让对方陪你一起联系学校心理中心或当地紧急服务。")
+        elif intent is Intent.COMPANION:
+            lines.append("\n我在听，你想从哪儿说起都行。")
         else:
-            lines.append("\n你可以接着告诉我：这件事最难受的时刻通常发生在什么时候？")
+            lines.append("\n你愿意的话，可以跟我多说说这件事现在最让你难受的地方。")
         return "\n".join(lines)
 
 
@@ -245,7 +297,7 @@ def _knowledge_from_plan(plan: ResponsePlan):
         name="search_knowledge",
         output={
             "documents": [
-                {"source": "response_plan", "content": snippet, "snippet": snippet}
+                {"source": format_source_label("response_plan"), "content": snippet, "snippet": snippet}
                 for snippet in plan.knowledge_snippets
             ]
         },

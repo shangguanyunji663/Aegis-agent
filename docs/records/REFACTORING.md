@@ -1,23 +1,23 @@
-# Aegis 第一次模块化重构方案与变更记录
+# Aegis 第一轮模块化重构方案与变更记录
 
 > 分支:`improve-code` · 时间:2026-08 · 性质:**纯结构性重构,业务逻辑零改动**(唯一功能增量:补齐 X-Request-ID / X-Trace-ID 中间件)
 > 验证:`pytest 43/43 通过` · `harness 7/7 套件通过` · `pyflakes 干净` · `uvicorn 冒烟 + 登录 + SSE 正常`
 
----
+***
 
 ## 1. 重构动机
 
 初版代码在快速迭代中形成了典型的"有机生长"结构,主要问题:
 
-| 问题 | 具体表现 | 危害 |
-| --- | --- | --- |
-| 上帝文件 | `app/repository.py` 1379 行:一个千行 `DatabaseStore` 大类 + BM25/重排/分词等纯算法 + 知识切块 + 记忆摘要 + 死代码 | 无法单测检索算法;改一处怕动全身 |
-| 路由闭包堆积 | `app/main.py` 576 行,约 45 个路由全部以闭包形式塞在 `create_app()` 里 | 无法按领域拆分 review;依赖靠闭包捕获而非显式注入 |
-| 重复实现 | `_loads`/`_now` 各复制 4 份(且时区语义不一致);看板读取函数 3 份;高危关键词表硬编码 4 处 | 安全词表改一处漏三处的隐患 |
-| 死代码 | 整个 `app/store.py`(JsonStore)从未被导入;repository 里 6 个被 `ReportCaseService` 取代的方法;多处未用导入 | 误导读者;pyflakes 噪声 |
-| 提示词散落 | 中文系统提示词硬编码在 `llm.py`/`agents.py`/`agent_models.py`/`autonomous_agents.py` 四处 | 安全文案无法集中审计 |
-| 数据混入代码包 | 12 篇知识库 `.md` 和 RAG 评测数据集放在 `app/` 导入包内 | 代码与数据边界模糊 |
-| 名不副实 | `static/app.js` 实为登录页脚本;"harness"/"runtime" 各有两三种含义 | 认知负担 |
+| 问题      | 具体表现                                                                                    | 危害                           |
+| ------- | --------------------------------------------------------------------------------------- | ---------------------------- |
+| 上帝文件    | `app/repository.py` 1379 行:一个千行 `DatabaseStore` 大类 + BM25/重排/分词等纯算法 + 知识切块 + 记忆摘要 + 死代码 | 无法单测检索算法;改一处怕动全身             |
+| 路由闭包堆积  | `app/main.py` 576 行,约 45 个路由全部以闭包形式塞在 `create_app()` 里                                  | 无法按领域拆分 review;依赖靠闭包捕获而非显式注入 |
+| 重复实现    | `_loads`/`_now` 各复制 4 份(且时区语义不一致);看板读取函数 3 份;高危关键词表硬编码 4 处                              | 安全词表改一处漏三处的隐患                |
+| 死代码     | 整个 `app/store.py`(JsonStore)从未被导入;repository 里 6 个被 `ReportCaseService` 取代的方法;多处未用导入    | 误导读者;pyflakes 噪声             |
+| 提示词散落   | 中文系统提示词硬编码在 `llm.py`/`agents.py`/`agent_models.py`/`autonomous_agents.py` 四处            | 安全文案无法集中审计                   |
+| 数据混入代码包 | 12 篇知识库 `.md` 和 RAG 评测数据集放在 `app/` 导入包内                                                 | 代码与数据边界模糊                    |
+| 名不副实    | `static/app.js` 实为登录页脚本;"harness"/"runtime" 各有两三种含义                                     | 认知负担                         |
 
 ## 2. 重构原则
 
@@ -98,36 +98,36 @@ app/
 
 ## 4. 旧 → 新文件映射
 
-| 旧路径 | 新路径 | 说明 |
-| --- | --- | --- |
-| `app/auth.py` | `app/core/auth.py` | 平移 |
-| `app/privacy.py` | `app/core/privacy.py` | 平移 |
-| `app/runtime.py` | `app/core/runtime.py` | 平移 |
-| — | `app/core/utils.py` | **新增**:收编 4 份 `_loads`、4 份 `_now`、`_json` |
-| `app/llm.py` | `app/llm/client.py` + `app/llm/prompts.py` | 客户端与提示词分离 |
-| `app/agents.py` | `app/agents/classic.py` | 删除死方法 `compose` |
-| `app/agent_models.py` | `app/agents/model_profiles.py` | |
-| `app/agent_runtime.py` | `app/agents/runtime.py` | |
-| `app/agent_harness.py` | `app/agents/harness.py` | 删除未被消费的 `AegisToolPlan` 与恒为 None 的分支 |
-| `app/orchestrator.py` | `app/agents/orchestrator.py` | `_report_from_dict` 改用 `PendingReport.from_dict` |
-| `app/autonomous_events.py` | `app/autonomous/events.py` | |
-| `app/autonomous_registry.py` | `app/autonomous/registry.py` | |
-| `app/autonomous_coordinator.py` | `app/autonomous/coordinator.py` | 底部 3 个重复函数删除 |
-| `app/autonomous_agents.py` | `app/autonomous/agents.py` | 底部 3 个重复函数删除;去未用导入 |
-| `app/autonomous_runtime.py` | `app/autonomous/runtime.py` | 类内重复方法删除 |
-| — | `app/autonomous/board.py` | **新增**:黑板读取单一实现 |
-| `app/repository.py`(1379 行) | `app/repository/store.py`(955 行)+ `app/rag/*` | 检索算法/切块/记忆摘要全部拆出 |
-| `app/vector_store.py` | `app/rag/vector_store.py` | |
-| `app/tool_contracts.py` | `app/tools/contracts.py` | |
-| `app/tool_gateway.py` | `app/tools/gateway.py` | |
-| `app/mcp_client.py` | `app/tools/mcp_client.py` | 删除死函数 `extract_job_id`/`queue_case_tools` |
-| `app/evaluation.py` | `app/evaluation/{runner,datasets,report_html}.py` | 数据集与 HTML 模板拆出 |
-| `app/main.py`(576 行) | `app/main.py`(~90 行)+ `app/api/*` | 路由按领域拆为 7 个模块 |
-| `app/store.py` | **删除** | JsonStore 死文件 |
-| `app/knowledge/*.md` | `knowledge/*.md` | 数据移出导入包 |
-| `app/rag_eval/aegis-rag-eval.json` | `eval/fixtures/aegis-rag-eval.json` | 评测数据归口 |
-| `static/app.js` | `static/login.js` | 名实相符(登录页脚本) |
-| — | `app/harness/factory.py` | **新增**:共享装配工厂 |
+| 旧路径                                | 新路径                                               | 说明                                               |
+| ---------------------------------- | ------------------------------------------------- | ------------------------------------------------ |
+| `app/auth.py`                      | `app/core/auth.py`                                | 平移                                               |
+| `app/privacy.py`                   | `app/core/privacy.py`                             | 平移                                               |
+| `app/runtime.py`                   | `app/core/runtime.py`                             | 平移                                               |
+| —                                  | `app/core/utils.py`                               | **新增**:收编 4 份 `_loads`、4 份 `_now`、`_json`        |
+| `app/llm.py`                       | `app/llm/client.py` + `app/llm/prompts.py`        | 客户端与提示词分离                                        |
+| `app/agents.py`                    | `app/agents/classic.py`                           | 删除死方法 `compose`                                  |
+| `app/agent_models.py`              | `app/agents/model_profiles.py`                    | <br />                                           |
+| `app/agent_runtime.py`             | `app/agents/runtime.py`                           | <br />                                           |
+| `app/agent_harness.py`             | `app/agents/harness.py`                           | 删除未被消费的 `AegisToolPlan` 与恒为 None 的分支             |
+| `app/orchestrator.py`              | `app/agents/orchestrator.py`                      | `_report_from_dict` 改用 `PendingReport.from_dict` |
+| `app/autonomous_events.py`         | `app/autonomous/events.py`                        | <br />                                           |
+| `app/autonomous_registry.py`       | `app/autonomous/registry.py`                      | <br />                                           |
+| `app/autonomous_coordinator.py`    | `app/autonomous/coordinator.py`                   | 底部 3 个重复函数删除                                     |
+| `app/autonomous_agents.py`         | `app/autonomous/agents.py`                        | 底部 3 个重复函数删除;去未用导入                               |
+| `app/autonomous_runtime.py`        | `app/autonomous/runtime.py`                       | 类内重复方法删除                                         |
+| —                                  | `app/autonomous/board.py`                         | **新增**:黑板读取单一实现                                  |
+| `app/repository.py`(1379 行)        | `app/repository/store.py`(955 行)+ `app/rag/*`     | 检索算法/切块/记忆摘要全部拆出                                 |
+| `app/vector_store.py`              | `app/rag/vector_store.py`                         | <br />                                           |
+| `app/tool_contracts.py`            | `app/tools/contracts.py`                          | <br />                                           |
+| `app/tool_gateway.py`              | `app/tools/gateway.py`                            | <br />                                           |
+| `app/mcp_client.py`                | `app/tools/mcp_client.py`                         | 删除死函数 `extract_job_id`/`queue_case_tools`        |
+| `app/evaluation.py`                | `app/evaluation/{runner,datasets,report_html}.py` | 数据集与 HTML 模板拆出                                   |
+| `app/main.py`(576 行)               | `app/main.py`(\~90 行)+ `app/api/*`                | 路由按领域拆为 7 个模块                                    |
+| `app/store.py`                     | **删除**                                            | JsonStore 死文件                                    |
+| `app/knowledge/*.md`               | `knowledge/*.md`                                  | 数据移出导入包                                          |
+| `app/rag_eval/aegis-rag-eval.json` | `eval/fixtures/aegis-rag-eval.json`               | 评测数据归口                                           |
+| `static/app.js`                    | `static/login.js`                                 | 名实相符(登录页脚本)                                      |
+| —                                  | `app/harness/factory.py`                          | **新增**:共享装配工厂                                    |
 
 ## 5. 删除清单(均经全仓 grep 验证无引用)
 
@@ -137,23 +137,23 @@ app/
 - `agent_harness.py`:`AegisToolPlan`/`tool_plan`(计算后从未被消费)、`stream` 中 outcome 恒为 None 的死分支
 - `mcp_client.py`:`extract_job_id`(与 gateway 内实现重复)、`queue_case_tools`
 - `database.py`:模块级 `engine`/`SessionLocal`/`get_db`/`session_scope` 单例(零引用,`create_schema`/`readiness_check` 的默认引擎改为按需 `build_engine()`)
-- 各文件未用导入(main.py 的 time/uuid4/Request、repository 的 RiskLevel、evaluation 的 asdict、autonomous_agents 的 CompanionAgent、tests 的 ReportStatus 等约 10 处)
+- 各文件未用导入(main.py 的 time/uuid4/Request、repository 的 RiskLevel、evaluation 的 asdict、autonomous\_agents 的 CompanionAgent、tests 的 ReportStatus 等约 10 处)
 
 ## 6. 去重明细(保留各调用点原语义)
 
-| 重复项 | 原位置 | 收编到 |
-| --- | --- | --- |
-| `_loads`(dict 守卫版)×2 | tool_queue / tool_records | `core.utils.loads_dict` |
-| `_loads`(默认值版)×2 | repository / report_case | `core.utils.loads_or` |
-| `_now`(naive UTC)×2 + auth.utcnow | repository / report_case | `core.utils.now_utc_naive` |
-| `_now`(aware UTC)×2 | tool_queue / tool_records | `core.utils.now_utc` |
-| `_json` | tool_records | `core.utils.dumps` |
-| `_risk_from_board` ×3 | autonomous_agents / autonomous_runtime / autonomous_coordinator | `autonomous/board.risk_from_board`(三份逐字相同) |
-| `_intent_from_board` ×3(有差异!) | 同上 | `autonomous/board.intent_from_board(use_board_risk=…, use_hard_terms=…)` —— agents=双开,runtime=关硬词回退,coordinator=关看板风险预判,行为逐点保留 |
-| `_hard_high_risk` ×2 + `HIGH_TERMS` | autonomous_agents / autonomous_coordinator / assessment | `autonomous/board.hard_high_risk` 引用 `assessment.HIGH_TERMS`(词表内容验证一致) |
-| `PendingReport` 字典转换 ×3 | orchestrator / autonomous_runtime / (反向 report_dict) | `models.PendingReport.from_dict` |
-| `build_local_orchestrator` ≈ `build_harness_orchestrator` | eval/run_eval.py / harness/runner.py | `app/harness/factory.py` |
-| 双重 `settings = runtime_settings or get_settings()` | main.py 86/91 行 | 删除重复行 |
+| 重复项                                                       | 原位置                                                                | 收编到                                                                                                                            |
+| --------------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `_loads`(dict 守卫版)×2                                      | tool\_queue / tool\_records                                        | `core.utils.loads_dict`                                                                                                        |
+| `_loads`(默认值版)×2                                          | repository / report\_case                                          | `core.utils.loads_or`                                                                                                          |
+| `_now`(naive UTC)×2 + auth.utcnow                         | repository / report\_case                                          | `core.utils.now_utc_naive`                                                                                                     |
+| `_now`(aware UTC)×2                                       | tool\_queue / tool\_records                                        | `core.utils.now_utc`                                                                                                           |
+| `_json`                                                   | tool\_records                                                      | `core.utils.dumps`                                                                                                             |
+| `_risk_from_board` ×3                                     | autonomous\_agents / autonomous\_runtime / autonomous\_coordinator | `autonomous/board.risk_from_board`(三份逐字相同)                                                                                     |
+| `_intent_from_board` ×3(有差异!)                             | 同上                                                                 | `autonomous/board.intent_from_board(use_board_risk=…, use_hard_terms=…)` —— agents=双开,runtime=关硬词回退,coordinator=关看板风险预判,行为逐点保留 |
+| `_hard_high_risk` ×2 + `HIGH_TERMS`                       | autonomous\_agents / autonomous\_coordinator / assessment          | `autonomous/board.hard_high_risk` 引用 `assessment.HIGH_TERMS`(词表内容验证一致)                                                         |
+| `PendingReport` 字典转换 ×3                                   | orchestrator / autonomous\_runtime / (反向 report\_dict)             | `models.PendingReport.from_dict`                                                                                               |
+| `build_local_orchestrator` ≈ `build_harness_orchestrator` | eval/run\_eval.py / harness/runner.py                              | `app/harness/factory.py`                                                                                                       |
+| 双重 `settings = runtime_settings or get_settings()`        | main.py 86/91 行                                                    | 删除重复行                                                                                                                          |
 
 ## 7. 唯一功能增量:请求追踪中间件
 
@@ -172,18 +172,19 @@ app/
 
 ## 9. 验证记录
 
-| 验证项 | 结果 |
-| --- | --- |
-| `pytest tests/` | **43 passed, 0 failed**(重构前 42 passed / 1 failed) |
-| `pyflakes app/ eval/ tests/` | 干净(仅 database.py 中带注释的有意惰性导入) |
-| `python -m compileall` | 通过 |
-| uvicorn 冒烟 | `/api/health` UP;登录成功;响应含 `x-request-id`/`x-trace-id` |
-| `python -m app.mcp_tools.server --list` | 正常输出能力清单 |
+| 验证项                                        | 结果                                                          |
+| ------------------------------------------ | ----------------------------------------------------------- |
+| `pytest tests/`                            | **43 passed, 0 failed**(重构前 42 passed / 1 failed)           |
+| `pyflakes app/ eval/ tests/`               | 干净(仅 database.py 中带注释的有意惰性导入)                               |
+| `python -m compileall`                     | 通过                                                          |
+| uvicorn 冒烟                                 | `/api/health` UP;登录成功;响应含 `x-request-id`/`x-trace-id`       |
+| `python -m app.mcp_tools.server --list`    | 正常输出能力清单                                                    |
 | `python -m app.harness.runner --suite all` | **7/7 套件通过**(risk/routing/skills/rag/api/tool-queue/scaled) |
-| 变更规模 | 87 个文件,+1734 / −1552 行 |
+| 变更规模                                       | 87 个文件,+1734 / −1552 行                                      |
 
 ## 10. 遗留说明
 
 - `database.migrate_legacy_schema` 仍与 `entities.py` 存在两份 schema 真相(手写 DDL 迁移),建议后续引入 Alembic 统一。
 - `agents/classic.py` 中路由关键词表、`skills.py` 中技能触发词表仍为硬编码,可后续外置为配置。
 - `McpToolGateway` 在同步方法内使用 `asyncio.run`,如需高并发可改造为原生异步。
+

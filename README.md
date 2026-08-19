@@ -21,7 +21,7 @@
 | Agentic RAG | 所有消息都检索知识库会增加噪声，尤其普通陪伴类对话容易被知识文档带偏 | 通过 CHAT / CONSULT / RISK 意图路由决定是否检索，混合 BM25 + 向量检索，并支持元数据过滤和 rerank |
 | 工具治理与 MCP | 高风险预警、Excel 记录、邮件通知不能由模型越权直接执行 | 工具调用先生成 `ToolJob`，经角色、风险等级、审批、脱敏和审计后进入队列；支持 internal 和 FastMCP 两种后端 |
 | 后台 Tool Queue | 外部工具慢、失败或限流时，不应阻塞学生端流式回复 | 独立 worker 支持依赖调度、重试延迟、邮件限流、dead letter、ExcelRecord 和 AlertRecord 持久化 |
-| Engineering Harness | Agent 项目只看 demo 容易高估完成度，需要可重复验证 | pytest 65 项、RAG eval、综合 eval(含 LLM-as-Judge)、harness 8 套件、三运行时 A/B 对比评测，覆盖路由、风险、安全、RAG、API、工具队列与编排器链路 |
+| Engineering Harness | Agent 项目只看 demo 容易高估完成度，需要可重复验证 | 基于真实代表性数据集的 pytest 单元/接口测试、RAG eval、综合 eval(含 LLM-as-Judge)、harness 8 套件、三运行时 A/B 对比评测，覆盖路由、风险、安全、RAG、API、工具队列与编排器链路；不再为追求满分筛选样本或人为凑 100% |
 | 风险双通道 | 关键词规则召回有限，单靠模型又不可控 | 规则 ∪ 轻量 LLM 二次评估取并集，任一通道判高危即高危；LLM 失败/超时自动回退纯规则，安全边界不变 |
 
 ## 架构概览
@@ -154,8 +154,8 @@ Compose 会启动应用、PostgreSQL、Redis 和 Chroma。默认本地模式使�
 # 初始化数据库
 python -m app.init_db
 
-# 后端测试
-python -m pytest -q
+# 后端测试（只跑 tests/，避免被根目录 test_chat.py 阻塞）
+python -m pytest tests -q
 
 # 前端脚本语法检查
 node --check static/login.js static/student.js static/admin.js
@@ -175,17 +175,30 @@ python -m app.mcp_tools.server --list
 
 ## 评测结果
 
-当前仓库包含一套可重复运行的工程验证脚本，不依赖人工点击 demo 判断效果。
+当前仓库的评测体系**基于真实代表性数据集**（人工构造但贴近真实校园心理求助语料），**不筛选样本、不为追求满分而人为凑 100%**。所有指标由 `python -m eval.run_eval` 与 `python -m app.harness.runner` 在确定性（MockLLM）环境下产出，衡量的是当前**规则引擎通道**的真实能力边界；生产环境开启 `RISK_LLM_CHANNEL_ENABLED` 后，双通道中的 LLM 通道会进一步补强召回。
 
-| 验证项 | 覆盖内容 | 最近验证结果 |
+> 数据来源与最近验证日期：**最近验证日期 2026-08-19**。
+> - 路由/风险/规模化基准：`eval/fixtures/representative_corpus.json`（150 条唯一真实样本，含隐式高危与第三人称干扰）
+> - RAG 检索：`eval/fixtures/rag_queries.json`（50 条自然语言问句，基于真实知识库 12 篇文档）
+> - 多轮回归：`eval/fixtures/multi_turn_corpus.json`（8 组多轮场景）
+> - 三运行时 A/B：10 条代表性消息（覆盖四意图 + 中风险 + 显式/隐式高危 + 第三人称干扰）
+
+| 验证项 | 覆盖内容 | 最近验证结果（2026-08-19） |
 | --- | --- | --- |
-| 单元与接口测试 | API、认证、风险双通道、Function Calling、Agent runtime、LangGraph checkpoint、MCP tools、评测 runner | `65 passed` |
-| RAG 独立评测 | 66 条多主题心理支持检索样本，包含 expected source 和 expected terms | `HitRate 1.0000`, `MRR 0.9924`, `NDCG@K 0.9722` |
-| 综合评测 | 路由、风险、安全、Skill、multi-turn、RAG summary、scaled benchmark、LLM-as-Judge 回复质量评分 | `all_passed=true`, `scaled_benchmark_total=150` |
-| 三运行时 A/B | langgraph / autonomous / ordered 同数据集对比延迟、trace 步数、LLM 调用数与判定一致性 | `判定 100% 一致` |
-| Harness 验证 | Risk Safety、Agent Routing、Standard Skills、RAG、API、Tool Queue、Runtime A/B 等链路 | `8/8 passed` |
+| 单元与接口测试 | API、认证、风险双通道、Function Calling、Agent runtime、LangGraph checkpoint、MCP tools、评测 runner | 本地 SQLite 可执行 **57 通过**（`tests/test_api.py` 依赖 MySQL 后端，本环境未运行；`test_langgraph_checkpoint` 的跨实例持久化为既有环境问题，与本次评测改造无关） |
+| 路由/风险判定 | 150 条代表性消息（含隐式高危、第三人称干扰），逐条标注期望意图/风险 | 路由准确率 **0.61**（95% CI [0.53, 0.69]）；风险准确率 **0.77**；高风险召回 **0.57**（CI [0.39, 0.73]）；误报率 **0.033** |
+| 150 条规模化基准 | 150 条唯一真实样本（非循环生成），联合意图+风险判定 | 联合准确率 **0.61**；意图 **0.61**；风险 **0.77**；高风险召回 **0.57**；误报率 **0.033**；按难度分层：easy 明显优于 hard |
+| 多轮回归 | 8 组多轮场景（含升级到中/高风险、第三人称转自身） | 最终关键内容命中率 **0.875**（7/8） |
+| RAG 检索 | 50 条自然语言问句，Top-4 混合检索（BM25 + 向量 + rerank） | HitRate **0.94**、Recall@4 **0.94**、Precision@4 **0.33**、MRR **0.84**、NDCG@4 **0.86**、Top-1 **0.76** |
+| 三运行时 A/B | langgraph / autonomous / ordered 同数据集对比延迟、trace 步数、LLM 调用数与判定一致性（10 条代表性消息） | 三运行时判定**完全一致**；意图准确率 **0.8**、风险准确率 **0.9**（含 1 条规则引擎当前漏判的隐式高危样本，如实暴露跨运行时一致的缺口） |
+| Harness 验证 | Risk Safety、Agent Routing、Standard Skills、RAG、API、Tool Queue、Runtime A/B 等链路（验证工程行为，**不强制满分**） | **8/8 通过**（行为级断言；已移除 HitRate≥0.9 / 规模化=100% / 风险=100% 等硬性阈值门限） |
 
-> 评测数据用于工程回归和能力展示，不等同于临床有效性评估。
+**非 100% 结果的真实含义（非"失败"，而是能力边界）：**
+- **高风险召回 0.57**：当前规则词表覆盖显式与部分隐式表达（已补强"一了百了/解脱/结束这一切"等），但**隐喻式自杀意念**（如"从没出生过""想消失""不再面对明天"）无关键词可命中，需依赖 LLM 风险通道；这是关键词路线的固有上限，非调参可解。
+- **路由准确率 0.61**：许多真实咨询/研究诉求**无明显关键词**（如"我和男朋友吵架了，心里不舒服"），纯关键词兜底路由必然漏判；已扩充通用中文求助表达词表，但彻底解决需 LLM 意图通道。
+- **误报率 0.033**：来自第三人称提及高危词（"新闻里有人轻生""直播自杀"），规则引擎无法区分说话人指向；需引入说话人消歧。
+
+> 评测数据用于工程回归和能力展示，不等同于临床有效性评估。允许并保留非 100% 的真实通过率，以暴露真实的代码/能力边界。
 
 ## 目录结构
 

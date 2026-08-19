@@ -1,7 +1,7 @@
 """三运行时 A/B 评测测试:结构与一致性。"""
 from pathlib import Path
 
-from app.evaluation.runtime_ab import render_report, run_runtime_ab
+from app.evaluation.runtime_ab import MESSAGES, render_report, run_runtime_ab
 
 
 def test_runtime_ab_structure_and_consistency(tmp_path: Path):
@@ -16,7 +16,7 @@ def test_runtime_ab_structure_and_consistency(tmp_path: Path):
         assert "total_llm_calls" in stats
         assert "intent_accuracy" in stats
         assert "risk_accuracy" in stats
-        assert len(stats["per_message"]) == 4
+        assert len(stats["per_message"]) == len(MESSAGES)
 
     # mock 下三运行时应判定一致(同一规则库)
     for item in result["consistency"]:

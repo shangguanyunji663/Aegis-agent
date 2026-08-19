@@ -12,3 +12,4 @@ data/**/*.sqlite
 data/**/*.sqlite-*
 .conda/
 .zcode/
+.mimosa/

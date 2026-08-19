@@ -1,0 +1,64 @@
+[
+  {"id": "rag-exam-01", "question": "考试前总是紧张，晚上睡不好，该怎么办", "expectedSources": ["exam-season-guidance.md"], "expectedTerms": ["考试季", "睡眠变浅", "任务拆成可执行的下一步", "压力真实存在"]},
+  {"id": "rag-exam-02", "question": "临近考试一直拖延，心里很内疚", "expectedSources": ["exam-season-guidance.md"], "expectedTerms": ["拖延后的内疚", "错题", "压力真实存在"]},
+  {"id": "rag-exam-03", "question": "考试季注意力下降怎么调节", "expectedSources": ["exam-season-guidance.md"], "expectedTerms": ["注意力下降", "压力真实存在"]},
+  {"id": "rag-exam-04", "question": "考试没考好特别绝望，是不是该找人聊聊", "expectedSources": ["exam-season-guidance.md"], "expectedTerms": ["明显绝望", "自我否定升级", "安全评估"]},
+  {"id": "rag-exam-05", "question": "复习压力大到想放弃学习", "expectedSources": ["exam-season-guidance.md"], "expectedTerms": ["压力真实存在", "可执行的下一步"]},
+
+  {"id": "rag-anx-01", "question": "一紧张就手心出汗心跳快，怎么缓解", "expectedSources": ["anxiety.md"], "expectedTerms": ["稳定身体反应", "呼吸放慢", "5-4-3-2-1 grounding"]},
+  {"id": "rag-anx-02", "question": "和朋友吵架后特别焦虑，停不下来", "expectedSources": ["anxiety.md"], "expectedTerms": ["关系冲突", "自动想法", "可信任同伴"]},
+  {"id": "rag-anx-03", "question": "求职面试前焦虑得睡不着", "expectedSources": ["anxiety.md"], "expectedTerms": ["求职", "触发情境", "短时离开刺激源"]},
+  {"id": "rag-anx-04", "question": "持续压力让我快要失控了", "expectedSources": ["anxiety.md"], "expectedTerms": ["持续压力", "强烈自伤冲动", "安全计划"]},
+  {"id": "rag-anx-05", "question": "我总是反复担心还没发生的事", "expectedSources": ["anxiety.md"], "expectedTerms": ["焦虑常见于", "识别触发情境", "自动想法"]},
+
+  {"id": "rag-crisis-01", "question": "我现在真的想结束自己的生命，帮帮我", "expectedSources": ["crisis.md"], "expectedTerms": ["自杀", "结束生命", "即时安全", "危机热线"]},
+  {"id": "rag-crisis-02", "question": "如果有人明确说要轻生，系统该怎么处理", "expectedSources": ["crisis.md"], "expectedTerms": ["轻生", "明确自伤计划", "无法保证安全"]},
+  {"id": "rag-crisis-03", "question": "对方有自杀想法，要不要联系紧急服务", "expectedSources": ["crisis.md"], "expectedTerms": ["当地紧急服务", "危机热线", "可信任的人"]},
+
+  {"id": "rag-campus-01", "question": "学校心理中心一般怎么预约", "expectedSources": ["campus-mental-health.md"], "expectedTerms": ["心理中心预约", "辅导员谈话", "求助话术"]},
+  {"id": "rag-campus-02", "question": "我想去找学校心理老师，但不知道怎么开口", "expectedSources": ["campus-mental-health.md"], "expectedTerms": ["求助话术", "最近的困扰", "持续时间"]},
+  {"id": "rag-campus-03", "question": "系统会编造咨询电话和地址吗", "expectedSources": ["campus-mental-health.md"], "expectedTerms": ["不应编造", "电话、地址、值班时间", "已上传的本校正式资料"]},
+  {"id": "rag-campus-04", "question": "除了心理中心还有什么校园支持渠道", "expectedSources": ["campus-mental-health.md"], "expectedTerms": ["同伴支持", "危机值班", "班主任或导师"]},
+
+  {"id": "rag-handoff-01", "question": "辅导员接手一个高风险学生时要了解哪些信息", "expectedSources": ["counselor-handoff.md"], "expectedTerms": ["学生表达", "风险等级", "触发依据", "当前会话摘要"]},
+  {"id": "rag-handoff-02", "question": "高风险交接要确认学生的什么安全状态", "expectedSources": ["counselor-handoff.md"], "expectedTerms": ["当前位置", "是否独处", "可信任的人", "当地紧急服务"]},
+
+  {"id": "rag-riskpol-01", "question": "学生说想轻生时后台应该生成哪些处置对象", "expectedSources": ["risk-policy.md"], "expectedTerms": ["高风险分流", "待人工确认报告", "交接摘要", "后置任务"]},
+  {"id": "rag-riskpol-02", "question": "风险报告编号和内部评分能展示给学生吗", "expectedSources": ["risk-policy.md"], "expectedTerms": ["内部风险分数", "报告编号", "工具任务编号", "审计细节"]},
+  {"id": "rag-riskpol-03", "question": "高风险场景的外部通知要经过谁审批", "expectedSources": ["risk-policy.md"], "expectedTerms": ["管理员审批", "审计记录", "失败重试记录"]},
+
+  {"id": "rag-lowmood-01", "question": "最近两周一直很低落，对什么都提不起兴趣", "expectedSources": ["low-mood-depression-support.md"], "expectedTerms": ["持续低落", "兴趣下降", "食欲或睡眠变化", "强烈自责"]},
+  {"id": "rag-lowmood-02", "question": "我总是很自责，觉得自己没用", "expectedSources": ["low-mood-depression-support.md"], "expectedTerms": ["强烈自责", "避免简单说教", "可获得的支持资源"]},
+  {"id": "rag-lowmood-03", "question": "情绪低落影响到正常学习了怎么办", "expectedSources": ["low-mood-depression-support.md"], "expectedTerms": ["学习效率下降", "影响日常功能", "精神卫生专业人员"]},
+  {"id": "rag-lowmood-04", "question": "怎么判断自己的低落是不是抑郁症", "expectedSources": ["low-mood-depression-support.md"], "expectedTerms": ["持续两周以上", "影响日常功能", "自伤念头"]},
+
+  {"id": "rag-sleep-01", "question": "最近总是失眠，凌晨才能睡着", "expectedSources": ["sleep.md"], "expectedTerms": ["睡眠困扰", "作息漂移", "固定起床时间"]},
+  {"id": "rag-sleep-02", "question": "晚上躺在床上反刍白天的糟心事", "expectedSources": ["sleep.md"], "expectedTerms": ["反刍思维", "睡前降刺激流程", "担忧记录"]},
+  {"id": "rag-sleep-03", "question": "连续好几周都严重失眠，要不要看医生", "expectedSources": ["sleep.md"], "expectedTerms": ["连续多周严重失眠", "医疗专业人员", "学校心理中心"]},
+  {"id": "rag-sleep-04", "question": "白天没精神因为晚上睡不好", "expectedSources": ["sleep.md"], "expectedTerms": ["白天活动不足", "固定起床时间", "轻量运动"]},
+
+  {"id": "rag-rel-01", "question": "和室友闹矛盾，怎么表达我的感受", "expectedSources": ["relationships-and-family.md"], "expectedTerms": ["事实、感受、需求和请求", "发生了什么", "表达请求"]},
+  {"id": "rag-rel-02", "question": "家里人总是否定我，沟通总是吵架", "expectedSources": ["relationships-and-family.md"], "expectedTerms": ["人际冲突", "感受", "请求四个层面"]},
+  {"id": "rag-rel-03", "question": "如果一段关系里有控制或威胁，还该练沟通吗", "expectedSources": ["relationships-and-family.md"], "expectedTerms": ["暴力、威胁、控制", "安全计划", "现实求助资源"]},
+  {"id": "rag-rel-04", "question": "和父母关系紧张，不知道怎么相处", "expectedSources": ["relationships-and-family.md"], "expectedTerms": ["人际冲突", "区分", "感受"]},
+
+  {"id": "rag-refer-01", "question": "这个系统能替代正规心理咨询吗", "expectedSources": ["referral-and-resources.md"], "expectedTerms": ["不能替代持证心理咨询", "医学诊断", "紧急救援"]},
+  {"id": "rag-refer-02", "question": "中高风险时系统会建议联系谁", "expectedSources": ["referral-and-resources.md"], "expectedTerms": ["中高风险", "学校心理中心", "可信任的现实支持者"]},
+  {"id": "rag-refer-03", "question": "怎么委婉地建议朋友去求助", "expectedSources": ["referral-and-resources.md"], "expectedTerms": ["转介话术", "可信任的人", "学校心理中心"]},
+  {"id": "rag-refer-04", "question": "我可以自己先稳定情绪吗，有什么练习", "expectedSources": ["referral-and-resources.md"], "expectedTerms": ["情绪支持", "稳定练习", "问题梳理"]},
+
+  {"id": "rag-priv-01", "question": "心理系统会收集我的姓名和学号吗", "expectedSources": ["privacy-boundaries-and-ethics.md"], "expectedTerms": ["不要求用户提供姓名、学号", "住址、身份证号", "精确定位"]},
+  {"id": "rag-priv-02", "question": "为什么学生端看不到内部风险分数", "expectedSources": ["privacy-boundaries-and-ethics.md"], "expectedTerms": ["学生端不展示内部评分", "模型判断细节", "避免制造羞耻感"]},
+  {"id": "rag-priv-03", "question": "系统在什么情况下会生成风险报告", "expectedSources": ["privacy-boundaries-and-ethics.md"], "expectedTerms": ["明确自伤", "伤害他人", "紧急安全风险", "待人工确认"]},
+
+  {"id": "rag-adj-01", "question": "刚入学很不适应，觉得自己格格不入", "expectedSources": ["adjustment-and-transition.md"], "expectedTerms": ["入学", "不确定、孤独", "比较、自我怀疑", "固定日程"]},
+  {"id": "rag-adj-02", "question": "换专业后节奏很乱，怎么办", "expectedSources": ["adjustment-and-transition.md"], "expectedTerms": ["换专业", "节奏混乱", "15 分钟行动"]},
+  {"id": "rag-adj-03", "question": "要搬宿舍了，有点焦虑", "expectedSources": ["adjustment-and-transition.md"], "expectedTerms": ["搬宿舍", "正常化转换期压力", "可执行的"]},
+  {"id": "rag-adj-04", "question": "毕业前特别迷茫，不知道下一步", "expectedSources": ["adjustment-and-transition.md"], "expectedTerms": ["毕业", "转换期压力", "小步骤"]},
+
+  {"id": "rag-amb-01", "question": "最近又焦虑又失眠，整个人很垮", "expectedSources": ["anxiety.md", "sleep.md"], "expectedTerms": ["稳定身体反应", "睡眠困扰", "固定起床时间"]},
+  {"id": "rag-amb-02", "question": "考试压力大导致失眠，怎么同时处理", "expectedSources": ["exam-season-guidance.md", "sleep.md"], "expectedTerms": ["压力真实存在", "固定起床时间", "睡眠变浅"]},
+  {"id": "rag-amb-03", "question": "朋友说想自杀，我作为同学该怎么做", "expectedSources": ["crisis.md", "referral-and-resources.md"], "expectedTerms": ["危机热线", "可信任的人", "紧急安全风险"]},
+  {"id": "rag-amb-04", "question": "怎么判断自己有没有抑郁倾向", "expectedSources": ["low-mood-depression-support.md"], "expectedTerms": ["持续两周以上", "自伤念头", "影响日常功能"]},
+  {"id": "rag-amb-05", "question": "情绪很糟的时候有哪些立刻能用的方法", "expectedSources": ["anxiety.md", "referral-and-resources.md"], "expectedTerms": ["呼吸放慢", "稳定练习", "5-4-3-2-1 grounding"]}
+]

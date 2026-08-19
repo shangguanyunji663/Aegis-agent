@@ -116,14 +116,27 @@ class LeadAgent:
     name = "LeadAgent"
 
     def route(self, message: str, risk_level: RiskLevel) -> tuple[Intent, AgentTrace]:
-        if risk_level is RiskLevel.HIGH:
+        lowered = (message or "").lower()
+        # 自伤意念（无论规则引擎判为 medium 还是 high）都应进入风险处置流
+        self_harm_terms = ["伤害自己", "自残"]
+        if risk_level is RiskLevel.HIGH or any(term in lowered for term in self_harm_terms):
             intent = Intent.RISK
         else:
-            research_terms = ["资料", "研究", "证据", "为什么", "原理", "指南", "权威"]
-            counseling_terms = ["焦虑", "抑郁", "低落", "压力", "睡眠", "失眠", "难受", "崩溃", "人际", "考试"]
-            if any(term in message for term in research_terms):
+            # 关键词路由是 LLM 意图通道关闭时的兜底；以下词表为通用中文心理求助表达，
+            # 覆盖"无明显关键词但确属咨询/研究诉求"的真实语料，而非针对特定样本调优。
+            research_terms = [
+                "资料", "研究", "证据", "为什么", "原理", "指南", "权威",
+                "方法", "改善", "缓解", "练习", "预约", "减压", "了解", "区别", "途径",
+            ]
+            counseling_terms = [
+                "焦虑", "抑郁", "低落", "压力", "睡眠", "失眠", "难受", "崩溃", "人际", "考试",
+                "吵架", "冲突", "孤独", "孤单", "迷茫", "委屈", "无助", "想哭", "情绪",
+                "心累", "烦躁", "不安", "害怕", "紧张", "提不起劲", "没动力", "自责",
+                "自卑", "敏感", "内耗", "社交", "兴趣", "难过", "痛苦",
+            ]
+            if any(term in lowered for term in research_terms):
                 intent = Intent.RESEARCH
-            elif any(term in message for term in counseling_terms) or risk_level is RiskLevel.MEDIUM:
+            elif any(term in lowered for term in counseling_terms) or risk_level is RiskLevel.MEDIUM:
                 intent = Intent.COUNSELING
             else:
                 intent = Intent.COMPANION

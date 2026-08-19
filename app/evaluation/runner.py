@@ -1,36 +1,65 @@
-"""评测运行器:路由/风险/检索/RAG/技能/安全/多轮/规模化八套指标聚合。"""
+"""评测运行器：基于真实代表性数据集的路由/风险/检索/RAG/技能/安全/多轮/规模化指标聚合。
+
+本模块与旧版的关键区别：
+
+1. **数据真实**：规模化基准、路由/风险判定、多轮回归均使用 ``eval/fixtures`` 下的真实标注
+   语料（150 条代表性消息 + 8 组多轮场景），不再循环生成伪样本凑满分。
+2. **指标完整**：除准确率外，明确输出
+   - 意图判定准确率、风险判定准确率
+   - 高风险召回率（high-risk recall）、误报率（false-positive rate）
+   - RAG：HitRate / Recall@K / Precision@K / MRR / NDCG@K
+   并对主指标给出 95% Wilson 置信区间。
+3. **如实标注**：每个维度标注样本规模、数据来源、最近验证日期。
+4. **去除满分门限**：``summarize`` 不再以"全部 100%"作为通过标准；非 100% 的真实结果
+   被如实呈现，并提示其对应的代码/能力边界。
+"""
 from __future__ import annotations
 
 import json
 import math
+from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from app.evaluation.datasets import generated_benchmark_cases
+from app.evaluation.datasets import (
+    load_multi_turn_corpus,
+    load_rag_queries,
+    load_representative_corpus,
+)
 from app.evaluation.judge import evaluate_reply_quality
 from app.evaluation.report_html import render_html
 from app.rag_eval.runner import evaluate as evaluate_rag_eval
 
+FIXTURES_DIR = Path(__file__).resolve().parents[2] / "eval" / "fixtures"
+
 
 def run_evaluation(orchestrator, store, fixtures_dir: Path, output_dir: Path) -> dict:
     output_dir.mkdir(parents=True, exist_ok=True)
+    corpus = load_representative_corpus()
+    multi_turn = load_multi_turn_corpus()
+
+    # RAG 检索评测（基于真实知识库的 50 条自然语言问句）
+    rag = evaluate_rag_eval(store, store.settings)
+    rag_section = _rag_section(rag)
+
     results = {
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "routing": evaluate_routing(orchestrator, fixtures_dir),
-        "risk": evaluate_risk(orchestrator, fixtures_dir),
-        "retrieval": evaluate_retrieval(store, fixtures_dir),
-        "rag_eval": evaluate_rag_eval(store, store.settings),
+        "data_sources": {
+            "routing_risk_scaled": str(FIXTURES_DIR / "representative_corpus.json"),
+            "rag": rag["dataset"],
+            "multi_turn": str(FIXTURES_DIR / "multi_turn_corpus.json"),
+        },
+        "routing": evaluate_routing(orchestrator, corpus),
+        "risk": evaluate_risk(orchestrator, corpus),
+        "retrieval": rag_section,
+        "rag_eval": rag_section,
         "skills": evaluate_skills(orchestrator, fixtures_dir),
         "safety": evaluate_safety(orchestrator, fixtures_dir),
-        "multi_turn": evaluate_multi_turn(orchestrator, fixtures_dir),
-        "scaled_benchmark": evaluate_scaled_benchmark(orchestrator),
+        "multi_turn": evaluate_multi_turn(orchestrator, multi_turn),
+        "scaled_benchmark": evaluate_scaled_benchmark(orchestrator, corpus),
         "judge": evaluate_judge(orchestrator, fixtures_dir),
     }
-    results["rag_eval"]["passed"] = sum(1 for item in results["rag_eval"]["results"] if item["hit"])
-    results["rag_eval"]["total"] = results["rag_eval"]["totalCases"]
-    results["rag_eval"]["accuracy"] = results["rag_eval"]["hitRate"]
-    results["rag_eval"]["cases"] = results["rag_eval"]["results"]
     results["summary"] = summarize(results)
     (output_dir / "latest.json").write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
     (output_dir / "latest.html").write_text(render_html(results), encoding="utf-8")
@@ -44,88 +73,191 @@ def latest_evaluation(output_dir: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8")) | {"status": "ready"}
 
 
-def evaluate_routing(orchestrator, fixtures_dir: Path) -> dict:
-    cases = read_cases(fixtures_dir / "routing.json")
+# --------------------------------------------------------------------------- #
+# 语料级评测（路由 / 风险 / 规模化基准共享同一次遍历，避免重复推断）
+# --------------------------------------------------------------------------- #
+
+def _evaluate_corpus(orchestrator, corpus: list[dict]) -> list[dict]:
     rows = []
-    for case in cases:
+    for case in corpus:
         response = orchestrator.handle(case["message"])
+        intent_ok = response.intent.value == case["expected_intent"]
+        risk_ok = response.risk_level.value == case["expected_risk"]
         rows.append(
             {
+                "id": case.get("id"),
                 "message": case["message"],
-                "expected": case["expected_intent"],
-                "actual": response.intent.value,
-                "passed": response.intent.value == case["expected_intent"],
+                "expected_intent": case["expected_intent"],
+                "actual_intent": response.intent.value,
+                "intent_ok": intent_ok,
+                "expected_risk": case["expected_risk"],
+                "actual_risk": response.risk_level.value,
+                "risk_ok": risk_ok,
+                "category": case.get("category"),
+                "difficulty": case.get("difficulty"),
+                "note": case.get("note"),
+                "passed": intent_ok and risk_ok,
             }
         )
-    return with_accuracy(rows)
+    return rows
 
 
-def evaluate_risk(orchestrator, fixtures_dir: Path) -> dict:
-    cases = read_cases(fixtures_dir / "risk.json")
-    rows = []
-    for case in cases:
-        response = orchestrator.handle(case["message"])
-        rows.append(
-            {
-                "message": case["message"],
-                "expected": case["expected_risk"],
-                "actual": response.risk_level.value,
-                "passed": response.risk_level.value == case["expected_risk"],
-            }
-        )
-    result = with_accuracy(rows)
-    high_cases = [row for row in rows if row["expected"] == "high"]
-    high_hits = sum(1 for row in high_cases if row["actual"] == "high")
-    low_medium_cases = [row for row in rows if row["expected"] != "high"]
-    false_positives = sum(1 for row in low_medium_cases if row["actual"] == "high")
-    result["high_recall"] = round(high_hits / len(high_cases), 4) if high_cases else 0.0
-    result["false_positive_rate"] = round(false_positives / len(low_medium_cases), 4) if low_medium_cases else 0.0
-    return result
+def evaluate_routing(orchestrator, corpus: list[dict] | None = None) -> dict:
+    corpus = corpus if corpus is not None else load_representative_corpus()
+    rows = _evaluate_corpus(orchestrator, corpus)
+    total = len(rows)
+    passed = sum(1 for r in rows if r["intent_ok"])
+    accuracy = round(passed / total, 4) if total else 0.0
+    # 按期望意图分层
+    by_intent = defaultdict(lambda: [0, 0])
+    for r in rows:
+        by_intent[r["expected_intent"]][1] += 1
+        if r["intent_ok"]:
+            by_intent[r["expected_intent"]][0] += 1
+    breakdown = {
+        intent: {"correct": c, "total": t, "accuracy": round(c / t, 4) if t else 0.0}
+        for intent, (c, t) in by_intent.items()
+    }
+    return {
+        "sample_size": total,
+        "data_source": str(FIXTURES_DIR / "representative_corpus.json"),
+        "validated_at": datetime.now(timezone.utc).isoformat(),
+        "accuracy": accuracy,
+        "ci95": _wilson_ci(passed, total),
+        "by_intent": breakdown,
+        "cases": rows,
+        "passed": passed,
+        "total": total,
+    }
 
 
-def evaluate_retrieval(store, fixtures_dir: Path) -> dict:
-    cases = read_cases(fixtures_dir / "retrieval.json")
-    rows = []
-    for case in cases:
-        results = store.search_knowledge(case["query"], top_k=3)
-        actual = results[0]["source"] if results else ""
-        expected_source = case["expected_source"]
-        reciprocal_rank = 0.0
-        relevant_positions = []
-        for index, item in enumerate(results, start=1):
-            if item["source"] == expected_source:
-                relevant_positions.append(index)
-                if reciprocal_rank == 0.0:
-                    reciprocal_rank = 1.0 / index
-        hit = bool(relevant_positions)
-        precision_at_k = (1.0 / len(results)) if hit and results else 0.0
-        recall_at_k = 1.0 if hit else 0.0
-        ndcg_at_k = 1.0 / math.log2(relevant_positions[0] + 1) if hit else 0.0
-        rows.append(
-            {
-                "query": case["query"],
-                "expected": expected_source,
-                "actual": actual,
-                "retrieved": results,
-                "hit": hit,
-                "first_relevant_rank": relevant_positions[0] if hit else None,
-                "recall_at_k": round(recall_at_k, 4),
-                "precision_at_k": round(precision_at_k, 4),
-                "reciprocal_rank": round(reciprocal_rank, 4),
-                "ndcg_at_k": round(ndcg_at_k, 4),
-                "passed": actual == case["expected_source"],
-            }
-        )
-    result = with_accuracy(rows)
-    total = len(rows) or 1
-    result["hit_rate"] = round(sum(1 for row in rows if row["hit"]) / total, 4)
-    result["recall_at_k"] = round(sum(row["recall_at_k"] for row in rows) / total, 4)
-    result["precision_at_k"] = round(sum(row["precision_at_k"] for row in rows) / total, 4)
-    result["mrr"] = round(sum(row["reciprocal_rank"] for row in rows) / total, 4)
-    result["ndcg_at_k"] = round(sum(row["ndcg_at_k"] for row in rows) / total, 4)
-    avg_rank_values = [row["first_relevant_rank"] for row in rows if row["first_relevant_rank"]]
-    result["average_first_relevant_rank"] = round(sum(avg_rank_values) / len(avg_rank_values), 4) if avg_rank_values else None
-    return result
+def evaluate_risk(orchestrator, corpus: list[dict] | None = None) -> dict:
+    corpus = corpus if corpus is not None else load_representative_corpus()
+    rows = _evaluate_corpus(orchestrator, corpus)
+    total = len(rows)
+    correct = sum(1 for r in rows if r["risk_ok"])
+    accuracy = round(correct / total, 4) if total else 0.0
+
+    high_cases = [r for r in rows if r["expected_risk"] == "high"]
+    high_hits = sum(1 for r in high_cases if r["actual_risk"] == "high")
+    high_recall = round(high_hits / len(high_cases), 4) if high_cases else 0.0
+
+    non_high = [r for r in rows if r["expected_risk"] != "high"]
+    false_positives = sum(1 for r in non_high if r["actual_risk"] == "high")
+    false_positive_rate = round(false_positives / len(non_high), 4) if non_high else 0.0
+
+    # 混淆：期望等级 -> 实际等级计数
+    confusion: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    for r in rows:
+        confusion[r["expected_risk"]][r["actual_risk"]] += 1
+    confusion_out = {exp: dict(act) for exp, act in confusion.items()}
+
+    # 漏判清单（期望高危但未被判高危）
+    missed_high = [{"id": r["id"], "message": r["message"], "actual_risk": r["actual_risk"]} for r in high_cases if r["actual_risk"] != "high"]
+    # 误报清单（实际高危但期望非高危）
+    fp_list = [{"id": r["id"], "message": r["message"], "expected_risk": r["expected_risk"]} for r in non_high if r["actual_risk"] == "high"]
+
+    return {
+        "sample_size": total,
+        "data_source": str(FIXTURES_DIR / "representative_corpus.json"),
+        "validated_at": datetime.now(timezone.utc).isoformat(),
+        "accuracy": accuracy,
+        "ci95": _wilson_ci(correct, total),
+        "high_recall": high_recall,
+        "high_recall_ci95": _wilson_ci(high_hits, len(high_cases)),
+        "false_positive_rate": false_positive_rate,
+        "confusion": confusion_out,
+        "missed_high": missed_high,
+        "false_positives": fp_list,
+        "cases": rows,
+        "passed": correct,
+        "total": total,
+    }
+
+
+def evaluate_scaled_benchmark(orchestrator, corpus: list[dict] | None = None) -> dict:
+    corpus = corpus if corpus is not None else load_representative_corpus()
+    rows = _evaluate_corpus(orchestrator, corpus)
+    total = len(rows)
+    passed = sum(1 for r in rows if r["passed"])
+    accuracy = round(passed / total, 4) if total else 0.0
+    intent_ok = sum(1 for r in rows if r["intent_ok"])
+    risk_ok = sum(1 for r in rows if r["risk_ok"])
+    intent_accuracy = round(intent_ok / total, 4) if total else 0.0
+    risk_accuracy = round(risk_ok / total, 4) if total else 0.0
+
+    high_cases = [r for r in rows if r["expected_risk"] == "high"]
+    high_hits = sum(1 for r in high_cases if r["actual_risk"] == "high")
+    high_recall = round(high_hits / len(high_cases), 4) if high_cases else 0.0
+    non_high = [r for r in rows if r["expected_risk"] != "high"]
+    fp = sum(1 for r in non_high if r["actual_risk"] == "high")
+    false_positive_rate = round(fp / len(non_high), 4) if non_high else 0.0
+
+    # 按难度分层
+    by_difficulty = defaultdict(lambda: [0, 0])
+    for r in rows:
+        by_difficulty[r["difficulty"]][1] += 1
+        if r["passed"]:
+            by_difficulty[r["difficulty"]][0] += 1
+    # 按类别分层（取顶层类别，如 suicidal_implicit -> suicidal）
+    by_category = defaultdict(lambda: [0, 0])
+    for r in rows:
+        cat = (r["category"] or "unknown").split("_")[0]
+        by_category[cat][1] += 1
+        if r["passed"]:
+            by_category[cat][0] += 1
+
+    return {
+        "sample_size": total,
+        "data_source": str(FIXTURES_DIR / "representative_corpus.json"),
+        "validated_at": datetime.now(timezone.utc).isoformat(),
+        "accuracy": accuracy,
+        "ci95": _wilson_ci(passed, total),
+        "intent_accuracy": intent_accuracy,
+        "risk_accuracy": risk_accuracy,
+        "high_recall": high_recall,
+        "false_positive_rate": false_positive_rate,
+        "by_difficulty": {d: {"correct": c, "total": t, "accuracy": round(c / t, 4) if t else 0.0} for d, (c, t) in by_difficulty.items()},
+        "by_category": {c: {"correct": cc, "total": t, "accuracy": round(cc / t, 4) if t else 0.0} for c, (cc, t) in by_category.items()},
+        "cases": rows,
+        "passed": passed,
+        "total": total,
+    }
+
+
+# --------------------------------------------------------------------------- #
+# RAG 检索 / 技能 / 安全 / 多轮 / LLM-Judge
+# --------------------------------------------------------------------------- #
+
+def _rag_section(report: dict) -> dict:
+    total = report.get("totalCases", 0)
+    hits = round(report.get("hitRate", 0.0) * total)
+    per_case = report.get("results", [])
+    # Top-1 准确率：首条召回片段是否与期望来源/词命中
+    top1_hits = 0
+    for case in per_case:
+        retrieved = case.get("retrieved") or []
+        if retrieved and retrieved[0].get("relevant"):
+            top1_hits += 1
+    top1 = round(top1_hits / total, 4) if total else 0.0
+    return {
+        "sample_size": total,
+        "data_source": report.get("dataset"),
+        "validated_at": report.get("createdAt"),
+        "top_k": report.get("topK"),
+        "top1_accuracy": top1,
+        "hit_rate": report.get("hitRate", 0.0),
+        "hit_rate_ci95": _wilson_ci(hits, total),
+        "recall_at_k": report.get("recallAtK", 0.0),
+        "precision_at_k": report.get("precisionAtK", 0.0),
+        "mrr": report.get("mrr", 0.0),
+        "ndcg_at_k": report.get("ndcgAtK", 0.0),
+        "average_first_relevant_rank": report.get("averageFirstRelevantRank"),
+        "cases": per_case,
+        "passed": hits,
+        "total": total,
+        "accuracy": report.get("hitRate", 0.0),
+    }
 
 
 def evaluate_skills(orchestrator, fixtures_dir: Path) -> dict:
@@ -155,7 +287,28 @@ def evaluate_skills(orchestrator, fixtures_dir: Path) -> dict:
                 "passed": not missing,
             }
         )
-    return with_accuracy(rows)
+    if not rows:
+        return {
+            "sample_size": 0,
+            "data_source": str(fixtures_dir),
+            "validated_at": datetime.now(timezone.utc).isoformat(),
+            "accuracy": None,
+            "note": "fixtures 中未定义 expected_skills，技能选择维度暂无以真实数据驱动的评测集（非 0 分失败，属数据缺口）。",
+            "cases": [],
+            "passed": 0,
+            "total": 0,
+        }
+    passed = sum(1 for r in rows if r["passed"])
+    total = len(rows)
+    return {
+        "sample_size": total,
+        "data_source": str(fixtures_dir),
+        "validated_at": datetime.now(timezone.utc).isoformat(),
+        "accuracy": round(passed / total, 4),
+        "cases": rows,
+        "passed": passed,
+        "total": total,
+    }
 
 
 def evaluate_safety(orchestrator, fixtures_dir: Path) -> dict:
@@ -174,34 +327,59 @@ def evaluate_safety(orchestrator, fixtures_dir: Path) -> dict:
             }
         )
     result = with_accuracy(rows)
+    result["sample_size"] = len(rows)
+    result["data_source"] = str(fixtures_dir / "safety.json")
+    result["validated_at"] = datetime.now(timezone.utc).isoformat()
     result["leak_count"] = sum(len(row["leaks"]) for row in rows)
     return result
 
 
-def evaluate_multi_turn(orchestrator, fixtures_dir: Path) -> dict:
-    cases = read_cases(fixtures_dir / "multi-turn.json")
+def evaluate_multi_turn(orchestrator, scenarios: list[dict] | None = None) -> dict:
+    scenarios = scenarios if scenarios is not None else load_multi_turn_corpus()
     rows = []
-    for case in cases:
+    for scenario in scenarios:
         session_id = None
         final_answer = ""
-        for turn in case["turns"]:
+        final_intent = None
+        final_risk = None
+        for turn in scenario["turns"]:
             response = orchestrator.handle(turn, session_id)
             session_id = response.session_id
             final_answer = response.answer
-        expected = case["expected_contains"]
+            final_intent = response.intent.value
+            final_risk = response.risk_level.value
+        expected_intent = scenario.get("expected_intent")
+        expected_risk = scenario.get("expected_risk")
+        expected_contains = scenario.get("expected_contains")
+        failures = []
+        if expected_intent and final_intent != expected_intent:
+            failures.append(f"expected intent {expected_intent}, got {final_intent}")
+        if expected_risk and final_risk != expected_risk:
+            failures.append(f"expected risk {expected_risk}, got {final_risk}")
+        if expected_contains and expected_contains not in final_answer:
+            failures.append(f"expected final answer to contain {expected_contains!r}")
         rows.append(
             {
-                "turns": case["turns"],
-                "expected_contains": expected,
-                "actual_answer": final_answer,
-                "passed": expected in final_answer,
+                "name": scenario.get("name"),
+                "turns": scenario["turns"],
+                "expected_intent": expected_intent,
+                "actual_intent": final_intent,
+                "expected_risk": expected_risk,
+                "actual_risk": final_risk,
+                "expected_contains": expected_contains,
+                "passed": not failures,
+                "failures": failures,
             }
         )
-    return with_accuracy(rows)
+    result = with_accuracy(rows)
+    result["sample_size"] = len(rows)
+    result["data_source"] = str(FIXTURES_DIR / "multi_turn_corpus.json")
+    result["validated_at"] = datetime.now(timezone.utc).isoformat()
+    return result
 
 
 def evaluate_judge(orchestrator, fixtures_dir: Path) -> dict | None:
-    """LLM-as-Judge:对 routing+multi-turn 的回复抽样评分;mock/失败返回 None。"""
+    """LLM-as-Judge：对 routing + multi-turn 的回复抽样评分；mock/失败返回 None。"""
     cases = read_cases(fixtures_dir / "routing.json")
     cases += read_cases(fixtures_dir / "multi-turn.json")
     samples = []
@@ -212,6 +390,10 @@ def evaluate_judge(orchestrator, fixtures_dir: Path) -> dict | None:
     return evaluate_reply_quality(orchestrator.llm_client, samples)
 
 
+# --------------------------------------------------------------------------- #
+# 聚合 / 工具
+# --------------------------------------------------------------------------- #
+
 def with_accuracy(rows: list[dict[str, Any]]) -> dict:
     passed = sum(1 for row in rows if row["passed"])
     total = len(rows)
@@ -219,30 +401,53 @@ def with_accuracy(rows: list[dict[str, Any]]) -> dict:
 
 
 def summarize(results: dict) -> dict:
+    risk = results["risk"]
+    retrieval = results["retrieval"]
+    rag = results["rag_eval"]
+    scaled = results["scaled_benchmark"]
     return {
+        "validated_at": results["created_at"],
+        "data_sources": results["data_sources"],
+        "sample_sizes": {
+            "routing": results["routing"]["sample_size"],
+            "risk": risk["sample_size"],
+            "scaled_benchmark": scaled["sample_size"],
+            "rag": retrieval["sample_size"],
+            "multi_turn": results["multi_turn"]["sample_size"],
+            "skills": results["skills"]["sample_size"],
+            "safety": results["safety"]["sample_size"],
+        },
         "routing_accuracy": results["routing"]["accuracy"],
-        "risk_accuracy": results["risk"]["accuracy"],
-        "risk_high_recall": results["risk"].get("high_recall", 0.0),
-        "risk_false_positive_rate": results["risk"].get("false_positive_rate", 0.0),
-        "retrieval_top1": results["retrieval"]["accuracy"],
-        "retrieval_hit_rate": results["retrieval"].get("hit_rate", 0.0),
-        "retrieval_mrr": results["retrieval"].get("mrr", 0.0),
-        "retrieval_ndcg_at_k": results["retrieval"].get("ndcg_at_k", 0.0),
-        "rag_eval_total_cases": results["rag_eval"].get("totalCases", 0),
-        "rag_eval_hit_rate": results["rag_eval"].get("hitRate", 0.0),
-        "rag_eval_mrr": results["rag_eval"].get("mrr", 0.0),
-        "rag_eval_ndcg_at_k": results["rag_eval"].get("ndcgAtK", 0.0),
+        "routing_ci95": results["routing"]["ci95"],
+        "risk_accuracy": risk["accuracy"],
+        "risk_ci95": risk["ci95"],
+        "risk_high_recall": risk["high_recall"],
+        "risk_high_recall_ci95": risk["high_recall_ci95"],
+        "risk_false_positive_rate": risk["false_positive_rate"],
+        "retrieval_top1": retrieval["top1_accuracy"],
+        "retrieval_hit_rate": retrieval["hit_rate"],
+        "retrieval_hit_rate_ci95": retrieval["hit_rate_ci95"],
+        "retrieval_recall_at_k": retrieval["recall_at_k"],
+        "retrieval_precision_at_k": retrieval["precision_at_k"],
+        "retrieval_mrr": retrieval["mrr"],
+        "retrieval_ndcg_at_k": retrieval["ndcg_at_k"],
+        "rag_eval_total_cases": rag["sample_size"],
+        "rag_eval_hit_rate": rag["hit_rate"],
+        "rag_eval_mrr": rag["mrr"],
+        "rag_eval_ndcg_at_k": rag["ndcg_at_k"],
         "skill_accuracy": results["skills"]["accuracy"],
         "safety_pass_rate": results["safety"]["accuracy"],
         "safety_leak_count": results["safety"].get("leak_count", 0),
         "multi_turn_accuracy": results["multi_turn"]["accuracy"],
-        "scaled_benchmark_accuracy": results["scaled_benchmark"]["accuracy"],
-        "scaled_benchmark_total": results["scaled_benchmark"]["total"],
-        "scaled_high_recall": results["scaled_benchmark"].get("high_recall", 0.0),
+        "multi_turn_total": results["multi_turn"]["total"],
+        "scaled_benchmark_accuracy": scaled["accuracy"],
+        "scaled_benchmark_total": scaled["total"],
+        "scaled_high_recall": scaled["high_recall"],
+        "scaled_false_positive_rate": scaled["false_positive_rate"],
         "judge_avg": (results.get("judge") or {}).get("avg"),
-        "all_passed": all(
-            results[name]["passed"] == results[name]["total"]
-            for name in ["routing", "risk", "retrieval", "rag_eval", "skills", "safety", "multi_turn", "scaled_benchmark"]
+        "evaluation_note": (
+            "评测不再以满分(100%)作为通过标准；以上为基于真实代表性数据集的真实通过率。"
+            "非 100% 的结果如实保留，并指向对应的代码/能力边界（见各维度 missed_high / false_positives / by_difficulty）。"
         ),
     }
 
@@ -251,33 +456,12 @@ def read_cases(path: Path) -> list[dict]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def evaluate_scaled_benchmark(orchestrator) -> dict:
-    rows = []
-    for case in generated_benchmark_cases():
-        response = orchestrator.handle(case["message"])
-        intent_ok = response.intent.value == case["expected_intent"]
-        risk_ok = response.risk_level.value == case["expected_risk"]
-        rows.append(
-            {
-                "id": case["id"],
-                "message": case["message"],
-                "expected_intent": case["expected_intent"],
-                "actual_intent": response.intent.value,
-                "expected_risk": case["expected_risk"],
-                "actual_risk": response.risk_level.value,
-                "passed": intent_ok and risk_ok,
-            }
-        )
-    result = with_accuracy(rows)
-    high_cases = [row for row in rows if row["expected_risk"] == "high"]
-    high_hits = sum(1 for row in high_cases if row["actual_risk"] == "high")
-    result["high_recall"] = round(high_hits / len(high_cases), 4) if high_cases else 0.0
-    result["intent_accuracy"] = round(sum(1 for row in rows if row["actual_intent"] == row["expected_intent"]) / len(rows), 4)
-    result["risk_accuracy"] = round(sum(1 for row in rows if row["actual_risk"] == row["expected_risk"]) / len(rows), 4)
-    result["distribution"] = {
-        "companion": sum(1 for row in rows if row["expected_intent"] == "companion"),
-        "counseling": sum(1 for row in rows if row["expected_intent"] == "counseling"),
-        "research": sum(1 for row in rows if row["expected_intent"] == "research"),
-        "risk": sum(1 for row in rows if row["expected_intent"] == "risk"),
-    }
-    return result
+def _wilson_ci(successes: int, n: int, z: float = 1.96) -> tuple[float, float]:
+    """95% Wilson 置信区间（比例）。返回 (lower, upper)。"""
+    if n == 0:
+        return (0.0, 0.0)
+    p = successes / n
+    denom = 1.0 + z * z / n
+    center = (p + z * z / (2.0 * n)) / denom
+    margin = (z * math.sqrt(p * (1.0 - p) / n + z * z / (4.0 * n * n))) / denom
+    return (round(max(0.0, center - margin), 4), round(min(1.0, center + margin), 4))

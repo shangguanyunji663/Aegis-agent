@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import json
 import math
+import tempfile
 from datetime import datetime, timezone
+from pathlib import Path
+
 from app.config import Settings, get_settings
-from app.database import build_session_factory, create_schema
+from app.database import build_engine, build_session_factory, create_schema
 from app.repository import DatabaseStore
 
 
@@ -12,10 +15,20 @@ def evaluate(store: DatabaseStore | None = None, settings: Settings | None = Non
     settings = settings or get_settings()
     owned_store = store is None
     if store is None:
-        session_factory = build_session_factory(settings)
-        create_schema()
-        store = DatabaseStore(session_factory, settings=settings)
-        store.rebuild_knowledge_dir(settings.resolve_path(settings.knowledge_dir))
+        # 独立运行（CLI/__main__）时构造一次性 SQLite 评测库，避免依赖默认 database_url
+        # （默认可能为 mysql，进而触发 pymysql；评测检索只需本地知识库索引，无需 MySQL）。
+        tmp_db = Path(tempfile.mkdtemp()) / "rag-eval.sqlite"
+        eval_settings = Settings(
+            database_url=f"sqlite:///{tmp_db}",
+            knowledge_dir=settings.knowledge_dir,
+            knowledge_top_k=settings.knowledge_top_k,
+            vector_enabled=False,
+        )
+        session_factory = build_session_factory(eval_settings)
+        create_schema(build_engine(eval_settings))
+        store = DatabaseStore(session_factory, settings=eval_settings)
+        store.rebuild_knowledge_dir(eval_settings.resolve_path(eval_settings.knowledge_dir))
+        settings = eval_settings
     dataset_path = settings.resolve_path(settings.rag_eval_dataset)
     cases = json.loads(dataset_path.read_text(encoding="utf-8"))
     results = [evaluate_case(store, case, settings.knowledge_top_k) for case in cases]

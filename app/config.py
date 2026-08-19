@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     knowledge_hybrid_vector_weight: float = 0.65
     knowledge_hybrid_bm25_weight: float = 0.35
     knowledge_rerank_enabled: bool = True
-    rag_eval_dataset: str = "eval/fixtures/aegis-rag-eval.json"
+    rag_eval_dataset: str = "eval/fixtures/rag_queries.json"
     rag_eval_output: str = "data/eval/rag-eval-report.json"
     memory_recent_messages: int = 15
     memory_summary_max_chars: int = 3000

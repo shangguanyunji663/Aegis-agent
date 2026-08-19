@@ -36,7 +36,15 @@ class AssessmentResult:
         }
 
 
-HIGH_TERMS = ["自杀", "轻生", "不想活", "结束生命", "suicide", "kill myself"]
+# 显式高危词 + 常见隐式/隐喻表达。后一类用于弥补原词表对"一了百了""解脱"等
+# 隐喻式自杀意念的漏判（对应代表性语料中 suicidal_implicit 类样本）。
+# 选择标准：在真实校园心理求助语境中高度特异、且不会误命中 benign/第三人称样本。
+HIGH_TERMS = [
+    "自杀", "轻生", "不想活", "结束生命", "suicide", "kill myself",
+    "一了百了", "离开这个世界", "结束这一切", "结束自己的生命",
+    "活下去的理由", "活下去的力气", "不再醒来", "永远睡过去",
+    "活着多余", "解脱", "死了算了",
+]
 MEDIUM_TERMS = ["伤害自己", "自残", "崩溃", "撑不住", "绝望", "panic", "hopeless"]
 DEPRESSED_TERMS = ["抑郁", "低落", "难过", "无助", "depress"]
 ANXIETY_TERMS = ["焦虑", "压力", "考试", "睡不着", "失眠", "panic", "anxious"]

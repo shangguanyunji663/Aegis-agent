@@ -21,8 +21,8 @@
 | Agentic RAG | 所有消息都检索知识库会增加噪声，尤其普通陪伴类对话容易被知识文档带偏 | 通过 CHAT / CONSULT / RISK 意图路由决定是否检索，混合 BM25 + 向量检索，并支持元数据过滤和 rerank |
 | 工具治理与 MCP | 高风险预警、Excel 记录、邮件通知不能由模型越权直接执行 | 工具调用先生成 `ToolJob`，经角色、风险等级、审批、脱敏和审计后进入队列；支持 internal 和 FastMCP 两种后端 |
 | 后台 Tool Queue | 外部工具慢、失败或限流时，不应阻塞学生端流式回复 | 独立 worker 支持依赖调度、重试延迟、邮件限流、dead letter、ExcelRecord 和 AlertRecord 持久化 |
-| Engineering Harness | Agent 项目只看 demo 容易高估完成度，需要可重复验证 | 基于真实代表性数据集的 pytest 单元/接口测试、RAG eval、综合 eval(含 LLM-as-Judge)、harness 8 套件、三运行时 A/B 对比评测，覆盖路由、风险、安全、RAG、API、工具队列与编排器链路；不再为追求满分筛选样本或人为凑 100% |
-| 风险双通道 | 关键词规则召回有限，单靠模型又不可控 | 规则 ∪ 轻量 LLM 二次评估取并集，任一通道判高危即高危；LLM 失败/超时自动回退纯规则，安全边界不变 |
+| Engineering Harness | Agent 项目只看 demo 容易高估完成度，需要可重复验证 | 基于真实代表性数据集的 pytest 单元/接口测试、RAG eval、综合 eval(含 LLM-as-Judge)、harness 8 套件、三运行时 A/B 对比评测，覆盖路由、风险、安全、RAG、API、工具队列与编排器链路（真实指标见下方「评测结果」） |
+| 风险双通道 | 关键词规则召回有限，单靠模型又不可控 | 规则 ∪ 轻量 LLM 取并集、任一判高危即高危，并以规则兜底回退保证安全边界（落地细节见 Roadmap） |
 
 ## 架构概览
 

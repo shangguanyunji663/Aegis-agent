@@ -43,7 +43,17 @@ HIGH_TERMS = [
     "自杀", "轻生", "不想活", "结束生命", "suicide", "kill myself",
     "一了百了", "离开这个世界", "结束这一切", "结束自己的生命",
     "活下去的理由", "活下去的力气", "不再醒来", "永远睡过去",
-    "活着多余", "解脱", "死了算了",
+    "活着多余", "解脱", "死了算了", "做傻事",
+]
+
+# 第三人称/虚构语境标记:用于避免把"新闻里有人轻生""写自杀预防论文"等
+# 提及他人或虚构情境的高危词误判为自身风险。规则引擎无指代消解能力,
+# 此处用保守启发式降低误升级;自身语境下的高危意念由生产 LLM 通道补充识别。
+THIRD_PERSON_MARKERS = [
+    "新闻", "电影", "同学", "朋友", "论文", "志愿者", "别人", "有人",
+    "讲座", "书", "电视剧", "报道", "听说", "看到", "网上", "网络",
+    "电视", "班里", "班上", "新闻里", "社交媒体", "帖", "文章", "课",
+    "小说", "新闻中",
 ]
 MEDIUM_TERMS = ["伤害自己", "自残", "崩溃", "撑不住", "绝望", "panic", "hopeless"]
 DEPRESSED_TERMS = ["抑郁", "低落", "难过", "无助", "depress"]
@@ -55,6 +65,19 @@ def assess_message(text: str) -> AssessmentResult:
     high_hits = [term for term in HIGH_TERMS if term in lowered]
     medium_hits = [term for term in MEDIUM_TERMS if term in lowered]
     if high_hits:
+        # 第三人称/虚构语境下的高危词(如"新闻里有人轻生""写自杀预防论文")不应触发自身高危处置
+        if any(marker in lowered for marker in THIRD_PERSON_MARKERS):
+            return AssessmentResult(
+                risk_level=RiskLevel.LOW,
+                emotion="normal",
+                emotion_score=0.0,
+                confidence=0.7,
+                rationale=[f"高危词（{term}）出现在提及他人/虚构情境的语境，判定为非自身风险，不升级" for term in high_hits][:1],
+                matched_indicators=high_hits,
+                recommended_stance="companion_support",
+                report_eligible=False,
+                escalation_policy="no_report",
+            )
         return AssessmentResult(
             risk_level=RiskLevel.HIGH,
             emotion="high_risk",

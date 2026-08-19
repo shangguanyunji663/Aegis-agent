@@ -188,6 +188,7 @@ python -m app.mcp_tools.server --list
 | 单元与接口测试 | API、认证、风险双通道、Function Calling、Agent runtime、LangGraph checkpoint、MCP tools、评测 runner | 本地 SQLite 可执行 **57 通过**（`tests/test_api.py` 依赖 MySQL 后端，本环境未运行；`test_langgraph_checkpoint` 的跨实例持久化为既有环境问题，与本次评测改造无关） |
 | 路由/风险判定 | 150 条代表性消息（含隐式高危、第三人称干扰），逐条标注期望意图/风险 | 路由准确率 **0.63**（95% CI [0.55, 0.71]）；风险准确率 **0.81**（CI [0.74, 0.86]）；高风险召回 **0.60**（CI [0.42, 0.75]）；误报率 **0.00** |
 | 150 条规模化基准（双层拆分） | 150 条唯一真实样本（非循环生成），按 `layer` 拆为 **基础层（贴近真实流量）63 条** 与 **压力层（边界探测）87 条**，runner 分别输出两套独立指标 | 整体：联合准确率 **0.63**；意图 **0.63**；风险 **0.81**；高风险召回 **0.60**；误报率 **0.00**。- **基础层（贴近真实流量）**：准确率 **0.97**、意图 **0.97**、风险 **1.00**、高召回 **1.00**（贴近真实校园求助流量，规则引擎表现稳健）。- **压力层（边界探测）**：准确率 **0.39**、意图 **0.39**、风险 **0.67**、高召回 **0.52**（隐喻式高危、无关键词咨询、第三人称干扰等边界样本，如实暴露规则通道的能力缺口）。按难度分层：easy 明显优于 hard |
+| 风险 LLM 通道双路径（第十一轮） | 150 条全量双路径对比：MockLLM OFF（纯规则，生产配置）vs MetaphorAwareStub ON（rules ∪ LLM 并集）+ GLM-4.7-flash sanity probe | **baseline（channel OFF）**：压力层风险 **0.67**、高召回 **0.52**、误报 **0.00**。**llm_stub（channel ON）**：压力层风险 **0.94**、高召回 **1.00**、误报 **0.03**（corp-106..130 全部 25 条隐喻命中；2 条 medium distress 含"撑不下去"/"不配"属 prompt-vs-corpus 标注张力，如实保留）。**GLM probe**：2/2 成功调用正确判 high（3 条 429 限流回退）。数据：`data/eval/risk_dual_path.json` |
 | 多轮回归 | 8 组多轮场景（含升级到中/高风险、第三人称转自身） | 最终关键内容命中率 **0.875**（7/8） |
 | RAG 检索 | 50 条自然语言问句，Top-4 混合检索（BM25 + 向量 + rerank） | HitRate **0.94**、Recall@4 **0.94**、Precision@4 **0.33**、MRR **0.84**、NDCG@4 **0.86**、Top-1 **0.76** |
 | 三运行时 A/B | langgraph / autonomous / ordered 同数据集对比延迟、trace 步数、LLM 调用数与判定一致性（10 条代表性消息） | 三运行时判定**完全一致**；意图准确率 **0.8**、风险准确率 **0.9**（含 1 条规则引擎当前漏判的隐式高危样本，如实暴露跨运行时一致的缺口） |
@@ -199,6 +200,12 @@ python -m app.mcp_tools.server --list
 - **高风险召回 0.60**：基础层显式/部分隐式高危已全命中（高召回 1.00）；但压力层的**隐喻式自杀意念**无关键词可命中，拉低整体，需依赖 LLM 风险通道；这是关键词路线的固有上限，非调参可解。
 - **路由准确率 0.63**：许多真实咨询/研究诉求**无明显关键词**（如"我和男朋友吵架了，心里不舒服"），纯关键词兜底路由必然漏判；已扩充通用中文求助表达词表，但彻底解决需 LLM 意图通道。
 - **误报率 0.00**：第三人称提及高危词（"新闻里有人轻生""直播自杀"）已通过说话人消歧修复，不再误判为自身高危。
+
+**风险 LLM 通道双路径验证（第十一轮，2026-08-19）：**
+- **生产配置**：`RISK_LLM_CHANNEL_ENABLED=false`（纯规则），压力层风险准确率 **0.67**、高风险召回 **0.52**——维持"暴露边界"卖点，baseline 不上升。
+- **能力上界**（`MetaphorAwareStubClient` + channel ON，rules ∪ LLM 并集）：压力层风险准确率 **0.94**、高风险召回 **1.00**（25 条隐喻式自杀意念 corp-106..130 全部命中）、误报率 **0.03**（2 条 medium distress 含"撑不下去"/"不配"被 prompt 列为 high，属 prompt-vs-corpus 标注张力，如实保留）。
+- **真实 GLM sanity check**：GLM-4.7-flash 对 5 条隐喻样本 best-effort 探针，2 条成功调用均正确判 high（3 条命中 429 限流回退 none），验证 endpoint 兼容、judge prompt 有效、stub 是 LLM 的合理代理。
+- **数据来源**：`data/eval/risk_dual_path.json`（150 条全量双路径对比）。
 
 > 评测数据用于工程回归和能力展示，不等同于临床有效性评估。允许并保留非 100% 的真实通过率，以暴露真实的代码/能力边界。
 
@@ -232,10 +239,10 @@ python -m app.mcp_tools.server --list
 ├── skills/                       # 标准化心理支持 Skill 规范(SKILL.md)
 ├── static/                       # 学生端和管理员端页面(login/student/admin)
 ├── tests/                        # pytest 测试
-├── scripts/                      # 本地与 Compose 启动脚本
+├── scripts/                      # 启动脚本 + 评测脚本(eval_risk_dual_path/probe_glm)
 ├── docs/                         # 架构、安全和演示文档
 ├── Aegis项目逐文件学习指南.md      # 从零构建式逐模块学习指南
-├── docs/records/                 # 迭代记录(重构→提速→注册MySQL→LangGraph→深度增强→回复真人化→记忆增强→对抗型对话测试→语料双层拆分)
+├── docs/records/                 # 迭代记录(重构→提速→注册MySQL→LangGraph→深度增强→回复真人化→记忆增强→对抗型对话测试→语料双层拆分→风险LLM通道双路径)
 ├── Dockerfile
 └── docker-compose.yml
 ```
@@ -296,7 +303,8 @@ python -m app.mcp_tools.server --list
 - [第六次回复真人化改造(提示词/兜底模板/429重试)](docs/records/LLM-RESPONSE-HUMANIZATION.md)
 - [第七次记忆系统增强(消息数/摘要容量提升)](docs/records/MEMORY-ENHANCEMENT.md)
 - [第八次对抗型对话测试(10轮配合+10轮对抗)](docs/records/CONFRONTATIONAL-DIALOGUE-TESTING.md)
-- [第九次代表性语料双层拆分(基础层/压力层)](docs/records/CORPUS-LAYER-SPLIT.md)
+- [第十轮代表性语料双层拆分(基础层/压力层)](docs/records/CORPUS-LAYER-SPLIT.md)
+- [第十一轮风险LLM通道双路径验证(stub-LLM on vs MockLLM OFF)](docs/records/ROUND-11-RISK-LLM-DUAL-CHANNEL.md)
 
 ## 待改进与优化(Roadmap)
 
@@ -304,6 +312,7 @@ python -m app.mcp_tools.server --list
 
 ### 安全与合规(心理场景立身之本)
 - ✅ **风险评估双通道**:规则关键词 ∪ 轻量 LLM 二次评估,任一通道判高危即高危,规则兜底(`RISK_LLM_CHANNEL_ENABLED`)
+- ✅ **双路径验证**:stub-LLM on vs MockLLM OFF,压力层风险准确率 0.67→0.94、高风险召回 0.52→1.00(第十一轮,`data/eval/risk_dual_path.json`)
 - 危机转介资源可配置化:学校心理中心/紧急联系方式从硬编码改为按校配置、管理端可编辑(低难度)
 - 对话数据字段级加密存储(中难度)
 - 账号安全补齐:登录失败锁定、密码强度策略、会话撤销列表(低难度)

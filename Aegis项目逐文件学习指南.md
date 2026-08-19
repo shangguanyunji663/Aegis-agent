@@ -1270,8 +1270,8 @@ async def attach_request_context(request, call_next):
 
 ：效果不是「看着不错」，而是可重复度量。
 
-- `evaluation/runner.py`：真实指标——路由/风险判定准确率、高风险召回率、误报率、HitRate/Recall@4/Precision@4/MRR/NDCG@4、技能选择、安全泄漏检查、多轮一致性、150 条规模化基准；如实标注样本量、数据来源与验证日期（含 95% 置信区间），不再为满分筛选样本。
-- `evaluation/datasets.py`：加载 `eval/fixtures/representative_corpus.json`（150 条唯一真实样本，含隐式高危与第三人称干扰）、`rag_queries.json`（50 条自然语言 RAG 问句）、`multi_turn_corpus.json`（8 组多轮场景）；并提供可复现的随机采样工具，保证评测基于真实代表性数据、不循环造数。
+- `evaluation/runner.py`：真实指标——路由/风险判定准确率、高风险召回率、误报率、HitRate/Recall@4/Precision@4/MRR/NDCG@4、技能选择、安全泄漏检查、多轮一致性、150 条规模化基准；如实标注样本量、数据来源与验证日期（含 95% 置信区间），不再为满分筛选样本。**150 条规模化基准按 `layer` 字段双层拆分**：`base`（基础层·贴近真实流量）/ `stress`（压力层·边界探测），runner 分别输出两套独立指标（`scaled_benchmark.base` / `scaled_benchmark.stress`），零删改、不凑分——既保住"真实"卖点，也主动暴露规则通道的边界缺口。
+- `evaluation/datasets.py`：加载 `eval/fixtures/representative_corpus.json`（150 条唯一真实样本，**每条含 `layer`（base/stress）与 `source`（synthetic-representative/synthetic-boundary）字段**，含隐式高危与第三人称干扰）、`rag_queries.json`（50 条自然语言 RAG 问句）、`multi_turn_corpus.json`（8 组多轮场景）；并提供可复现的随机采样工具，保证评测基于真实代表性数据、不循环造数。
 - `evaluation/report_html.py`：单文件 HTML 报告（内联 CSS），管理端一键可看。
 - `app/rag_eval/runner.py`：RAG 专项（HitRate/Recall@4/Precision@4/MRR/NDCG@4，独立运行改用一次性 SQLite 评测库、不依赖 MySQL/pymysql），数据集在 `eval/fixtures/rag_queries.json`（50 条自然语言问句，基于真实知识库）。
 - `app/harness/runner.py` + `factory.py`：工程级场景回放——8 套件（risk/routing/skills/rag/api/tool-queue/scaled/runtime-ab）验证端到端行为（如「审批后 5 个工具任务全部 success」「死信被正确创建」），失败退出码 1，可接 CI。`factory.py` 是重构产物：harness 与 `eval/run_eval.py` 共用一个装配工厂，消除两份漂移的样板。
@@ -1367,7 +1367,7 @@ async def attach_request_context(request, call_next):
 &#x20;
 `main`
 &#x20;
-分支第九轮之后的状态（REFACTORING → OPTIMIZATION → AUTH-MYSQL → LANGGRAPH-DOCKER → DEEP-ENHANCEMENTS → LLM-RESPONSE-HUMANIZATION → MEMORY-ENHANCEMENT → CONFRONTATIONAL-DIALOGUE-TESTING → ROUND-9-CONSOLIDATION）。各轮详细变更见
+分支第十轮之后的状态（REFACTORING → OPTIMIZATION → AUTH-MYSQL → LANGGRAPH-DOCKER → DEEP-ENHANCEMENTS → LLM-RESPONSE-HUMANIZATION → MEMORY-ENHANCEMENT → CONFRONTATIONAL-DIALOGUE-TESTING → ROUND-9-CONSOLIDATION → CORPUS-LAYER-SPLIT）。各轮详细变更见
 &#x20;
 [docs/records/](docs/records/)
 &#x20;

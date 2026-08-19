@@ -55,6 +55,8 @@ def _metric_cards(summary: dict) -> str:
         ("RAG NDCG@K", summary.get("retrieval_ndcg_at_k")),
         ("MultiTurn", summary.get("multi_turn_accuracy")),
         ("Scaled", summary.get("scaled_benchmark_accuracy")),
+        ("Base", summary.get("scaled_base_accuracy")),
+        ("Stress", summary.get("scaled_stress_accuracy")),
     ]
     parts = []
     for label, value in cards:
@@ -96,9 +98,9 @@ def render_section(name: str, section: dict) -> str:
             scalars.append(f"<li>{label}：{value}</li>")
     scalar_html = f"<ul>{''.join(scalars)}</ul>" if scalars else ""
 
-    # 分层明细（按难度/类别）
+    # 分层明细（按难度/类别/分层）
     strat_html = ""
-    for key in ("by_difficulty", "by_category", "by_intent"):
+    for key in ("by_difficulty", "by_category", "by_intent", "by_layer"):
         if key in section and isinstance(section[key], dict):
             items = "；".join(f"{k}={v.get('accuracy')}（{v.get('correct')}/{v.get('total')}）" for k, v in section[key].items())
             strat_html += f"<p class='meta'>{key}：{items}</p>"

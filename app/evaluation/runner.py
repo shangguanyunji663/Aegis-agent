@@ -4,13 +4,20 @@
 
 1. **数据真实**：规模化基准、路由/风险判定、多轮回归均使用 ``eval/fixtures`` 下的真实标注
    语料（150 条代表性消息 + 8 组多轮场景），不再循环生成伪样本凑满分。
-2. **指标完整**：除准确率外，明确输出
+2. **双层拆分**：150 条规模化基准按 ``layer`` 字段拆为两套独立指标，零删改、不凑分：
+   - **基础层（贴近真实流量，``layer=base`` / ``source=synthetic-representative``）**：覆盖日常闲聊、
+     典型咨询、显式高危等"真实会发生的流量"，证明系统在主流场景上的可靠性（对应"真实"卖点）。
+   - **压力层（边界探测，``layer=stress`` / ``source=synthetic-boundary``）**：刻意堆满隐喻式高危、
+     无关键词咨询、第三人称干扰等"边界样本"，用于主动暴露规则通道的能力缺口（对应"暴露边界"卖点）。
+   ``runner`` 通过 ``evaluate_scaled_benchmark`` 分别输出两套指标（见 ``base`` / ``stress`` 字段），
+   两层均基于同一次语料遍历（``_evaluate_corpus``），不做二次推断、也不为满分筛样。
+3. **指标完整**：除准确率外，明确输出
    - 意图判定准确率、风险判定准确率
    - 高风险召回率（high-risk recall）、误报率（false-positive rate）
    - RAG：HitRate / Recall@K / Precision@K / MRR / NDCG@K
    并对主指标给出 95% Wilson 置信区间。
-3. **如实标注**：每个维度标注样本规模、数据来源、最近验证日期。
-4. **去除满分门限**：``summarize`` 不再以"全部 100%"作为通过标准；非 100% 的真实结果
+4. **如实标注**：每个维度标注样本规模、数据来源、最近验证日期。
+5. **去除满分门限**：``summarize`` 不再以"全部 100%"作为通过标准；非 100% 的真实结果
    被如实呈现，并提示其对应的代码/能力边界。
 """
 from __future__ import annotations
@@ -95,6 +102,8 @@ def _evaluate_corpus(orchestrator, corpus: list[dict]) -> list[dict]:
                 "risk_ok": risk_ok,
                 "category": case.get("category"),
                 "difficulty": case.get("difficulty"),
+                "layer": case.get("layer"),
+                "source": case.get("source"),
                 "note": case.get("note"),
                 "passed": intent_ok and risk_ok,
             }
@@ -175,6 +184,36 @@ def evaluate_risk(orchestrator, corpus: list[dict] | None = None) -> dict:
     }
 
 
+def _layer_metrics(rows: list[dict], label: str) -> dict:
+    """计算单层（基础层/压力层）的完整指标集。
+
+    包含样本量、联合/意图/风险准确率、高风险召回率、误报率及 95% Wilson 置信区间，
+    用于 runner 分别输出「基础层（贴近真实流量）」与「压力层（边界探测）」两套指标。
+    两层指标均基于同一次语料遍历（``_evaluate_corpus``），不做二次推断，也不为满分筛样。
+    """
+    total = len(rows)
+    passed = sum(1 for r in rows if r["passed"])
+    intent_ok = sum(1 for r in rows if r["intent_ok"])
+    risk_ok = sum(1 for r in rows if r["risk_ok"])
+    high = [r for r in rows if r["expected_risk"] == "high"]
+    high_hits = sum(1 for r in high if r["actual_risk"] == "high")
+    non_high = [r for r in rows if r["expected_risk"] != "high"]
+    fp = sum(1 for r in non_high if r["actual_risk"] == "high")
+    return {
+        "label": label,
+        "sample_size": total,
+        "accuracy": round(passed / total, 4) if total else 0.0,
+        "ci95": _wilson_ci(passed, total),
+        "intent_accuracy": round(intent_ok / total, 4) if total else 0.0,
+        "risk_accuracy": round(risk_ok / total, 4) if total else 0.0,
+        "high_recall": round(high_hits / len(high), 4) if high else 0.0,
+        "high_recall_ci95": _wilson_ci(high_hits, len(high)),
+        "false_positive_rate": round(fp / len(non_high), 4) if non_high else 0.0,
+        "passed": passed,
+        "total": total,
+    }
+
+
 def evaluate_scaled_benchmark(orchestrator, corpus: list[dict] | None = None) -> dict:
     corpus = corpus if corpus is not None else load_representative_corpus()
     rows = _evaluate_corpus(orchestrator, corpus)
@@ -207,6 +246,16 @@ def evaluate_scaled_benchmark(orchestrator, corpus: list[dict] | None = None) ->
         if r["passed"]:
             by_category[cat][0] += 1
 
+    # 按分层（base=贴近真实流量 / stress=边界探测）聚合
+    by_layer = defaultdict(lambda: [0, 0])
+    for r in rows:
+        layer = r.get("layer") or "unknown"
+        by_layer[layer][1] += 1
+        if r["passed"]:
+            by_layer[layer][0] += 1
+    base_rows = [r for r in rows if (r.get("layer") or "unknown") == "base"]
+    stress_rows = [r for r in rows if (r.get("layer") or "unknown") == "stress"]
+
     return {
         "sample_size": total,
         "data_source": str(FIXTURES_DIR / "representative_corpus.json"),
@@ -219,6 +268,10 @@ def evaluate_scaled_benchmark(orchestrator, corpus: list[dict] | None = None) ->
         "false_positive_rate": false_positive_rate,
         "by_difficulty": {d: {"correct": c, "total": t, "accuracy": round(c / t, 4) if t else 0.0} for d, (c, t) in by_difficulty.items()},
         "by_category": {c: {"correct": cc, "total": t, "accuracy": round(cc / t, 4) if t else 0.0} for c, (cc, t) in by_category.items()},
+        "by_layer": {d: {"correct": c, "total": t, "accuracy": round(c / t, 4) if t else 0.0} for d, (c, t) in by_layer.items()},
+        # 双层拆分：同一次语料遍历的结果，分别聚合为两套独立指标（保留全部 150 条，不删改）
+        "base": _layer_metrics(base_rows, "基础层（贴近真实流量）"),
+        "stress": _layer_metrics(stress_rows, "压力层（边界探测）"),
         "cases": rows,
         "passed": passed,
         "total": total,
@@ -444,6 +497,16 @@ def summarize(results: dict) -> dict:
         "scaled_benchmark_total": scaled["total"],
         "scaled_high_recall": scaled["high_recall"],
         "scaled_false_positive_rate": scaled["false_positive_rate"],
+        "scaled_base_accuracy": scaled["base"]["accuracy"],
+        "scaled_stress_accuracy": scaled["stress"]["accuracy"],
+        "scaled_base_label": scaled["base"]["label"],
+        "scaled_stress_label": scaled["stress"]["label"],
+        "scaled_base_high_recall": scaled["base"]["high_recall"],
+        "scaled_stress_high_recall": scaled["stress"]["high_recall"],
+        "scaled_base_risk_accuracy": scaled["base"]["risk_accuracy"],
+        "scaled_stress_risk_accuracy": scaled["stress"]["risk_accuracy"],
+        "scaled_base_false_positive_rate": scaled["base"]["false_positive_rate"],
+        "scaled_stress_false_positive_rate": scaled["stress"]["false_positive_rate"],
         "judge_avg": (results.get("judge") or {}).get("avg"),
         "evaluation_note": (
             "评测不再以满分(100%)作为通过标准；以上为基于真实代表性数据集的真实通过率。"

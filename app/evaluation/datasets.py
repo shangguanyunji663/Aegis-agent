@@ -9,7 +9,7 @@
 - `generated_benchmark_cases` 保留为向后兼容别名，现直接返回代表性语料。
 
 数据集位置：`eval/fixtures/`
-- `representative_corpus.json`：150 条代表性消息（意图/风险双标注，含隐式高危与第三人称干扰项）
+- `representative_corpus.json`：150 条代表性消息（意图/风险双标注，含隐式高危与第三人称干扰项；每条另含 `layer`（base/stress）与 `source`（synthetic-representative/synthetic-boundary）字段，用于双层拆分）
 - `rag_queries.json`：50 条自然语言检索问句（基于真实知识库文档，非关键词堆砌）
 - `multi_turn_corpus.json`：8 组多轮对话场景（含升级到中/高风险与第三人称转自身）
 """
@@ -29,7 +29,8 @@ MULTI_TURN_CORPUS = FIXTURES_DIR / "multi_turn_corpus.json"
 def load_representative_corpus() -> list[dict]:
     """加载 150 条代表性消息语料（真实标注，非循环生成）。
 
-    每条记录字段：id, message, expected_intent, expected_risk, category, difficulty, note
+    每条记录字段：id, message, expected_intent, expected_risk, category, difficulty, note,
+    layer（base/stress）, source（synthetic-representative/synthetic-boundary）
     """
     return json.loads(REPRESENTATIVE_CORPUS.read_text(encoding="utf-8"))
 

@@ -82,3 +82,26 @@ def test_eval_includes_multi_turn_and_rich_metrics(tmp_path: Path):
     assert "safety_leak_count" in results["summary"]
     assert "retrieval_mrr" in results["summary"]
     assert results["multi_turn"]["total"] >= 1
+
+
+def test_scaled_benchmark_supports_layer_split(tmp_path: Path):
+    """150 条规模化基准应按 layer(base/stress) 分层，且两层覆盖全部样本。"""
+    store, orchestrator = build_store(tmp_path / "eval", vector_enabled=False)
+    fixtures_dir = Path(__file__).resolve().parents[1] / "eval" / "fixtures"
+    output_dir = tmp_path / "out"
+
+    results = run_evaluation(orchestrator, store, fixtures_dir, output_dir)
+    scaled = results["scaled_benchmark"]
+
+    assert "by_layer" in scaled
+    assert set(scaled["by_layer"].keys()) >= {"base", "stress"}
+    covered = sum(v["total"] for v in scaled["by_layer"].values())
+    assert covered == scaled["total"] == 150
+
+    summary = results["summary"]
+    assert "scaled_base_accuracy" in summary
+    assert "scaled_stress_accuracy" in summary
+    assert "scaled_base_high_recall" in summary
+    assert "scaled_stress_high_recall" in summary
+    # 压力层（隐式/无词样本）准确率应低于基础层，验证分层确实区分了难度
+    assert summary["scaled_stress_accuracy"] <= summary["scaled_base_accuracy"]

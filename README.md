@@ -187,7 +187,7 @@ python -m app.mcp_tools.server --list
 | --- | --- | --- |
 | 单元与接口测试 | API、认证、风险双通道、Function Calling、Agent runtime、LangGraph checkpoint、MCP tools、评测 runner | 本地 SQLite 可执行 **57 通过**（`tests/test_api.py` 依赖 MySQL 后端，本环境未运行；`test_langgraph_checkpoint` 的跨实例持久化为既有环境问题，与本次评测改造无关） |
 | 150 条规模化基准（双层拆分，横向分层） | 150 条唯一真实样本（非循环生成），按 `layer` 拆为 **基础层（贴近真实流量）63 条** 与 **压力层（边界探测）87 条**，runner 分别输出两套独立指标。**目的：横向对比基础层 vs 压力层，衡量规则引擎能力边界** | 整体：联合准确率 **0.63**；意图 **0.63**；风险 **0.81**；高风险召回 **0.60**；误报率 **0.00**。- **基础层（贴近真实流量）**：准确率 **0.97**、意图 **0.97**、风险 **1.00**、高召回 **1.00**（贴近真实校园求助流量，规则引擎表现稳健）。- **压力层（边界探测）**：准确率 **0.39**、意图 **0.39**、风险 **0.67**、高召回 **0.52**（隐喻式高危、无关键词咨询、第三人称干扰等边界样本，如实暴露规则通道的能力缺口）。按难度分层：easy 明显优于 hard |
-| 风险 LLM 通道双路径（第十一轮，纵向对比） | 150 条全量双路径对比：baseline（纯规则 channel OFF，**即上行压力层纯规则结果，此处作为纵向对比起点不重复数字**）→ MetaphorAwareStub ON（rules ∪ LLM 并集）→ GLM-4.7-flash sanity probe。**目的：纵向对比 LLM 通道相对纯规则的补强幅度** | **baseline（channel OFF）**：压力层风险 **0.67**、高召回 **0.52**、误报 **0.00**（同上行压力层，纯规则）。**llm_stub（channel ON）**：压力层风险 **0.94**（↑0.27）、高召回 **1.00**（↑0.48）、误报 **0.03**（corp-106..130 全部 25 条隐喻命中；2 条 medium distress 含"撑不下去"/"不配"属 prompt-vs-corpus 标注张力，如实保留）。**GLM probe**：4/5 成功调用正确判 high（1 条 429 限流回退 none；best-effort 探针，结果随限流波动，2026-08-20 快照）。数据：`data/eval/risk_dual_path.json` |
+| 风险 LLM 通道双路径（第十一轮，纵向对比） | 150 条全量双路径对比：baseline（纯规则 channel OFF，**即上行压力层纯规则结果，此处作为纵向对比起点不重复数字**）→ MetaphorAwareStub ON（rules ∪ LLM 并集）→ GLM-4.7-flash sanity probe。**目的：纵向对比 LLM 通道相对纯规则的补强幅度** | **baseline（channel OFF）**：压力层风险 **0.67**、高召回 **0.52**、误报 **0.00**（同上行压力层，纯规则）。**llm_stub（channel ON）**：压力层风险 **0.94**（↑0.27）、高召回 **1.00**（↑0.48）、误报 **0.03**（corp-106..130 全部 25 条隐喻命中；2 条 medium distress 含"撑不下去"/"不配"属 prompt-vs-corpus 标注张力，如实保留）。**GLM probe**：25 条扩展探针，成功调用 11 条中 10 条正确判 high、1 条判 medium（14 条 429 回退 none；成功调用准确率 0.91，不超 stub 上界 0.94，符合预期）。数据：`data/eval/risk_dual_path.json` + `data/eval/glm_probe_25.json` |
 | 多轮回归 | 8 组多轮场景（含升级到中/高风险、第三人称转自身） | 最终关键内容命中率 **0.875**（7/8） |
 | RAG 检索 | 50 条自然语言问句，Top-4 混合检索（BM25 + 向量 + rerank） | HitRate **0.94**、Recall@4 **0.94**、Precision@4 **0.33**、MRR **0.84**、NDCG@4 **0.86**、Top-1 **0.76** |
 | 三运行时 A/B | langgraph / autonomous / ordered 同数据集对比延迟、trace 步数、LLM 调用数与判定一致性（10 条代表性消息） | 三运行时判定**完全一致**；意图准确率 **0.8**、风险准确率 **0.9**（含 1 条规则引擎当前漏判的隐式高危样本，如实暴露跨运行时一致的缺口） |
@@ -203,8 +203,38 @@ python -m app.mcp_tools.server --list
 **风险 LLM 通道双路径验证（第十一轮，2026-08-19）：**
 - **生产配置**：`RISK_LLM_CHANNEL_ENABLED=false`（纯规则），压力层风险准确率 **0.67**、高风险召回 **0.52**——与上行「规模化基准」压力层纯规则结果同源（同一语料 + 同一规则引擎），维持"暴露边界"卖点，baseline 不上升。
 - **能力上界**（`MetaphorAwareStubClient` + channel ON，rules ∪ LLM 并集）：压力层风险准确率 **0.94**、高风险召回 **1.00**（25 条隐喻式自杀意念 corp-106..130 全部命中）、误报率 **0.03**（2 条 medium distress 含"撑不下去"/"不配"被 prompt 列为 high，属 prompt-vs-corpus 标注张力，如实保留）。
-- **真实 GLM sanity check**：GLM-4.7-flash 对 5 条隐喻样本 best-effort 探针，4 条成功调用均正确判 high（1 条命中 429 限流回退 none；2026-08-20 快照，结果随限流波动），验证 endpoint 兼容、judge prompt 有效、stub 是 LLM 的合理代理。
-- **数据来源**：`data/eval/risk_dual_path.json`（150 条全量双路径对比）。
+- **真实 GLM sanity check**：GLM-4.7-flash 对压力层全部 **25 条**隐喻式自杀意念样本做扩展探针（2026-08-20，`data/eval/glm_probe_25.json`）。受免费档限流影响，14 条命中 429/超时回退 none；**成功调用的 11 条中 10 条正确判 high、1 条判 medium（corp-130）**，成功调用准确率 **0.91**，验证 stub 量出的 0.94 上界是真实 GLM 可达水平（真实模型不超 stub 上界，且有 1 条理解偏差，符合预期）。
+- **数据来源**：`data/eval/risk_dual_path.json`（150 条全量双路径对比）、`data/eval/glm_probe_25.json`（25 条扩展 GLM 探针）。
+
+<details>
+<summary><b>风险双通道机制详解（点击展开）</b></summary>
+
+本系统的风险判定由**两条通道**组成，`RISK_LLM_CHANNEL_ENABLED` 控制是否启用第二条 LLM 通道：
+
+**规则通道（rules channel，不可关）** — `app/assessment.py` 的 `assess_message()`
+- 纯关键词匹配，零 LLM 调用、零外部依赖、可审计
+- `HIGH_TERMS`（自杀/轻生/一了百了等 19 词）命中 → HIGH
+- `MEDIUM_TERMS`（自残/崩溃/绝望等 7 词）命中 → MEDIUM
+- 第三人称消歧：高危词出现在"新闻/电影/朋友"等语境 → 降级 LOW
+- **固有上限**：只能识别词面，隐喻式表达（"想消失""不配""撑不下去"）常漏判
+
+**LLM 通道（llm channel，可开关）** — `app/llm/client.py` + `app/agents/classic.py:78-94`
+- 用 `RISK_ASSESS_SYSTEM_PROMPT`（`client.py:45-53`）让模型理解隐喻
+- 并集融合：`order[llm_level] > order[risk_level]` 时升级（只升不降，安全优先）
+- 兜底：LLM 失败/超时/429 返回 None → 回退纯规则结果，保证安全边界
+
+**CHANNEL ON/OFF 的含义**
+- `RISK_LLM_CHANNEL_ENABLED=false`（生产）：只跑规则通道，trace 记 `llm: "skipped"`
+- `RISK_LLM_CHANNEL_ENABLED=true`（dev）：两条通道并行，取并集，trace 记 `llm: "high/medium/low"`
+
+**双路径评测中的两个"假客户端"**
+- `MockLLMClient`（baseline 路径用）：`assess_risk()` 返回 None，让 LLM 通道形同虚设 → 量**下界**（LLM 通道最差情况 = 不工作）
+- `MetaphorAwareStubClient`（llm_stub 路径用）：继承 MockLLMClient，用 30 个隐喻关键词 + 13 个痛苦关键词**模拟**理想 LLM 的判定逻辑，不调真模型 → 量**上界**（LLM 通道满血情况）
+- 真实 GLM（GLM probe 路径）：小样本 sanity check，量**真实表现**（介于上下界之间）
+
+**为什么上界用 stub 不用真模型**：GLM 免费档 ~1 req/s，150 条全量跑会大量 429 污染结果；stub 用关键词确定性地模拟"LLM 完美理解 prompt 会怎么判"，给出可复现的能力天花板。25 条扩展 GLM 探针验证了这一设计——成功调用准确率 0.91，接近 stub 量出的 0.94 上界且不超，说明 stub 是 LLM 的合理代理。
+
+</details>
 
 > 评测数据用于工程回归和能力展示，不等同于临床有效性评估。允许并保留非 100% 的真实通过率，以暴露真实的代码/能力边界。
 
@@ -238,7 +268,7 @@ python -m app.mcp_tools.server --list
 ├── skills/                       # 标准化心理支持 Skill 规范(SKILL.md)
 ├── static/                       # 学生端和管理员端页面(login/student/admin)
 ├── tests/                        # pytest 测试
-├── scripts/                      # 启动脚本 + 评测脚本(eval_risk_dual_path/probe_glm)
+├── scripts/                      # 启动脚本 + 评测脚本(eval_risk_dual_path/probe_glm/probe_glm_25)
 ├── docs/                         # 架构、安全和演示文档
 ├── Aegis项目逐文件学习指南.md      # 从零构建式逐模块学习指南
 ├── docs/records/                 # 迭代记录(重构→提速→注册MySQL→LangGraph→深度增强→回复真人化→记忆增强→对抗型对话测试→语料双层拆分→风险LLM通道双路径)

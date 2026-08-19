@@ -767,8 +767,9 @@ ANXIETY_TERMS = ["焦虑", "压力", "考试", "睡不着", "失眠", "panic", "
 
 （风险双通道）：`assess_message` 是规则通道；`RiskGuardianAgent` 会再用轻量 LLM 通道（`llm.assess_risk`，严格 JSON、8s 短超时）复核，两通道取并集——任一判 high 即 high，弥补关键词召回不足；LLM 失败/超时/mock 一律回退纯规则，输出 `risk_channels` 溯源。
 
-- `HIGH_TERMS` 是单一事实来源是——`autonomous/board.py` 的 `hard_high_risk()` 也引用它，改关键词只改一处。
-- 规则评估可解释（命中了哪个词一目了然）、可单测、零成本零延迟。代价是召回有限——所以它被定位为「下限保障」而非「上限智能」。
+- **双路径验证（第十一轮）**：150 条语料双路径对比——baseline（channel OFF，纯规则）压力层 risk_acc=**0.67**、high_recall=**0.52**；stub-LLM on（`MetaphorAwareStubClient` + channel ON）risk_acc=**0.94**、high_recall=**1.00**（corp-106..130 全部 25 条隐喻式自杀意念命中）。生产保持 channel OFF 不变（保"暴露边界"卖点），LLM 通道只在 dev/能力验证时开启。GLM-4.7-flash sanity probe 2/2 成功调用正确（3 条 429 限流回退），验证 endpoint 兼容、judge prompt 有效、stub 是 LLM 的合理代理。数据：`data/eval/risk_dual_path.json`，脚本：`scripts/eval_risk_dual_path.py`。
+- `HIGH_TERMS` 是单一事实来源——`autonomous/board.py` 的 `hard_high_risk()` 也引用它，改关键词只改一处。
+- 规则评估可解释（命中了哪个词一目了然）、可单测、零成本零延迟。代价是召回有限——25 条隐喻式自杀意念中仅命中 13 条（corp-106..130），剩余 12 条需 LLM 语义理解才能捕捉，这是关键词路线的固有上限。
 
 ***
 
@@ -844,11 +845,13 @@ class LLMClient(Protocol):
 
 三个实现：
 
-- `MockLLMClient`：方法都返回 `None`（None 就代表「请走本地模板兜底」——。这让无 key 环境下整条链路（含高风险处置）照常可测。
-- `OpenAICompatibleClient`：`client.py` 用 urllib 裸调 `{base_url}/chat/completions`，支持智谱等 OpenAI 兼容端点的 `thinking:{"type":"disabled"}` 参数（默认关闭深度思考，大幅降低延迟）。第六轮起支持性回复使用独立温度 `LLM_SUPPORT_TEMPERATURE`（默认 `0.6`，偏口语更像真人；风险评估/改写/评审仍固定 `0.0`）。`post_json()` 对 429/5xx/超时做指数退避重试（最多 2 次，间隔 2s/4s）；流式请求在在在连接建立阶段在在重试，一旦已开始接收 delta 则不再回退（避免已直播的 token 被丢掉）。
+- `MockLLMClient`：方法都返回 `None`（None 就代表「请走本地模板兜底」）。这让无 key 环境下整条链路（含高风险处置）照常可测。测试中还派生了 `MetaphorAwareStubClient`（`tests/test_risk_dual_channel.py`），模拟 LLM judge 的隐喻检测行为，用于 corp-106..130 双路径验证。
+- `OpenAICompatibleClient`：`client.py` 用 urllib 裸调 `{base_url}/chat/completions`，支持智谱等 OpenAI 兼容端点的 `thinking:{"type":"disabled"}` 参数（默认关闭深度思考，大幅降低延迟）。第六轮起支持性回复使用独立温度 `LLM_SUPPORT_TEMPERATURE`（默认 `0.6`，偏口语更像真人；风险评估/改写/评审仍固定 `0.0`）。`post_json()` 对 429/5xx/超时做指数退避重试（最多 2 次，间隔 2s/4s）；流式请求在连接建立阶段重试，一旦已开始接收 delta 则不再回退（避免已直播的 token 被丢掉）。当前配置：endpoint=`https://open.bigmodel.cn/api/paas/v4`，model=`glm-4.7-flash`（免费档，200K 上下文，~1 req/s 限流）。
 - `OllamaClient`：调 `/api/chat`，本地模型零成本。
 
 `build_llm_client(settings)` 按配置三选一。
+
+**风险 judge prompt**（`RISK_ASSESS_SYSTEM_PROMPT`，`client.py:45-53`）：LLM 通道的核心提示词，判定 high/medium/low 三档。显式覆盖隐喻式自杀意念（想消失/活着多余/从没出生过/不配/撑不下去/永远睡过去/离开这个世界/结束这一切/不愿再醒来/要是不在了就好了），并标注第三人称/虚构语境不视为自身 high（"新闻里有人轻生/写论文提到自杀/朋友直播自杀"）。输出严格 JSON（`{"risk_level": "...", "reason": "..."}`），`_parse_risk_json()` 容忍代码块包裹与前后杂文。第十一轮双路径验证确认该 prompt 覆盖 corp-106..130 全部 25 条隐喻。
 
 ### 5.2 llm/prompts.py — 提示词模板
 
@@ -1275,20 +1278,22 @@ async def attach_request_context(request, call_next):
 - `evaluation/report_html.py`：单文件 HTML 报告（内联 CSS），管理端一键可看。
 - `app/rag_eval/runner.py`：RAG 专项（HitRate/Recall@4/Precision@4/MRR/NDCG@4，独立运行改用一次性 SQLite 评测库、不依赖 MySQL/pymysql），数据集在 `eval/fixtures/rag_queries.json`（50 条自然语言问句，基于真实知识库）。
 - `app/harness/runner.py` + `factory.py`：工程级场景回放——8 套件（risk/routing/skills/rag/api/tool-queue/scaled/runtime-ab）验证端到端行为（如「审批后 5 个工具任务全部 success」「死信被正确创建」），失败退出码 1，可接 CI。`factory.py` 是重构产物：harness 与 `eval/run_eval.py` 共用一个装配工厂，消除两份漂移的样板。
+- `scripts/eval_risk_dual_path.py`（第十一轮新增）：风险 LLM 通道双路径评测——同 150 条语料分别跑 baseline（MockLLM + channel OFF）与 llm_stub（`MetaphorAwareStubClient` + channel ON），直调 `RiskGuardianAgent.assess()` 避免 response 生成/judge 等额外 LLM 调用。含真实 GLM-4.7-flash sanity probe（5 条隐喻样本 best-effort）。产出 `data/eval/risk_dual_path.json`。
+- `scripts/probe_glm.py`（第十一轮新增）：GLM 端点探针——验证 endpoint/model/api_key 可用性，不打印 API key，退出码 0=可用。
 - `eval/fixtures/`：路由/风险/安全/多轮小型金标集 + `representative_corpus.json`（150 条）/ `rag_queries.json`（50 条）/ `multi_turn_corpus.json`（8 组）真实代表性数据集。
 
 
 
 学习要点
 
-：评测三层——单元（pytest 约 57 项）/能力（eval runner）/链路（harness 8 套件）；mock LLM 保证全链评测确定性，测的是系统不是模型运气。三运行时 A/B（`--suite runtime-ab`）对比编排器延迟/trace/调用数，LLM-as-Judge（`evaluation/judge.py`）给回复打共情/安全/结构分——评测从「分对错」升级到「评质量」。
+：评测三层——单元（pytest 约 62 项）/能力（eval runner）/链路（harness 8 套件）；mock LLM 保证全链评测确定性，测的是系统不是模型运气。三运行时 A/B（`--suite runtime-ab`）对比编排器延迟/trace/调用数，LLM-as-Judge（`evaluation/judge.py`）给回复打共情/安全/结构分——评测从「分对错」升级到「评质量」。**双路径验证**（`scripts/eval_risk_dual_path.py`）量化 LLM 通道的能力上界：baseline（channel OFF）压力层 risk_acc=0.67 → stub-LLM on（channel ON）0.94，证明 LLM 通道能补齐规则漏判的 12 条隐喻式自杀意念；生产保持 channel OFF 不变，维持"暴露边界"卖点。
 
 ***
 
 ## 第 14 站 收尾 — static/ + tests/
 
 - `static/index.html + login.js`：登录页；`student.html/js`：会话列表 + SSE 流式对话；`admin.html/js`：报告/个案/trace/知识库/工具/评测/审计七大面板。原生 JS，零构建。
-- `tests/` 十四个文件 约 57 项：orchestrator（提供 `build_orchestrator` 给其他测试复用）、api（TestClient 全链）、agent\_runtime、retrieval\_eval、mcp\_tools、harness、assessment，以及第五轮新增的 risk\_dual\_channel（双通道）、function\_calling（FC）、runtime\_ab（A/B）、judge（LLM 评审）、langgraph\_runtime、langgraph\_checkpoint（跨进程恢复）；第六轮新增 `test_reply_style.py` 守护「提示词自然人设」与「兜底模板不露内部标签」两条底线。
+- `tests/` 十四个文件 约 62 项：orchestrator（提供 `build_orchestrator` 给其他测试复用）、api（TestClient 全链）、agent\_runtime、retrieval\_eval、mcp\_tools、harness、assessment，以及第五轮新增的 risk\_dual\_channel（双通道，第十一轮扩展至 **9 项**：4 原有 + 5 新增覆盖 corp-106..130 隐喻双路径，含 `MetaphorAwareStubClient` 模拟 LLM judge）、function\_calling（FC）、runtime\_ab（A/B）、judge（LLM 评审）、langgraph\_runtime、langgraph\_checkpoint（跨进程恢复）；第六轮新增 `test_reply_style.py` 守护「提示词自然人设」与「兜底模板不露内部标签」两条底线。
 
 ***
 
@@ -1341,6 +1346,7 @@ async def attach_request_context(request, call_next):
 3.   读一次黑板  ：`tests/test_orchestrator.py` 里的高风险用例断言了 SAFETY\_OVERRIDE 的传播；再对照 `autonomous/runtime.py` 的 `_trace_from_board` 看事件如何变成 trace。
 4.   改一个小东西试试  ：往 `assessment.HIGH_TERMS` 加一个词，跑 `pytest` 与 `python -m app.harness.runner --suite risk`——体会「单一来源 + 评测护栏」如何让修改变得安全。
 5.   换个模型  ：设 `AI_PROVIDER=ollama` 起服务，其余什么都不用改。
+6.   跑一次双路径验证  ：`python scripts/eval_risk_dual_path.py`——看 baseline（channel OFF）与 stub-LLM on（channel ON）在 150 条语料上的风险准确率对比，体会「生产纯规则保暴露边界、LLM 通道补齐隐喻缺口」的设计取舍。
 
 ## 总结四：按引导式路线「从零重建」的检查清单
 
@@ -1353,7 +1359,7 @@ async def attach_request_context(request, call_next):
 - [ ] RAG 先路由再检索，BM25 与向量融合 + rerank，向量可降级（第 9 站）
 - [ ] 工具不直接执行，先成受治理 ToolJob，经契约/审批/脱敏/审计，后台 worker 异步跑（第 11 站）
 - [ ] HTTP 层纯净（鉴权/限流/路由），Agent 细节收口在 Harness（第 8、12 站）
-- [ ] 评测可重复：单测 + 端到端 harness + 三运行时 A/B（第 13 站）
+- [ ] 评测可重复：单测 + 端到端 harness + 三运行时 A/B + 风险 LLM 通道双路径验证（第 13 站）
 - [ ] 默认本地零依赖可跑，外部依赖（Redis/向量/SMTP/MCP）均可选且语义一致降级（第四部分）
 
 ***

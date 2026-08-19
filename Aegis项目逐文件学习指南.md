@@ -512,6 +512,7 @@ python -m app.mcp_tools.server --list
 ## 第〇章 学习路线总览
 
 Aegis 是一个「学生倾诉 + 风险识别 + 管理员处置」的完整闭环系统。从头写它，你会经过 14 站：
+Aegis 是一个「学生倾诉 + 风险识别 + 管理员处置」的完整闭环系统。从头写它，你会经过 14 站：
 
 ```
 第 1 站   地基          config / models / entities / database   — 先把"数据形状"立起来
@@ -554,6 +555,7 @@ class Settings(BaseSettings):
     ai_provider: str = "mock"          # mock / openai / ollama
     knowledge_dir: str = "knowledge"   # 知识库目录(项目根下)
     agent_runtime: str = "autonomous"  # autonomous / ordered / langgraph 三档开关
+    agent_runtime: str = "autonomous"  # autonomous / ordered / langgraph 三档开关
     agent_max_rounds: int = 8
     agent_final_acceptance_min_confidence: float = 0.6
     ...
@@ -583,6 +585,7 @@ def resolve_path(self, value: str) -> Path:
 ：配置是「数据」不是「代码」；用带默认值的声明式字段替代散落各处的常量；`.env.example` 是给使用者的配置说明书。
 
 ### 1.2 app/models.py — 领域模型（纯数据）
+### 1.2 app/models.py — 领域模型（纯数据）
 
 这一层定义义义全项目通用的词汇表义义，不依赖任何其他 app 模块（测试时可以单独 import 它）：
 
@@ -595,9 +598,15 @@ class RiskLevel(str, Enum):     # 风险三级分流,整个系统的"红绿灯"
 ```
 
 继承 `str, Enum` 是个小技巧：`RiskLevel.HIGH == "high"` 直接成立，和 JSON/数据库里的字符串无缝互转。
+继承 `str, Enum` 是个小技巧：`RiskLevel.HIGH == "high"` 直接成立，和 JSON/数据库里的字符串无缝互转。
 
 核心数据类（全部 `@dataclass`，纯 JSON 可序列化）：
+核心数据类（全部 `@dataclass`，纯 JSON 可序列化）：
 
+- `SkillResult` — 一次技能调用的结果（`name/output/side_effect`），`side_effect=True` 表示产生了外部副作用（如建报告）。
+- `AgentTrace(agent, action, detail)` — 一条执行痕迹，三个字符串，最终拼成管理端可读的时间线。
+- `ResponsePlan` — 回复的「施工图」：模式、知识片段、稳定练习步骤、prompt 消息。
+- `PendingReport` — 待管理员审批的风险报告。带有 `from_dict()` 类方法：
 - `SkillResult` — 一次技能调用的结果（`name/output/side_effect`），`side_effect=True` 表示产生了外部副作用（如建报告）。
 - `AgentTrace(agent, action, detail)` — 一条执行痕迹，三个字符串，最终拼成管理端可读的时间线。
 - `ResponsePlan` — 回复的「施工图」：模式、知识片段、稳定练习步骤、prompt 消息。
@@ -661,7 +670,9 @@ def build_session_factory(runtime_settings=None):
 ***
 
 ## 第 2 站 安全底座：core/
+## 第 2 站 安全底座：core/
 
+地基立好后，先写「任何功能上线前必须有的东西」：谁能用（认证）、哪些字段不能见（脱敏）、请求会不会打爆（限流）。
 地基立好后，先写「任何功能上线前必须有的东西」：谁能用（认证）、哪些字段不能见（脱敏）、请求会不会打爆（限流）。
 
 ### 2.1 core/auth.py — 口令与会话
@@ -678,6 +689,8 @@ def verify_password(password: str, salt: str, expected_hash: str) -> bool:
 ```
 
 - PBKDF2-HMAC-SHA256、12 万轮迭代、随机盐——不引入 bcrypt 依赖也能达到及格线的口令存储。
+- `verify_password` 用 `hmac.compare_digest` 而非 `==`：避免「比较耗时差异」泄露前缀。
+- 会话令牌 `secrets.token_urlsafe(32)`；`AuthPrincipal`（frozen dataclass）是「当前登录者」的轻量表示，贯穿所有路由依赖。
 - `verify_password` 用 `hmac.compare_digest` 而非 `==`：避免「比较耗时差异」泄露前缀。
 - 会话令牌 `secrets.token_urlsafe(32)`；`AuthPrincipal`（frozen dataclass）是「当前登录者」的轻量表示，贯穿所有路由依赖。
 - `random_id(prefix)` 生成 `usr-xxx`/`audit-xxx` 这类可读 ID——日志里一眼看懂类型。
@@ -701,6 +714,7 @@ INTERNAL_RESPONSE_TERMS = ("report_id", "risk-", "内部评分", "confidence")
 ：心理场景的隐私是合规底线；脱敏要同时覆盖「存储侧」（payload 进审计表之前）和「输出侧」（回复发给用户之前）两个面。
 
 ### 2.3 core/runtime.py — RuntimeServices（限流与锁）
+### 2.3 core/runtime.py — RuntimeServices（限流与锁）
 
 ```python
 class RuntimeServices:
@@ -719,6 +733,7 @@ class RuntimeServices:
 - `check_rate_limit(key, limit, window)`：Redis `INCR+EXPIRE` 计数窗口；无 Redis 时用进程内 `dict[str, list[float]]` 模拟————同一个接口两种实现，语义一致——，这是「可选依赖」的标准写法。
 - `lock(name, ttl)` 上下文管理器：Redis `SET NX EX`；本地退化为过期时间表。用在「手动跑工具任务」接口上，防止两个管理员同时触发批处理。
 
+### 2.4 core/utils.py — 统一工具函数（去重产物）
 ### 2.4 core/utils.py — 统一工具函数（去重产物）
 
 初版里 `_loads`（JSON 容错解析）在 4 个文件各有一份、`_now` 也有 4 份——而且且且有两种时区语义且且（带/不带 tzinfo）。重构时按原语义分别收编：
@@ -754,6 +769,7 @@ ANXIETY_TERMS = ["焦虑", "压力", "考试", "睡不着", "失眠", "panic", "
 ```
 
 `assess_message(text) -> AssessmentResult` 是纯函数：先匹配 HIGH（命中即 `risk_level=HIGH, confidence=0.95, report_eligible=True, escalation_policy="create_pending_report_and_require_admin_review"`），再 MEDIUM，再按抑郁/焦虑词给出 LOW，最后兜底「普通陪伴」。
+`assess_message(text) -> AssessmentResult` 是纯函数：先匹配 HIGH（命中即 `risk_level=HIGH, confidence=0.95, report_eligible=True, escalation_policy="create_pending_report_and_require_admin_review"`），再 MEDIUM，再按抑郁/焦虑词给出 LOW，最后兜底「普通陪伴」。
 
 返回的 `AssessmentResult` 不只是等级，还带带带处置策略带带（`recommended_stance`/`escalation_policy`）：
 
@@ -761,6 +777,7 @@ ANXIETY_TERMS = ["焦虑", "压力", "考试", "睡不着", "失眠", "panic", "
 - MEDIUM → `stabilize_and_refer`：稳定练习 + 转介指引。
 - LOW → 倾听陪伴。
 
+`as_skill_output()` 把结果转成扁平 dict，供技能层透传。
 `as_skill_output()` 把结果转成扁平 dict，供技能层透传。
 
 
@@ -794,6 +811,7 @@ class SkillSpec:
 ```
 
 `SkillRegistry.__init__` 注册 4 个内置技能：
+`SkillRegistry.__init__` 注册 4 个内置技能：
 
 | 技能                      | 副作用   | 实现                                                 |
 | ----------------------- | ----- | -------------------------------------------------- |
@@ -810,9 +828,11 @@ SkillRegistry(knowledge_dir, store.add_report, store.search_knowledge)
 ```
 
 技能层不 import 仓储，而是接收函数——测试时可以塞假函数，这就是它可单测的原因。
+技能层不 import 仓储，而是接收函数——测试时可以塞假函数，这就是它可单测的原因。
 
 另一条线：：：标准化 Skill：：（7 个 `skills/*/SKILL.md` 文档，带 frontmatter）。`response_skill_names(intent, risk, text)` 按规则选中（高风险 → 安全计划 + 交接摘要；命中「失眠」→ 睡眠支持……），`standard_context(names)` 拼成提示词注入。这是「用文档约束模型输出结构」的轻量做法。
 
+`_split_frontmatter` 手写解析 YAML 头——不引入 yaml 依赖的取舍（知识文档的 frontmatter 解析在 `rag/chunking.py`，两者格式相似但容错策略不同：技能解析遇到坏文档直接跳过，知识解析静默忽略坏行）。
 `_split_frontmatter` 手写解析 YAML 头——不引入 yaml 依赖的取舍（知识文档的 frontmatter 解析在 `rag/chunking.py`，两者格式相似但容错策略不同：技能解析遇到坏文档直接跳过，知识解析静默忽略坏行）。
 
 
@@ -838,12 +858,16 @@ class LLMClient(Protocol):
     def assess_risk(self, text: str) -> dict | None: ...                      # 风险双通道
     def chat_with_tools(self, system, user, tools) -> list[str] | None: ...   # Function Calling
     def judge_reply(self, message, reply) -> dict | None: ...                 # LLM-as-Judge
+    def assess_risk(self, text: str) -> dict | None: ...                      # 风险双通道
+    def chat_with_tools(self, system, user, tools) -> list[str] | None: ...   # Function Calling
+    def judge_reply(self, message, reply) -> dict | None: ...                 # LLM-as-Judge
 ```
 
 `LLMContext` 是喂给模型的的的结构化上下文包的的：用户消息、意图、风险等级、记忆摘要、知识片段、稳定练习、技能约束——回复生成所需的一切都显式传入，模型不自己「想」。
 
 协议从最初的「一问一答」长成了了了多通道客户端了了：回复生成（阻塞）、回复直播（流式）、查询改写（RAG）、风险复核（双通道）、技能选择（FC）、质量评审（Judge）。新增通道全部遵守同一条铁律：：：失败/超时/mock 返回 None，调用方优雅降级：：——这正是全系统「LLM 永远不是安全关键路径」的落点。
 
+三个实现：
 三个实现：
 
 - `MockLLMClient`：方法都返回 `None`————None 就代表「请走本地模板兜底」——。这让无 key 环境下整条链路（含高风险处置）照常可测。
@@ -854,6 +878,7 @@ class LLMClient(Protocol):
 
 ### 5.2 llm/prompts.py — 提示词模板
 
+系统提示词是安全边界的一部分，值得整段读：
 系统提示词是安全边界的一部分，值得整段读：
 
 ```python
@@ -868,6 +893,7 @@ system = (
 四句话分别划定：能力边界 / 禁止事项 / 与规则层的分工 / 输出风格。用户消息模板把记忆、意图、风险、知识、练习、技能逐块拼装————上下文工程就是把「该给的信息」按结构喂给模型——。
 
 第六轮把提示词从「机器人模板」改成「真人陪伴风格」：不再自称「咨询回复生成器」，改为「你是 Aegis，校园心理支持助手」；指令从「先共情→1-3步骤→开放问题」改成灵活对话指导（短句口语、长度匹配用户消息、一次最多一个问题、建议最多两条且只在合适时给）。历史摘要/知识/练习字段仍动态注入，但加了防泄漏指示——禁止把「用户提到/系统回应重点」等内部标签原文放进回复里。
+第六轮把提示词从「机器人模板」改成「真人陪伴风格」：不再自称「咨询回复生成器」，改为「你是 Aegis，校园心理支持助手」；指令从「先共情→1-3步骤→开放问题」改成灵活对话指导（短句口语、长度匹配用户消息、一次最多一个问题、建议最多两条且只在合适时给）。历史摘要/知识/练习字段仍动态注入，但加了防泄漏指示——禁止把「用户提到/系统回应重点」等内部标签原文放进回复里。
 
 
 
@@ -879,6 +905,7 @@ system = (
 
 ## 第 6 站 agents/classic.py — 六个单轮智能体
 
+这一层是「每个角色做一件小事」，全部是无状态类（除 Counselor 持有 registry/llm）：
 这一层是「每个角色做一件小事」，全部是无状态类（除 Counselor 持有 registry/llm）：
 
 | Agent               | 方法                                         | 职责                                                             |
@@ -915,11 +942,13 @@ def finalize_plan(self, plan: ResponsePlan) -> tuple[str, AgentTrace]:
 ***
 
 ## 第 7 站 autonomous/ — 自治黑板协作（项目的心脏）
+## 第 7 站 autonomous/ — 自治黑板协作（项目的心脏）
 
 单轮 Agent 只是零件。真正的多 Agent 协作在这一站：六个自治 Agent 围绕一块块块只增不删的黑板块块认领任务、发布产物、互相评审。
 
 ### 7.1 autonomous/events.py — 纯数据协议
 
+先定义「协作的语言」：
 先定义「协作的语言」：
 
 - `AgentEventType`：TURN\_STARTED / TASK\_CREATED / TASK\_CLAIMED / ARTIFACT\_PUBLISHED / SAFETY\_OVERRIDE / REVISION\_REQUESTED / FINAL\_ACCEPTED / BUDGET\_EXHAUSTED …
@@ -947,7 +976,9 @@ def append_artifact(self, artifact: AgentArtifact) -> "CollaborationBlackboard":
 - `AutonomousAgentRegistry.candidate_decisions_for(task, board)`：过滤出能力匹配的 Agent，逐个问 `decide()`，把愿意认领的按置信度排序————认领制（claim-based）的核心——。
 
 ### 7.3 autonomous/board.py — 黑板共享读取（去重产物）
+### 7.3 autonomous/board.py — 黑板共享读取（去重产物）
 
+协作双方（协调器、Agent、运行时）都要「看一眼黑板推断当前状态」。此前三份近似拷贝，重构收编为：
 协作双方（协调器、Agent、运行时）都要「看一眼黑板推断当前状态」。此前三份近似拷贝，重构收编为：
 
 ```python
@@ -964,6 +995,7 @@ def intent_from_board(board, *, use_board_risk=True, use_hard_terms=True) -> Int
 
 ### 7.4 autonomous/coordinator.py — 认领制协调器
 
+`AutonomousCoordinator.run(board)` 主循环（不超过 `max_rounds` 轮）：
 `AutonomousCoordinator.run(board)` 主循环（不超过 `max_rounds` 轮）：
 
 ```
@@ -983,7 +1015,9 @@ def intent_from_board(board, *, use_board_risk=True, use_hard_terms=True) -> Int
 ### 7.5 autonomous/agents.py — 六个自治 Agent
 
 `BaseAutonomousAgent` 提供公共设施：`_artifact()`（造产物）、`_message()`（发消息）、`client()`（按档案取专属模型）、`private_memory()/remember()`（读写 Agent 私有记忆）。
+`BaseAutonomousAgent` 提供公共设施：`_artifact()`（造产物）、`_message()`（发消息）、`client()`（按档案取专属模型）、`private_memory()/remember()`（读写 Agent 私有记忆）。
 
+每个子类实现 `decide()`（要不要认领）+ `act()`（做事发产物）。最值得读的是 `RiskGuardianAutonomousAgent`——它身兼两职：
 每个子类实现 `decide()`（要不要认领）+ `act()`（做事发产物）。最值得读的是 `RiskGuardianAutonomousAgent`——它身兼两职：
 
 1.   独立评估  （`_assess`）：调单轮 RiskGuardian，产出 `risk` 工件；HIGH 时追加 `pending_report` 工件 + 发 `SAFETY_OVERRIDE` 事件（这个事件会让 `risk_from_board` 永远返回 HIGH，即使后续有人评估成 LOW————安全一票否决——）。
@@ -1021,6 +1055,7 @@ if risk is RiskLevel.HIGH and not any(term in answer for term in ["安全", "可
 ### 8.1 orchestrator.py — PsychOrchestrator
 
 构造函数一次性装配：六个单轮 Agent + AgentRegistry + AgentRuntimeRunner + AgentModelRegistry + AutonomousAgentRuntime。
+构造函数一次性装配：六个单轮 Agent + AgentRegistry + AgentRuntimeRunner + AgentModelRegistry + AutonomousAgentRuntime。
 
 `_run()` 开头的分流是是是双/三运行时开关是是：
 
@@ -1037,6 +1072,7 @@ if getattr(self.settings, "agent_runtime", "autonomous") == "autonomous":
 ### 8.2 harness.py — AegisAgentHarness
 
 HTTP 与 Agent 世界之间的薄适配层，职责就三件：
+HTTP 与 Agent 世界之间的薄适配层，职责就三件：
 
 ```python
 def _prepare(self, message, session_id, owner_user_public_id):
@@ -1046,6 +1082,7 @@ def _prepare(self, message, session_id, owner_user_public_id):
     return original_input, model_input, owned_session_id   # ③ 交给 orchestrator
 ```
 
+`stream()` 把 `handle_stream` 的事件转发给 emit 回调。路由层因此可以保持「参数校验 + 鉴权 + 限流」的纯净，不碰任何 Agent 细节。
 `stream()` 把 `handle_stream` 的事件转发给 emit 回调。路由层因此可以保持「参数校验 + 鉴权 + 限流」的纯净，不碰任何 Agent 细节。
 
 ### 8.3 model\_profiles.py — 每 Agent 模型档案
@@ -1098,6 +1135,7 @@ new_line = f"用户提到：{compact_sentence(user_message, 120)}；系统回应
 ```
 
 滚动摘要：每轮一行，超预算从最旧开始丢——心理对话「最近的上下文最重要」，这个丢弃方向是对的。
+滚动摘要：每轮一行，超预算从最旧开始丢——心理对话「最近的上下文最重要」，这个丢弃方向是对的。
 
 ### 9.5 vector\_store.py — 向量后端
 
@@ -1122,6 +1160,7 @@ new_line = f"用户提到：{compact_sentence(user_message, 120)}；系统回应
 
 ## 第 10 站 repository/store.py — 持久化仓储
 
+`DatabaseStore` 是所有表的读写总闸（约 950 行，按区块组织）：
 `DatabaseStore` 是所有表的读写总闸（约 950 行，按区块组织）：
 
 -   会话/消息  ：`ensure_session`（不存在则建，支持归属回填）、`list/get/delete/rename_session`、`append_message`（首条用户消息自动成为标题）。
@@ -1148,6 +1187,7 @@ except Exception as exc:
 ```
 
 治理审计不在「成功路径」上，恰恰要覆盖失败路径——被拒绝的调用是最需要审计的东西。
+治理审计不在「成功路径」上，恰恰要覆盖失败路径——被拒绝的调用是最需要审计的东西。
 
 
 
@@ -1159,6 +1199,7 @@ except Exception as exc:
 
 ## 第 11 站 工具治理 — tools/ + services/
 
+高风险场景的完整闭环：报告审批 → 建个案 → 派发 5 个工具任务 → 后台执行 → 落记录。这一站是「治理与业务正交」的落地。
 高风险场景的完整闭环：报告审批 → 建个案 → 派发 5 个工具任务 → 后台执行 → 落记录。这一站是「治理与业务正交」的落地。
 
 ### 11.1 tools/contracts.py — 契约先行
@@ -1205,6 +1246,7 @@ def governed_payload(kind, payload, role, approved) -> dict:
 ### 11.5 services/tool\_records.py + tool\_governance.py
 
 前者持久化 ExcelRecord/AlertRecord（去重：同报告同个案只记一条）；后者提供执行前授权检查与审计写入，供 MCP 边界复用。
+前者持久化 ExcelRecord/AlertRecord（去重：同报告同个案只记一条）；后者提供执行前授权检查与审计写入，供 MCP 边界复用。
 
 ### 11.6 tools/gateway.py + mcp\_tools/server.py + tools/mcp\_client.py — MCP 边界
 
@@ -1221,7 +1263,9 @@ def governed_payload(kind, payload, role, approved) -> dict:
 ## 第 12 站 HTTP 层 — api/ + main.py
 
 ### 12.1 main.py — 只做装配（约 90 行）
+### 12.1 main.py — 只做装配（约 90 行）
 
+`create_app()` 顺序：settings → engine/会话工厂/建表 → DatabaseStore（默认账号+知识库种子）→ RuntimeServices → SkillRegistry → LLM 客户端 → Orchestrator → Harness → 工具网关 → 队列 worker。全部挂 `app.state`，注册中间件与 5 个路由模块。lifespan 里启停 worker。
 `create_app()` 顺序：settings → engine/会话工厂/建表 → DatabaseStore（默认账号+知识库种子）→ RuntimeServices → SkillRegistry → LLM 客户端 → Orchestrator → Harness → 工具网关 → 队列 worker。全部挂 `app.state`，注册中间件与 5 个路由模块。lifespan 里启停 worker。
 
 
@@ -1242,6 +1286,7 @@ def current_principal(request: Request) -> AuthPrincipal:
 `require_admin = Depends(current_principal) + 角色检查`。路由声明 `principal: AuthPrincipal = Depends(require_admin)` 即完成鉴权——FastAPI 依赖注入的标准用法。
 
 ### 12.3 api/middleware.py — 请求追踪（重构补齐的功能）
+### 12.3 api/middleware.py — 请求追踪（重构补齐的功能）
 
 ```python
 async def attach_request_context(request, call_next):
@@ -1254,9 +1299,15 @@ async def attach_request_context(request, call_next):
 ```
 
 请求方带头则沿用（链路串联），否则生成。配合落库的 Agent trace，一次请求从 HTTP 到 Agent 每一步都可追。
+请求方带头则沿用（链路串联），否则生成。配合落库的 Agent trace，一次请求从 HTTP 到 Agent 每一步都可追。
 
 ### 12.4 其余路由模块
 
+- `schemas.py`：9 个请求模型集中定义。
+- `pages.py`（3 个 HTML）、`system.py`（health/readiness/agent-status/skills）。
+- `auth_routes.py`：register（注册即登录：学生自由注册，教师须凭 `AUTH_TEACHER_INVITE_CODE` 邀请码，防自助获取工作台权限）/login（httpOnly + samesite-lax Cookie，防 XSS/CSRF）/logout/me。`api/errors.py` 提供全局异常处理：治理拒绝→403、ValueError→400、参数校验→422、未知异常→500（日志留完整堆栈，响应不泄露内部细节）。
+- `chat.py`：`POST /api/chat`（限流→归属校验→harness.run）、`/api/chat/stream`（SSE，含异常兜底：流中出错也补发 error+done 事件）、会话 CRUD。
+- `admin.py`：约 20 个后台接口。值得注意 `safe_knowledge_filename`（白名单后缀+字符清洗，防路径穿越）与上传接口的 PDF 解析分支（pypdf 惰性导入）。
 - `schemas.py`：9 个请求模型集中定义。
 - `pages.py`（3 个 HTML）、`system.py`（health/readiness/agent-status/skills）。
 - `auth_routes.py`：register（注册即登录：学生自由注册，教师须凭 `AUTH_TEACHER_INVITE_CODE` 邀请码，防自助获取工作台权限）/login（httpOnly + samesite-lax Cookie，防 XSS/CSRF）/logout/me。`api/errors.py` 提供全局异常处理：治理拒绝→403、ValueError→400、参数校验→422、未知异常→500（日志留完整堆栈，响应不泄露内部细节）。
@@ -1315,6 +1366,7 @@ async def attach_request_context(request, call_next):
 | 参数化收编        | board.intent\_from\_board(use\_board\_risk/use\_hard\_terms)                     | 去重但显式保留历史语义差异       |
 
 ## 总结二：一次请求的完整数据流
+## 总结二：一次请求的完整数据流
 
 ```
 学生输入
@@ -1337,6 +1389,7 @@ async def attach_request_context(request, call_next):
         → Excel/邮件/预警/交接/审计 全部落记录
 ```
 
+## 总结三：实操建议
 ## 总结三：实操建议
 
 1.   跑起来  ：`python -m app.init_db && uvicorn app.main:app --port 8091`，用 student/student123! 登录发一句「我最近考试压力很大，晚上睡不着」，再去 /admin 看报告与 trace。

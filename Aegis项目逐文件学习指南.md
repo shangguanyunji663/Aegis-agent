@@ -1,8 +1,8 @@
 # Aegis 项目学习指南 — 从零构建一个校园心理支持多 Agent 平台
 
-> 本文档按照「如果你要从头写这个项目，你会怎么思考和编码」的顺序组织。它不是一份 API 清单，而是一份份份引导式蓝图份份：先讲清楚「为什么这样设计」（架构思路）、「谁负责什么、怎么协作」（模块职责与流程）、「为什么选这些技术」（选型理由）、「怎么把它跑起来」（环境搭建），最后才逐文件拆解「每一站具体怎么写」（动手实现）。
+> 本文档按照「如果你要从头写这个项目，你会怎么思考和编码」的顺序组织。它不是一份 API 清单，而是一份引导式蓝图：先讲清楚「为什么这样设计」（架构思路）、「谁负责什么、怎么协作」（模块职责与流程）、「为什么选这些技术」（选型理由）、「怎么把它跑起来」（环境搭建），最后才逐文件拆解「每一站具体怎么写」（动手实现）。
 >
-> 读者定位：刚接触 Agent 应用开发、有 Python 基础的学生。你不需要先懂 LangChain 或 RAG——本文档从「为什么需要这个东西」讲起。读完并按引导走完，你应当能依据思路路路独立搭出结构相同、功能一致的项目路路，而不是照抄代码。
+> 读者定位：刚接触 Agent 应用开发、有 Python 基础的学生。你不需要先懂 LangChain 或 RAG——本文档从「为什么需要这个东西」讲起。读完并按引导走完，你应当能依据思路独立搭出结构相同、功能一致的项目，而不是照抄代码。
 >
 > 文档结论的「正确性」以仓库当前 `main` 分支为准；本文档在多处给出「为什么这么选」的判断，便于你在自己的项目里做取舍。
 
@@ -23,7 +23,7 @@
 2.   「高风险表达」必须进入可审计流程。   涉及自伤、危机的表达，不能只由模型「回复一句安抚」就结束——它需要人审、脱敏、重试、留痕，且工具执行不能由模型越权直接触发。
 3.   「多 Agent 协作」不能只是顺序调用。   单个 Lead Agent 串行分派，复杂场景下没有中间产物、没有任务认领、没有验收点，一旦出错无法复盘。
 
->   一句话定位  ：Aegis 不是聊天机器人，而是把「学生侧即时支持」与「管理侧可审计干预」拆成两套独立信息架构，并用一套后端 Agent Runtime 统一处理意图路由、记忆注入、RAG 检索、风险报告、trace 落库与工具计划。
+>   一句话定位：Aegis 不是聊天机器人，而是把「学生侧即时支持」与「管理侧可审计干预」拆成两套独立信息架构，并用一套后端 Agent Runtime 统一处理意图路由、记忆注入、RAG 检索、风险报告、trace 落库与工具计划。
 
 ## 1.2 四条贯穿全程的设计哲学
 
@@ -36,7 +36,7 @@
 
 ## 1.3 分层架构总览
 
-把系统想象成一组组组同心圆 + 一条主线组组：最外层是两个前端（学生端 / 管理端），往里是 HTTP 层，再往里是 Harness（统一编排入口），再往里是 Agent Runtime（三档可切换的协作引擎），最底层是 RAG、工具治理、持久化与评测。
+把系统想象成一组同心圆 + 一条主线：最外层是两个前端（学生端 / 管理端），往里是 HTTP 层，再往里是 Harness（统一编排入口），再往里是 Agent Runtime（三档可切换的协作引擎），最底层是 RAG、工具治理、持久化与评测。
 
 ```mermaid
 flowchart LR
@@ -95,9 +95,7 @@ flowchart LR
 
 
 
-为什么都要
-
-：三者复用同一批 Agent 与安全规则，只是「调度方式」不同。这让读者可以：先读 `ordered` 理解每个零件，再读 `autonomous` 理解真实协作，最后对比 `langgraph` 理解工业方案——并且用「三运行时 A/B 评测」证明「判定 100% 一致」，说明换引擎不改业务语义。
+为什么三个运行时都要存在：三者复用同一批 Agent 与安全规则，只是「调度方式」不同。这让读者可以：先读 `ordered` 理解每个零件，再读 `autonomous` 理解真实协作，最后对比 `langgraph` 理解工业方案——并且用「三运行时 A/B 评测」证明换引擎不改业务语义（三档运行时判定彼此一致），说明换引擎不改业务语义。
 
 ## 1.6 一次对话的宏观数据流（俯瞰）
 
@@ -124,7 +122,7 @@ flowchart LR
 
 ## 2.1 模块职责矩阵
 
-这张表是后续阅读地图的「索引」。每个模块回答三个问题：：：负责什么 / 对外暴露什么 / 依赖谁：：。
+这张表是后续阅读地图的「索引」。每个模块回答三个问题：负责什么 / 对外暴露什么 / 依赖谁。
 
 | 模块                                                       | 核心职责                                                                                                 | 对外关键接口                                                                                           | 主要依赖               |
 | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------ |
@@ -148,7 +146,7 @@ flowchart LR
 | `app/api/`                                               | HTTP 路由：schemas/deps/middleware/pages/system/auth\_routes/chat/admin                                 | RESTful + SSE 接口                                                                                 | FastAPI、harness    |
 | `app/mcp_tools/server.py`                                | FastMCP 工具服务（可选后端）                                                                                   | `@mcp.tool` 暴露的工具                                                                                | store、contracts    |
 | `app/evaluation/`、`app/harness/`、`app/rag_eval/`、`eval/` | 评测闭环：runner / datasets / report\_html / runtime\_ab / judge / harness 回放                             | `eval.run_eval`、`harness.runner`                                                                 | store、llm          |
-| `static/`、`tests/`                                       | 双端原生前端 + 65 项 pytest                                                                                 | HTML/JS 页面、测试                                                                                    | —                  |
+| `static/`、`tests/`                                       | 双端原生前端 + pytest 单测（本地约 57 项通过）                                                                                 | HTML/JS 页面、测试                                                                                    | —                  |
 
 ## 2.2 学生端对话主流程（时序图）
 
@@ -178,7 +176,7 @@ sequenceDiagram
     API-->>U: SSE 逐字推送(低风险真流式)
 ```
 
-要点：：：低风险：：对话在生成的同时逐字直播（真流式，首字延迟≈模型首 token）；；；中/高风险；；回复经安全复核通过后才输出，不直播。
+要点：低风险对话在生成的同时逐字直播（真流式，首字延迟≈模型首 token）；中/高风险回复经安全复核通过后才输出，不直播。
 
 ## 2.3 风险识别与报告闭环（时序图）
 
@@ -204,7 +202,7 @@ sequenceDiagram
     T->>T: Excel/Alert/Email/Handoff/审计落记录
 ```
 
-要点：高风险场景下，，，模型不碰外部动作，，；一切副作用都先变成受治理的 `ToolJob`，经审批、脱敏、审计后才由后台 worker 异步执行。
+要点：高风险场景下，模型不碰外部动作；一切副作用都先变成受治理的 `ToolJob`，经审批、脱敏、审计后才由后台 worker 异步执行。
 
 ## 2.4 工具治理与后台执行（时序图）
 
@@ -235,7 +233,7 @@ sequenceDiagram
     end
 ```
 
-要点：：：契约在入队前统一关卡：：（责任链），被拒绝的调用也要留痕；worker 用「生产者-消费者」模型把副作用异步化，不阻塞学生端；失败可重试、可进死信。
+要点：契约在入队前统一关卡（责任链），被拒绝的调用也要留痕；worker 用「生产者-消费者」模型把副作用异步化，不阻塞学生端；失败可重试、可进死信。
 
 ## 2.5 模块装配与依赖关系（谁创建谁）
 
@@ -332,7 +330,7 @@ settings → engine/会话工厂 → create_schema
 
 ### pytest + 自研评测闭环（工程化验证）
 
-- **选了**：pytest 65 项单测 + `evaluation/runner`（八套指标）+ `harness/runner`（8 套件端到端回放）+ RAG 专项 eval + 三运行时 A/B + LLM-as-Judge。
+- **选了**：pytest 单测（本地约 57 项通过） + `evaluation/runner`（真实指标）+ `harness/runner`（8 套件端到端回放）+ RAG 专项 eval + 三运行时 A/B + LLM-as-Judge。
 - **为什么**：Agent 项目「只看 demo 容易高估完成度」。评测用 **mock LLM 保证确定性**，测的是「系统」不是「模型运气」；harness 失败退出码 1，可接 CI。
 - **替代**：纯手工点 demo（不可重复、不可回归）。
 - **代价/取舍**：维护数据集与套件有成本，但换来「改一个词（如 `HIGH_TERMS`）跑一遍评测就能确认没破坏安全边界」。
@@ -400,11 +398,11 @@ uvicorn app.main:app --host 127.0.0.1 --port 8091
 | 学生  | `student` | `student123!` |
 | 管理员 | `admin`   | `admin123!`   |
 
-> 教师注册需邀请码（默认 `aegis-teacher`，由 `AUTH_TEACHER_INVITE_CODE` 配置）。。。生产务必修改。。。
+> 教师注册需邀请码（默认 `aegis-teacher`，由 `AUTH_TEACHER_INVITE_CODE` 配置）。生产务必修改。
 
 ## 4.3 配置 `.env`：最小可运行 vs 进阶
 
-`.env.example` 已给出全部变量。。。最小可运行。。只需默认值（`AI_PROVIDER=mock`、SQLite、向量关、Redis 空）。按组理解关键变量：
+`.env.example` 已给出全部变量。最小可运行只需默认值（`AI_PROVIDER=mock`、SQLite、向量关、Redis 空）。按组理解关键变量：
 
 | 分组  | 变量                                                           | 作用                                 | 默认                               |
 | --- | ------------------------------------------------------------ | ---------------------------------- | -------------------------------- |
@@ -447,7 +445,7 @@ DATABASE_URL=mysql+pymysql://root:你的密码@localhost:3306/aegis?charset=utf8
 ## 4.5 验证：三步跑通闭环
 
 1.   普通对话  ：学生端登录 `student/student123!`，发「我最近考试压力很大，晚上睡不着」。管理端 `/admin` 应能搜到对应知识、看到会话 trace。
-2.   风险闭环  ：发「我不想活了」。观察：学生端得到到到本地安全模板回复到到（mock 下也是）→ 管理端出现「待审报告」→ 审批 → 「工具任务」全部 `success`（可在死信/审计页核对）。
+2.   风险闭环  ：发「我不想活了」。观察：学生端得到本地安全模板回复（mock 下也是）→ 管理端出现「待审报告」→ 审批 → 「工具任务」全部 `success`（可在死信/审计页核对）。
 3.   代码护栏  ：往 `app/assessment.py` 的 `HIGH_TERMS` 加一个词，跑 `pytest` 与 `python -m app.harness.runner --suite risk`——体会「单一来源 + 评测护栏」让修改变安全。
 
 ## 4.6 方式二：Docker Compose
@@ -464,7 +462,7 @@ Compose 启动 app + PostgreSQL + Redis + Chroma。若要在容器里启用向�
 # 初始化数据库
 python -m app.init_db
 
-# 后端测试(65 项)
+# 后端测试(本地约 57 项)
 python -m pytest -q
 
 # 前端脚本语法检查
@@ -497,7 +495,7 @@ python -m app.mcp_tools.server --list
 
 ## 4.9 建议的开发工作流
 
-1. 先 `pytest -q` 确立基线（65 passed）。
+1. 先 `pytest -q` 确立基线（本地约 57 项通过，test_api 需 MySQL）。
 2. 小步修改 → 跑相关单测 + 对应 harness 套件（如改风险逻辑跑 `--suite risk`）。
 3. 涉及编排/运行时时跑 `runtime-ab` 确认三档判定一致。
 4. 涉及回复质量时跑 LLM-as-Judge（接真模型时）或 `test_reply_style.py` 守底线。
@@ -507,11 +505,10 @@ python -m app.mcp_tools.server --list
 
 # 第五部分：从零动手 — 14 站实现地图
 
-> 下面每一站对应一个文件/模块。。。引导式学习法。。：先读「为什么先写它」，再对照源码走一遍，最后尝试不抄代码、凭理解重写一遍该站。
+> 下面每一站对应一个文件/模块。引导式学习法：先读「为什么先写它」，再对照源码走一遍，最后尝试不抄代码、凭理解重写一遍该站。
 
 ## 第〇章 学习路线总览
 
-Aegis 是一个「学生倾诉 + 风险识别 + 管理员处置」的完整闭环系统。从头写它，你会经过 14 站：
 Aegis 是一个「学生倾诉 + 风险识别 + 管理员处置」的完整闭环系统。从头写它，你会经过 14 站：
 
 ```
@@ -555,7 +552,6 @@ class Settings(BaseSettings):
     ai_provider: str = "mock"          # mock / openai / ollama
     knowledge_dir: str = "knowledge"   # 知识库目录(项目根下)
     agent_runtime: str = "autonomous"  # autonomous / ordered / langgraph 三档开关
-    agent_runtime: str = "autonomous"  # autonomous / ordered / langgraph 三档开关
     agent_max_rounds: int = 8
     agent_final_acceptance_min_confidence: float = 0.6
     ...
@@ -563,7 +559,7 @@ class Settings(BaseSettings):
 ```
 
 - `BaseSettings` 来自 `pydantic-settings`：环境变量和 `.env` 文件自动映射到字段（`AI_PROVIDER=xxx` → `ai_provider`），大小写不敏感。
-- 每个字段都有有有安全默认值有有——你不写任何 .env，系统也能本地跑。
+- 每个字段都有安全默认值——你不写任何 .env，系统也能本地跑。
 - `project_root` 属性 + `resolve_path()` 把「相对路径配置」统一解析到项目根，兼容从任意工作目录启动：
 
 ```python
@@ -585,9 +581,8 @@ def resolve_path(self, value: str) -> Path:
 ：配置是「数据」不是「代码」；用带默认值的声明式字段替代散落各处的常量；`.env.example` 是给使用者的配置说明书。
 
 ### 1.2 app/models.py — 领域模型（纯数据）
-### 1.2 app/models.py — 领域模型（纯数据）
 
-这一层定义义义全项目通用的词汇表义义，不依赖任何其他 app 模块（测试时可以单独 import 它）：
+这一层定义全项目通用的词汇表，不依赖任何其他 app 模块（测试时可以单独 import 它）：
 
 ```python
 class Intent(str, Enum):        # 意图:companion 陪伴 / counseling 咨询 / risk 风险 / research 查资料
@@ -598,19 +593,13 @@ class RiskLevel(str, Enum):     # 风险三级分流,整个系统的"红绿灯"
 ```
 
 继承 `str, Enum` 是个小技巧：`RiskLevel.HIGH == "high"` 直接成立，和 JSON/数据库里的字符串无缝互转。
-继承 `str, Enum` 是个小技巧：`RiskLevel.HIGH == "high"` 直接成立，和 JSON/数据库里的字符串无缝互转。
 
-核心数据类（全部 `@dataclass`，纯 JSON 可序列化）：
 核心数据类（全部 `@dataclass`，纯 JSON 可序列化）：
 
 - `SkillResult` — 一次技能调用的结果（`name/output/side_effect`），`side_effect=True` 表示产生了外部副作用（如建报告）。
 - `AgentTrace(agent, action, detail)` — 一条执行痕迹，三个字符串，最终拼成管理端可读的时间线。
-- `ResponsePlan` — 回复的「施工图」：模式、知识片段、稳定练习步骤、prompt 消息。
-- `PendingReport` — 待管理员审批的风险报告。带有 `from_dict()` 类方法：
 - `SkillResult` — 一次技能调用的结果（`name/output/side_effect`），`side_effect=True` 表示产生了外部副作用（如建报告）。
 - `AgentTrace(agent, action, detail)` — 一条执行痕迹，三个字符串，最终拼成管理端可读的时间线。
-- `ResponsePlan` — 回复的「施工图」：模式、知识片段、稳定练习步骤、prompt 消息。
-- `PendingReport` — 待管理员审批的风险报告。带有 `from_dict()` 类方法：
 
 ```python
 @classmethod
@@ -632,13 +621,13 @@ def from_dict(cls, data: dict[str, Any]) -> "PendingReport":
 
 ### 1.3 app/entities.py — ORM 实体（16 张表）
 
-SQLAlchemy 2.0 声明式实体，和 `models.py` 的关系是：：：models 是「怎么说」，entities 是「怎么存」：：。
+SQLAlchemy 2.0 声明式实体，和 `models.py` 的关系是：models 是「怎么说」，entities 是「怎么存」：。
 
 代表表：`ChatSession`（会话，含 `owner_user_public_id` 归属）、`ChatMessage`、`SessionMemory`（滚动记忆摘要）、`AuthUser`/`AuthSession`（口令与令牌）、`PsychologicalReport`（风险报告）、`RiskCase`+`CaseNote`（个案）、`KnowledgeChunk`（知识切块）、`ToolJob`/`ToolAuditRecord`/`DeadLetterRecord`（工具任务/审计/死信）、`ExcelRecord`/`AlertRecord`（副作用记录）、`AgentPrivateMemory`（Agent 私有记忆）、`AgentModelProfile`（每 Agent 模型档案）、`AdminAuditLog`（管理端审计）。
 
 注意两个细节：
 
-- 时间字段统一用 `now()` 工厂生成成成不带时区的 UTC成成——和历史行为保持一致（数据库里已存的是 naive 时间）。
+- 时间字段统一用 `now()` 工厂生成不带时区的 UTC——和历史行为保持一致（数据库里已存的是 naive 时间）。
 - `KnowledgeChunk` 同时存 `content`（原文）、`metadata_json`（元数据）、`embedding_json`（本地降级用的向量）——一个表兼容「有无向量库」两种部署。
 
 ### 1.4 app/database.py — 引擎与会话工厂（支持 SQLite / MySQL 双后端）
@@ -657,7 +646,7 @@ def build_session_factory(runtime_settings=None):
 ```
 
 -   工厂而非模块级单例  ：测试要用独立的 tmp 数据库，每个调用方自建 engine。
-- `create_schema()` 里 `from app import entities` 是是是惰性导入是是——先注册全部 ORM 实体到 `Base.metadata`，再 `create_all`。
+- `create_schema()` 里 `from app import entities` 是惰性导入是——先注册全部 ORM 实体到 `Base.metadata`，再 `create_all`。
 - `migrate_legacy_schema()`：对旧库手写 `ALTER TABLE`/`CREATE TABLE` 补列补表，保证升级不丢数据。它与 entities.py 是两份 schema 真相，是已知的遗留债（见 REFACTORING.md 第 10 节）。
 - `readiness_check()` 只做 `SELECT 1`，是 `/api/readiness` 的依据——和 `/api/health`（进程活着）区分。
 
@@ -670,9 +659,7 @@ def build_session_factory(runtime_settings=None):
 ***
 
 ## 第 2 站 安全底座：core/
-## 第 2 站 安全底座：core/
 
-地基立好后，先写「任何功能上线前必须有的东西」：谁能用（认证）、哪些字段不能见（脱敏）、请求会不会打爆（限流）。
 地基立好后，先写「任何功能上线前必须有的东西」：谁能用（认证）、哪些字段不能见（脱敏）、请求会不会打爆（限流）。
 
 ### 2.1 core/auth.py — 口令与会话
@@ -691,8 +678,6 @@ def verify_password(password: str, salt: str, expected_hash: str) -> bool:
 - PBKDF2-HMAC-SHA256、12 万轮迭代、随机盐——不引入 bcrypt 依赖也能达到及格线的口令存储。
 - `verify_password` 用 `hmac.compare_digest` 而非 `==`：避免「比较耗时差异」泄露前缀。
 - 会话令牌 `secrets.token_urlsafe(32)`；`AuthPrincipal`（frozen dataclass）是「当前登录者」的轻量表示，贯穿所有路由依赖。
-- `verify_password` 用 `hmac.compare_digest` 而非 `==`：避免「比较耗时差异」泄露前缀。
-- 会话令牌 `secrets.token_urlsafe(32)`；`AuthPrincipal`（frozen dataclass）是「当前登录者」的轻量表示，贯穿所有路由依赖。
 - `random_id(prefix)` 生成 `usr-xxx`/`audit-xxx` 这类可读 ID——日志里一眼看懂类型。
 
 ### 2.2 core/privacy.py — 脱敏与输入消毒
@@ -704,7 +689,7 @@ INTERNAL_RESPONSE_TERMS = ("report_id", "risk-", "内部评分", "confidence")
 ```
 
 - `redact_payload(payload, fields)` 递归把敏感字段替换为 `"[redacted]"`，返回 `(脱敏后, 命中字段列表)`——命中列表用于审计记录「哪些字段被藏了」。
-- `contains_internal_response_leak(text)`：：：安全复核的关键：：。任何要发给学生的回复，先过这个函数——只要包含 `report_id`/`risk-`/`confidence` 等内部词汇，就会被 RiskGuardian 打回重写。
+- `contains_internal_response_leak(text)`：安全复核的关键：。任何要发给学生的回复，先过这个函数——只要包含 `report_id`/`risk-`/`confidence` 等内部词汇，就会被 RiskGuardian 打回重写。
 - `sanitize_user_input(text)`：进入模型前的预处理——压缩空白，并把「手机号/电话/身份证」替换成「联系方式/证件」，降低模型诱导输出个人敏感信息的概率。
 
 
@@ -713,7 +698,6 @@ INTERNAL_RESPONSE_TERMS = ("report_id", "risk-", "内部评分", "confidence")
 
 ：心理场景的隐私是合规底线；脱敏要同时覆盖「存储侧」（payload 进审计表之前）和「输出侧」（回复发给用户之前）两个面。
 
-### 2.3 core/runtime.py — RuntimeServices（限流与锁）
 ### 2.3 core/runtime.py — RuntimeServices（限流与锁）
 
 ```python
@@ -730,13 +714,12 @@ class RuntimeServices:
                 self.redis_client = None          # 本地无 Redis 也能跑
 ```
 
-- `check_rate_limit(key, limit, window)`：Redis `INCR+EXPIRE` 计数窗口；无 Redis 时用进程内 `dict[str, list[float]]` 模拟————同一个接口两种实现，语义一致——，这是「可选依赖」的标准写法。
+- `check_rate_limit(key, limit, window)`：Redis `INCR+EXPIRE` 计数窗口；无 Redis 时用进程内 `dict[str, list[float]]` 模拟——同一个接口两种实现，语义一致——，这是「可选依赖」的标准写法。
 - `lock(name, ttl)` 上下文管理器：Redis `SET NX EX`；本地退化为过期时间表。用在「手动跑工具任务」接口上，防止两个管理员同时触发批处理。
 
 ### 2.4 core/utils.py — 统一工具函数（去重产物）
-### 2.4 core/utils.py — 统一工具函数（去重产物）
 
-初版里 `_loads`（JSON 容错解析）在 4 个文件各有一份、`_now` 也有 4 份——而且且且有两种时区语义且且（带/不带 tzinfo）。重构时按原语义分别收编：
+初版里 `_loads`（JSON 容错解析）在 4 个文件各有一份、`_now` 也有 4 份——而且有两种时区语义（带/不带 tzinfo）。重构时按原语义分别收编：
 
 ```python
 def loads_dict(value: str) -> dict[str, Any]: ...   # 必须是 dict,否则 {}(队列/记录场景)
@@ -769,24 +752,22 @@ ANXIETY_TERMS = ["焦虑", "压力", "考试", "睡不着", "失眠", "panic", "
 ```
 
 `assess_message(text) -> AssessmentResult` 是纯函数：先匹配 HIGH（命中即 `risk_level=HIGH, confidence=0.95, report_eligible=True, escalation_policy="create_pending_report_and_require_admin_review"`），再 MEDIUM，再按抑郁/焦虑词给出 LOW，最后兜底「普通陪伴」。
-`assess_message(text) -> AssessmentResult` 是纯函数：先匹配 HIGH（命中即 `risk_level=HIGH, confidence=0.95, report_eligible=True, escalation_policy="create_pending_report_and_require_admin_review"`），再 MEDIUM，再按抑郁/焦虑词给出 LOW，最后兜底「普通陪伴」。
 
-返回的 `AssessmentResult` 不只是等级，还带带带处置策略带带（`recommended_stance`/`escalation_policy`）：
+返回的 `AssessmentResult` 不只是等级，还带处置策略（`recommended_stance`/`escalation_policy`）：
 
 - HIGH → `immediate_safety`：本地安全模板回复 + 建待审报告。
 - MEDIUM → `stabilize_and_refer`：稳定练习 + 转介指引。
 - LOW → 倾听陪伴。
 
 `as_skill_output()` 把结果转成扁平 dict，供技能层透传。
-`as_skill_output()` 把结果转成扁平 dict，供技能层透传。
 
 
 
 学习要点
 
-（风险双通道）：`assess_message` 是规则通道；`RiskGuardianAgent` 会再用轻量 LLM 通道（`llm.assess_risk`，严格 JSON、8s 短超时）复核，两通道道道取并集道道——任一判 high 即 high，弥补关键词召回不足；LLM 失败/超时/mock 一律回退纯规则，输出 `risk_channels` 溯源。
+（风险双通道）：`assess_message` 是规则通道；`RiskGuardianAgent` 会再用轻量 LLM 通道（`llm.assess_risk`，严格 JSON、8s 短超时）复核，两通道取并集——任一判 high 即 high，弥补关键词召回不足；LLM 失败/超时/mock 一律回退纯规则，输出 `risk_channels` 溯源。
 
-- `HIGH_TERMS` 是是是单一事实来源是是——`autonomous/board.py` 的 `hard_high_risk()` 也引用它，改关键词只改一处。
+- `HIGH_TERMS` 是单一事实来源是——`autonomous/board.py` 的 `hard_high_risk()` 也引用它，改关键词只改一处。
 - 规则评估可解释（命中了哪个词一目了然）、可单测、零成本零延迟。代价是召回有限——所以它被定位为「下限保障」而非「上限智能」。
 
 ***
@@ -811,7 +792,6 @@ class SkillSpec:
 ```
 
 `SkillRegistry.__init__` 注册 4 个内置技能：
-`SkillRegistry.__init__` 注册 4 个内置技能：
 
 | 技能                      | 副作用   | 实现                                                 |
 | ----------------------- | ----- | -------------------------------------------------- |
@@ -820,7 +800,7 @@ class SkillSpec:
 | `grounding_exercise`    | 否     | 返回固定三步「60 秒稳定练习」                                   |
 | `create_pending_report` |   是   | 构造 `PendingReport` 并通过 `report_sink` 落库            |
 
-注意构造参数的的的依赖注入的的：
+注意构造参数的依赖注入：
 
 ```python
 SkillRegistry(knowledge_dir, store.add_report, store.search_knowledge)
@@ -828,11 +808,9 @@ SkillRegistry(knowledge_dir, store.add_report, store.search_knowledge)
 ```
 
 技能层不 import 仓储，而是接收函数——测试时可以塞假函数，这就是它可单测的原因。
-技能层不 import 仓储，而是接收函数——测试时可以塞假函数，这就是它可单测的原因。
 
-另一条线：：：标准化 Skill：：（7 个 `skills/*/SKILL.md` 文档，带 frontmatter）。`response_skill_names(intent, risk, text)` 按规则选中（高风险 → 安全计划 + 交接摘要；命中「失眠」→ 睡眠支持……），`standard_context(names)` 拼成提示词注入。这是「用文档约束模型输出结构」的轻量做法。
+另一条线：标准化 Skill（7 个 `skills/*/SKILL.md` 文档，带 frontmatter）。`response_skill_names(intent, risk, text)` 按规则选中（高风险 → 安全计划 + 交接摘要；命中「失眠」→ 睡眠支持……），`standard_context(names)` 拼成提示词注入。这是「用文档约束模型输出结构」的轻量做法。
 
-`_split_frontmatter` 手写解析 YAML 头——不引入 yaml 依赖的取舍（知识文档的 frontmatter 解析在 `rag/chunking.py`，两者格式相似但容错策略不同：技能解析遇到坏文档直接跳过，知识解析静默忽略坏行）。
 `_split_frontmatter` 手写解析 YAML 头——不引入 yaml 依赖的取舍（知识文档的 frontmatter 解析在 `rag/chunking.py`，两者格式相似但容错策略不同：技能解析遇到坏文档直接跳过，知识解析静默忽略坏行）。
 
 
@@ -858,19 +836,15 @@ class LLMClient(Protocol):
     def assess_risk(self, text: str) -> dict | None: ...                      # 风险双通道
     def chat_with_tools(self, system, user, tools) -> list[str] | None: ...   # Function Calling
     def judge_reply(self, message, reply) -> dict | None: ...                 # LLM-as-Judge
-    def assess_risk(self, text: str) -> dict | None: ...                      # 风险双通道
-    def chat_with_tools(self, system, user, tools) -> list[str] | None: ...   # Function Calling
-    def judge_reply(self, message, reply) -> dict | None: ...                 # LLM-as-Judge
 ```
 
-`LLMContext` 是喂给模型的的的结构化上下文包的的：用户消息、意图、风险等级、记忆摘要、知识片段、稳定练习、技能约束——回复生成所需的一切都显式传入，模型不自己「想」。
+`LLMContext` 是喂给模型的结构化上下文包：用户消息、意图、风险等级、记忆摘要、知识片段、稳定练习、技能约束——回复生成所需的一切都显式传入，模型不自己「想」。
 
-协议从最初的「一问一答」长成了了了多通道客户端了了：回复生成（阻塞）、回复直播（流式）、查询改写（RAG）、风险复核（双通道）、技能选择（FC）、质量评审（Judge）。新增通道全部遵守同一条铁律：：：失败/超时/mock 返回 None，调用方优雅降级：：——这正是全系统「LLM 永远不是安全关键路径」的落点。
+协议从最初的「一问一答」长成了多通道客户端：回复生成（阻塞）、回复直播（流式）、查询改写（RAG）、风险复核（双通道）、技能选择（FC）、质量评审（Judge）。新增通道全部遵守同一条铁律：失败/超时/mock 返回 None，调用方优雅降级——这正是全系统「LLM 永远不是安全关键路径」的落点。
 
 三个实现：
-三个实现：
 
-- `MockLLMClient`：方法都返回 `None`————None 就代表「请走本地模板兜底」——。这让无 key 环境下整条链路（含高风险处置）照常可测。
+- `MockLLMClient`：方法都返回 `None`（None 就代表「请走本地模板兜底」——。这让无 key 环境下整条链路（含高风险处置）照常可测。
 - `OpenAICompatibleClient`：`client.py` 用 urllib 裸调 `{base_url}/chat/completions`，支持智谱等 OpenAI 兼容端点的 `thinking:{"type":"disabled"}` 参数（默认关闭深度思考，大幅降低延迟）。第六轮起支持性回复使用独立温度 `LLM_SUPPORT_TEMPERATURE`（默认 `0.6`，偏口语更像真人；风险评估/改写/评审仍固定 `0.0`）。`post_json()` 对 429/5xx/超时做指数退避重试（最多 2 次，间隔 2s/4s）；流式请求在在在连接建立阶段在在重试，一旦已开始接收 delta 则不再回退（避免已直播的 token 被丢掉）。
 - `OllamaClient`：调 `/api/chat`，本地模型零成本。
 
@@ -878,7 +852,6 @@ class LLMClient(Protocol):
 
 ### 5.2 llm/prompts.py — 提示词模板
 
-系统提示词是安全边界的一部分，值得整段读：
 系统提示词是安全边界的一部分，值得整段读：
 
 ```python
@@ -890,9 +863,8 @@ system = (
 )
 ```
 
-四句话分别划定：能力边界 / 禁止事项 / 与规则层的分工 / 输出风格。用户消息模板把记忆、意图、风险、知识、练习、技能逐块拼装————上下文工程就是把「该给的信息」按结构喂给模型——。
+四句话分别划定：能力边界 / 禁止事项 / 与规则层的分工 / 输出风格。用户消息模板把记忆、意图、风险、知识、练习、技能逐块拼装——上下文工程就是把「该给的信息」按结构喂给模型——。
 
-第六轮把提示词从「机器人模板」改成「真人陪伴风格」：不再自称「咨询回复生成器」，改为「你是 Aegis，校园心理支持助手」；指令从「先共情→1-3步骤→开放问题」改成灵活对话指导（短句口语、长度匹配用户消息、一次最多一个问题、建议最多两条且只在合适时给）。历史摘要/知识/练习字段仍动态注入，但加了防泄漏指示——禁止把「用户提到/系统回应重点」等内部标签原文放进回复里。
 第六轮把提示词从「机器人模板」改成「真人陪伴风格」：不再自称「咨询回复生成器」，改为「你是 Aegis，校园心理支持助手」；指令从「先共情→1-3步骤→开放问题」改成灵活对话指导（短句口语、长度匹配用户消息、一次最多一个问题、建议最多两条且只在合适时给）。历史摘要/知识/练习字段仍动态注入，但加了防泄漏指示——禁止把「用户提到/系统回应重点」等内部标签原文放进回复里。
 
 
@@ -906,18 +878,17 @@ system = (
 ## 第 6 站 agents/classic.py — 六个单轮智能体
 
 这一层是「每个角色做一件小事」，全部是无状态类（除 Counselor 持有 registry/llm）：
-这一层是「每个角色做一件小事」，全部是无状态类（除 Counselor 持有 registry/llm）：
 
 | Agent               | 方法                                         | 职责                                                             |
 | ------------------- | ------------------------------------------ | -------------------------------------------------------------- |
 | `MemoryAgent`       | `load / update`                            | 读写会话记忆摘要                                                       |
-| `RiskGuardianAgent` | `assess / create_report`                   | 调 assess\_risk 技能（（（规则∪LLM 双通道取并集（（，详见第 3 站）；HIGH 时建待审报告       |
+| `RiskGuardianAgent` | `assess / create_report`                   | 调 assess\_risk 技能（规则∪LLM 双通道取并集（，详见第 3 站）；HIGH 时建待审报告       |
 | `LeadAgent`         | `route`                                    | 关键词路由：高危→RISK；资料词→RESEARCH；咨询词或 MEDIUM→COUNSELING；否则 COMPANION |
 | `KnowledgeAgent`    | `search / rewrite_query`                   | LLM 改写检索词（失败退化原文前 60 字）+ 检索                                    |
 | `CounselorAgent`    | `grounding / compose_plan / finalize_plan` | 组装 ResponsePlan 并生成最终回复                                        |
 | `CompanionAgent`    | —                                          | 空类，低风险陪伴的「占位角色」（回复实际复用 Counselor 的模板路径）                        |
 
-重点看 `CounselorAgent.finalize_plan` 的的的分层兜底的的：
+重点看 `CounselorAgent.finalize_plan` 的分层兜底的：
 
 ```python
 def finalize_plan(self, plan: ResponsePlan) -> tuple[str, AgentTrace]:
@@ -931,7 +902,7 @@ def finalize_plan(self, plan: ResponsePlan) -> tuple[str, AgentTrace]:
     return fallback, ...                           # ⑤ 模型不可用/mock:模板兜底
 ```
 
-`_fallback_answer` 的模板按风险分三档开头（高危段直接给出「联系可信任的人/心理中心/紧急服务」），再拼记忆回显、稳定练习、知识首条、意图化收尾————这就是 mock 模式下学生看到的回复来源——。
+`_fallback_answer` 的模板按风险分三档开头（高危段直接给出「联系可信任的人/心理中心/紧急服务」），再拼记忆回显、稳定练习、知识首条、意图化收尾——这就是 mock 模式下学生看到的回复来源——。
 
 
 
@@ -942,18 +913,16 @@ def finalize_plan(self, plan: ResponsePlan) -> tuple[str, AgentTrace]:
 ***
 
 ## 第 7 站 autonomous/ — 自治黑板协作（项目的心脏）
-## 第 7 站 autonomous/ — 自治黑板协作（项目的心脏）
 
-单轮 Agent 只是零件。真正的多 Agent 协作在这一站：六个自治 Agent 围绕一块块块只增不删的黑板块块认领任务、发布产物、互相评审。
+单轮 Agent 只是零件。真正的多 Agent 协作在这一站：六个自治 Agent 围绕只增不删的黑板块认领任务、发布产物、互相评审。
 
 ### 7.1 autonomous/events.py — 纯数据协议
 
 先定义「协作的语言」：
-先定义「协作的语言」：
 
 - `AgentEventType`：TURN\_STARTED / TASK\_CREATED / TASK\_CLAIMED / ARTIFACT\_PUBLISHED / SAFETY\_OVERRIDE / REVISION\_REQUESTED / FINAL\_ACCEPTED / BUDGET\_EXHAUSTED …
 - `AgentTask`：带 `required_capabilities`（能力要求）、`priority`、`metadata`。
-- `AgentArtifact`：`(owner, kind, payload, confidence, task_id, metadata)`————一切中间产物——：`memory`/`intent`/`risk`/`context`/`response_proposal`/`safety_review`/`pending_report`。
+- `AgentArtifact`：`(owner, kind, payload, confidence, task_id, metadata)`——一切中间产物——：`memory`/`intent`/`risk`/`context`/`response_proposal`/`safety_review`/`pending_report`。
 - `CollaborationBlackboard`：核心结构，`turn_id/session_id/user_input` + `tasks/artifacts/messages/events` 四个列表。
 
 ```python
@@ -972,13 +941,11 @@ def append_artifact(self, artifact: AgentArtifact) -> "CollaborationBlackboard":
 ### 7.2 autonomous/registry.py — 能力与决策
 
 - `AgentCapability` 五种能力：MEMORY / UNDERSTANDING / SAFETY / CONTEXT / RESPONSE。
-- `AgentProfile(name, capabilities, system_prompt, memory_policy, tool_permissions)`：Agent 的「名片」。`tool_permissions` 声明它可触碰的工具————权限是声明的，不是散落的 if——。
-- `AutonomousAgentRegistry.candidate_decisions_for(task, board)`：过滤出能力匹配的 Agent，逐个问 `decide()`，把愿意认领的按置信度排序————认领制（claim-based）的核心——。
+- `AgentProfile(name, capabilities, system_prompt, memory_policy, tool_permissions)`：Agent 的「名片」。`tool_permissions` 声明它可触碰的工具——权限是声明的，不是散落的 if——。
+- `AutonomousAgentRegistry.candidate_decisions_for(task, board)`：过滤出能力匹配的 Agent，逐个问 `decide()`，把愿意认领的按置信度排序——认领制（claim-based）的核心——。
 
 ### 7.3 autonomous/board.py — 黑板共享读取（去重产物）
-### 7.3 autonomous/board.py — 黑板共享读取（去重产物）
 
-协作双方（协调器、Agent、运行时）都要「看一眼黑板推断当前状态」。此前三份近似拷贝，重构收编为：
 协作双方（协调器、Agent、运行时）都要「看一眼黑板推断当前状态」。此前三份近似拷贝，重构收编为：
 
 ```python
@@ -991,11 +958,10 @@ def intent_from_board(board, *, use_board_risk=True, use_hard_terms=True) -> Int
     # ③ 否则按硬高危词回退(use_hard_terms)→ RISK,不然 COMPANION
 ```
 
-两个开关不是多余————原三份实现语义确有差异——：runtime 版不做硬词回退、coordinator 版不做风险预判。参数化让「历史行为逐点保留」且差异显式可见。`hard_high_risk()` 引用 `assessment.HIGH_TERMS`，安全词表全项目只此一份。
+两个开关不是多余——原三份实现语义确有差异——：runtime 版不做硬词回退、coordinator 版不做风险预判。参数化让「历史行为逐点保留」且差异显式可见。`hard_high_risk()` 引用 `assessment.HIGH_TERMS`，安全词表全项目只此一份。
 
 ### 7.4 autonomous/coordinator.py — 认领制协调器
 
-`AutonomousCoordinator.run(board)` 主循环（不超过 `max_rounds` 轮）：
 `AutonomousCoordinator.run(board)` 主循环（不超过 `max_rounds` 轮）：
 
 ```
@@ -1010,17 +976,15 @@ def intent_from_board(board, *, use_board_risk=True, use_hard_terms=True) -> Int
   5. 回到 1
 ```
 
-预算护栏体现在三处：轮次上限（超了发 `BUDGET_EXHAUSTED`）、每轮认领上限、单 Agent 认领上限。`force_response=True` 分支保证即使前置缺失也会被逼着产出一个回复————学生端永远有答案——。
+预算护栏体现在三处：轮次上限（超了发 `BUDGET_EXHAUSTED`）、每轮认领上限、单 Agent 认领上限。`force_response=True` 分支保证即使前置缺失也会被逼着产出一个回复——学生端永远有答案——。
 
 ### 7.5 autonomous/agents.py — 六个自治 Agent
 
 `BaseAutonomousAgent` 提供公共设施：`_artifact()`（造产物）、`_message()`（发消息）、`client()`（按档案取专属模型）、`private_memory()/remember()`（读写 Agent 私有记忆）。
-`BaseAutonomousAgent` 提供公共设施：`_artifact()`（造产物）、`_message()`（发消息）、`client()`（按档案取专属模型）、`private_memory()/remember()`（读写 Agent 私有记忆）。
 
 每个子类实现 `decide()`（要不要认领）+ `act()`（做事发产物）。最值得读的是 `RiskGuardianAutonomousAgent`——它身兼两职：
-每个子类实现 `decide()`（要不要认领）+ `act()`（做事发产物）。最值得读的是 `RiskGuardianAutonomousAgent`——它身兼两职：
 
-1.   独立评估  （`_assess`）：调单轮 RiskGuardian，产出 `risk` 工件；HIGH 时追加 `pending_report` 工件 + 发 `SAFETY_OVERRIDE` 事件（这个事件会让 `risk_from_board` 永远返回 HIGH，即使后续有人评估成 LOW————安全一票否决——）。
+1.   独立评估  （`_assess`）：调单轮 RiskGuardian，产出 `risk` 工件；HIGH 时追加 `pending_report` 工件 + 发 `SAFETY_OVERRIDE` 事件（这个事件会让 `risk_from_board` 永远返回 HIGH，即使后续有人评估成 LOW——安全一票否决——）。
 2.   复核回复  （`_review_response`）：对每个新提案做安全审查——
 
 ```python
@@ -1030,7 +994,7 @@ if risk is RiskLevel.HIGH and not any(term in answer for term in ["安全", "可
     approved = False; reason = "high-risk response lacks immediate safety guidance"
 ```
 
-不通过就发 `critique` 工件 + `REVISION_REQUESTED` 事件 + 创建 CRITICAL 修订任务——Counselor 重新写，再送审，，，直到通过才可能被验收，，。
+不通过就发 `critique` 工件 + `REVISION_REQUESTED` 事件 + 创建 CRITICAL 修订任务——Counselor 重新写，再送审，直到通过才可能被验收，。
 
 ### 7.6 autonomous/runtime.py — 黑板 → 聊天响应
 
@@ -1055,9 +1019,8 @@ if risk is RiskLevel.HIGH and not any(term in answer for term in ["安全", "可
 ### 8.1 orchestrator.py — PsychOrchestrator
 
 构造函数一次性装配：六个单轮 Agent + AgentRegistry + AgentRuntimeRunner + AgentModelRegistry + AutonomousAgentRuntime。
-构造函数一次性装配：六个单轮 Agent + AgentRegistry + AgentRuntimeRunner + AgentModelRegistry + AutonomousAgentRuntime。
 
-`_run()` 开头的分流是是是双/三运行时开关是是：
+`_run()` 开头的分流是双/三运行时开关：
 
 ```python
 if getattr(self.settings, "agent_runtime", "autonomous") == "autonomous":
@@ -1067,11 +1030,10 @@ if getattr(self.settings, "agent_runtime", "autonomous") == "autonomous":
 
 有序路径（`agent_runtime="ordered"`）同样值得读一遍：load memory → assess risk → route →（companion 跳过检索！）→ search\_knowledge → grounding → HIGH 则 create\_report → 选标准 Skill → compose\_plan → finalize\_plan → 存消息/更新记忆/落 trace。每步都经 `runtime_runner.run_step()` 包裹（记录 AGENT\_STARTED/RUN\_FAILED 事件）。
 
-两条路径最终都汇成 `ChatResponse`。`_run_autonomous` 额外把黑板事件流翻译成 RuntimeEvent 发给 `emit`——这就是 SSE 流式输出的来源。。。低风险对话支持真流式。。：回复生成的 token 经回调链（services.on\_reply\_token → finalize\_plan → stream\_support\_reply）实时推给 SSE，首字延迟≈模型首 token 延迟；中/高风险不直播，必须等 RiskGuardian 安全复核通过后输出。直播过真实 token 后，结尾的模拟切块 `_token_chunks()` 会自动跳过，避免重复。
+两条路径最终都汇成 `ChatResponse`。`_run_autonomous` 额外把黑板事件流翻译成 RuntimeEvent 发给 `emit`——这就是 SSE 流式输出的来源。低风险对话支持真流式：回复生成的 token 经回调链（services.on\_reply\_token → finalize\_plan → stream\_support\_reply）实时推给 SSE，首字延迟≈模型首 token 延迟；中/高风险不直播，必须等 RiskGuardian 安全复核通过后输出。直播过真实 token 后，结尾的模拟切块 `_token_chunks()` 会自动跳过，避免重复。
 
 ### 8.2 harness.py — AegisAgentHarness
 
-HTTP 与 Agent 世界之间的薄适配层，职责就三件：
 HTTP 与 Agent 世界之间的薄适配层，职责就三件：
 
 ```python
@@ -1083,11 +1045,10 @@ def _prepare(self, message, session_id, owner_user_public_id):
 ```
 
 `stream()` 把 `handle_stream` 的事件转发给 emit 回调。路由层因此可以保持「参数校验 + 鉴权 + 限流」的纯净，不碰任何 Agent 细节。
-`stream()` 把 `handle_stream` 的事件转发给 emit 回调。路由层因此可以保持「参数校验 + 鉴权 + 限流」的纯净，不碰任何 Agent 细节。
 
 ### 8.3 model\_profiles.py — 每 Agent 模型档案
 
-`DEFAULT_AGENT_MODEL_PROFILES` 为六个 Agent 声明默认温度（记忆/路由/安全 0.0、知识 0.1、咨询 0.2、陪伴 0.3）与系统提示词，启动时写入 `agent_model_profiles` 表。`client_for(agent_name)`：档案是 `inherit` 就返回全局客户端，否则按档案的 provider/model 现造一个————让「安全评估用小模型、回复生成用大模型」成为一行配置——。
+`DEFAULT_AGENT_MODEL_PROFILES` 为六个 Agent 声明默认温度（记忆/路由/安全 0.0、知识 0.1、咨询 0.2、陪伴 0.3）与系统提示词，启动时写入 `agent_model_profiles` 表。`client_for(agent_name)`：档案是 `inherit` 就返回全局客户端，否则按档案的 provider/model 现造一个——让「安全评估用小模型、回复生成用大模型」成为一行配置——。
 
 ### 8.4 langgraph\_runtime.py — LangGraph StateGraph（主推运行时之一）
 
@@ -1119,7 +1080,7 @@ def tokenize(text: str) -> list[str]:
 ### 9.2 scoring.py — 打分
 
 - `bm25_scores`：教科书式 BM25（k1=1.5, b=0.75），中文用 bigram 词表。
-- `rerank_score`：：：四路词法信号加权：：——`base*0.55 + (余弦*0.75+关键词*0.25)*0.25 + 覆盖率*0.15 + 短语命中*0.05`。纯 Python，零模型成本，却显著改善排序。
+- `rerank_score`：四路词法信号加权：——`base*0.55 + (余弦*0.75+关键词*0.25)*0.25 + 覆盖率*0.15 + 短语命中*0.05`。纯 Python，零模型成本，却显著改善排序。
 - `fused_score` + `normalize_scores`：向量分与 BM25 分各自 min-max 归一后按权重（默认 0.65/0.35）线性融合。
 - `expand_best_hit`：冠军块合并同源相邻块——切块会把答案拦腰截断，这一步把邻居拼回来。
 
@@ -1135,18 +1096,17 @@ new_line = f"用户提到：{compact_sentence(user_message, 120)}；系统回应
 ```
 
 滚动摘要：每轮一行，超预算从最旧开始丢——心理对话「最近的上下文最重要」，这个丢弃方向是对的。
-滚动摘要：每轮一行，超预算从最旧开始丢——心理对话「最近的上下文最重要」，这个丢弃方向是对的。
 
 ### 9.5 vector\_store.py — 向量后端
 
 `build_vector_backend(settings)` 按配置返回：
 
 - `ChromaVectorBackend`：真向量库，chromadb 持久化（cosine 空间），支持快照。嵌入有两种来源，由 `EMBEDDING_PROVIDER` 决定：
-  - `local`（默认推荐）：chromadb 内置   MiniLM 本地嵌入  ——离线、零 KEY、零费用；中文语义主要靠 BM25 主导、向量补充
+  - `local`（默认推荐）：chromadb 内置 MiniLM 本地嵌入  ——离线、零 KEY、零费用；中文语义主要靠 BM25 主导、向量补充
   - `openai`：OpenAI 兼容 `/embeddings` API（需向量模型额度）
-- `LocalVectorBackend`：：：哈希 bigram 伪向量：： + 本地余弦——向量开关关掉时的降级路径，保证检索始终可用。
+- `LocalVectorBackend`：哈希 bigram 伪向量： + 本地余弦——向量开关关掉时的降级路径，保证检索始终可用。
 
-> 取舍实录：本项目接入真实 GLM 聊天模型但但但没有向量模型额度但但，于是把 Chroma 的嵌入源切到本地 MiniLM——向量库是真的、嵌入是离线的，检索质量经实测命中正确（考试→exam/sleep、关系→relationships）。
+> 取舍实录：本项目接入真实 GLM 聊天模型但没有向量模型额度，于是把 Chroma 的嵌入源切到本地 MiniLM——向量库是真的、嵌入是离线的，检索质量经实测命中正确（考试→exam/sleep、关系→relationships）。
 
 `store.search_knowledge`（第 10 站）把 9.1–9.5 串成完整流水线：改写查询 → 向量候选（可选）→ 元数据过滤 → BM25 → 双路归一融合 → 重排 → 邻块扩展 → 截 top\_k。
 
@@ -1160,7 +1120,6 @@ new_line = f"用户提到：{compact_sentence(user_message, 120)}；系统回应
 
 ## 第 10 站 repository/store.py — 持久化仓储
 
-`DatabaseStore` 是所有表的读写总闸（约 950 行，按区块组织）：
 `DatabaseStore` 是所有表的读写总闸（约 950 行，按区块组织）：
 
 -   会话/消息  ：`ensure_session`（不存在则建，支持归属回填）、`list/get/delete/rename_session`、`append_message`（首条用户消息自动成为标题）。
@@ -1187,19 +1146,17 @@ except Exception as exc:
 ```
 
 治理审计不在「成功路径」上，恰恰要覆盖失败路径——被拒绝的调用是最需要审计的东西。
-治理审计不在「成功路径」上，恰恰要覆盖失败路径——被拒绝的调用是最需要审计的东西。
 
 
 
 学习要点
 
-：仓储大类按「领域分区块」组织仍然可维护，关键是把把把算法把把（rag/）与与与服务逻辑与与（services/）请出去；`with self.db_factory() as db:` 每方法一会话，提交即释放。
+：仓储大类按「领域分区块」组织仍然可维护，关键是把算法（rag/）与服务逻辑（services/）请出去；`with self.db_factory() as db:` 每方法一会话，提交即释放。
 
 ***
 
 ## 第 11 站 工具治理 — tools/ + services/
 
-高风险场景的完整闭环：报告审批 → 建个案 → 派发 5 个工具任务 → 后台执行 → 落记录。这一站是「治理与业务正交」的落地。
 高风险场景的完整闭环：报告审批 → 建个案 → 派发 5 个工具任务 → 后台执行 → 落记录。这一站是「治理与业务正交」的落地。
 
 ### 11.1 tools/contracts.py — 契约先行
@@ -1215,7 +1172,7 @@ class ToolContract:
     max_attempts: int = 3
 ```
 
-6 个受治理工具（alert/email/ledger/handoff/lookup/follow\_up）各有一份契约。`governed_payload()` 是是是入队前的统一关卡是是：
+6 个受治理工具（alert/email/ledger/handoff/lookup/follow\_up）各有一份契约。`governed_payload()` 是入队前的统一关卡：
 
 ```python
 def governed_payload(kind, payload, role, approved) -> dict:
@@ -1226,31 +1183,30 @@ def governed_payload(kind, payload, role, approved) -> dict:
     return {**payload, "tool_kind": ..., "redacted_payload": redacted, ...}  # ⑤ 盖章放行
 ```
 
-任何一步不过都是异常————工具根本进不了队列——。`TOOL_KIND_ALIASES` 把旧名（alert\_log\_mock 等）规范化，兼容历史调用方。
+任何一步不过都是异常——工具根本进不了队列——。`TOOL_KIND_ALIASES` 把旧名（alert\_log\_mock 等）规范化，兼容历史调用方。
 
 ### 11.2 services/report\_case.py — 审批后的编排
 
-`ReportCaseService.update_report`：状态改为 APPROVED 且风险 ≥ MEDIUM 时自动 `ensure_case`。`ensure_case_tool_jobs` 是是是工具派发中心是是：为每个新个案一次性创建 5 个 ToolJob（create\_alert/send\_email/write\_ledger/create\_handoff\_summary/follow\_up\_suggestion），载荷全部先过 `governed_payload`。
+`ReportCaseService.update_report`：状态改为 APPROVED 且风险 ≥ MEDIUM 时自动 `ensure_case`。`ensure_case_tool_jobs` 是工具派发中心是：为每个新个案一次性创建 5 个 ToolJob（create\_alert/send\_email/write\_ledger/create\_handoff\_summary/follow\_up\_suggestion），载荷全部先过 `governed_payload`。
 
 ### 11.3 services/tool\_queue.py — 队列与后台 worker
 
 - `ToolQueueService.run_pending(db, limit)`：批量取 PENDING 任务，检查依赖（`_dependency_ready`：同 case 的 handoff 完成后 email 才发）、执行、记录结果。
-- 失败处理：attempts+1，未超限则改回 PENDING 并设 `run_after`（延迟重试）；超限写 `DeadLetterRecord`————死信是可运营的失败——，管理端有专门页面。
+- 失败处理：attempts+1，未超限则改回 PENDING 并设 `run_after`（延迟重试）；超限写 `DeadLetterRecord`——死信是可运营的失败——，管理端有专门页面。
 - `RateLimiter`：邮件每分钟限 N 封，超了不算失败，只延迟。
 - `ToolQueueWorker`：线程池 + 轮询的后台常驻进程，FastAPI lifespan 里启停；`run_once()` 供手动触发（加分布式锁防并发）。
 
 ### 11.4 services/tool\_executor.py — 真实副作用
 
-`execute(kind, payload, attempts)` 分发到：`write_ledger`（openpyxl 追加 Excel 行）、`create_alert`（建 AlertRecord + 可选 webhook）、`send_email`（SMTP 真发或 log 模式）、`create_handoff_summary`（写 Markdown 文件）、`append_jsonl`（通用 JSONL 追加）。`always_fail` 载荷是是是故意留的测试钩子是是——harness 用它验证重试与死信路径。
+`execute(kind, payload, attempts)` 分发到：`write_ledger`（openpyxl 追加 Excel 行）、`create_alert`（建 AlertRecord + 可选 webhook）、`send_email`（SMTP 真发或 log 模式）、`create_handoff_summary`（写 Markdown 文件）、`append_jsonl`（通用 JSONL 追加）。`always_fail` 载荷是故意留的测试钩子是——harness 用它验证重试与死信路径。
 
 ### 11.5 services/tool\_records.py + tool\_governance.py
 
 前者持久化 ExcelRecord/AlertRecord（去重：同报告同个案只记一条）；后者提供执行前授权检查与审计写入，供 MCP 边界复用。
-前者持久化 ExcelRecord/AlertRecord（去重：同报告同个案只记一条）；后者提供执行前授权检查与审计写入，供 MCP 边界复用。
 
 ### 11.6 tools/gateway.py + mcp\_tools/server.py + tools/mcp\_client.py — MCP 边界
 
-`ToolGateway` 协议两个实现：`InternalToolGateway`（直接 store.create\_tool\_job）与 `McpToolGateway`（通过 stdio 拉起 FastMCP server 子进程调用同一套受治理工具）。`build_tool_gateway` 按 `TOOL_BACKEND` 选择————换后端不改业务代码——。MCP server 的每个 `@mcp.tool` 内部走的仍是 DatabaseStore + 契约校验：协议变，治理不变。
+`ToolGateway` 协议两个实现：`InternalToolGateway`（直接 store.create\_tool\_job）与 `McpToolGateway`（通过 stdio 拉起 FastMCP server 子进程调用同一套受治理工具）。`build_tool_gateway` 按 `TOOL_BACKEND` 选择——换后端不改业务代码——。MCP server 的每个 `@mcp.tool` 内部走的仍是 DatabaseStore + 契约校验：协议变，治理不变。
 
 
 
@@ -1263,9 +1219,7 @@ def governed_payload(kind, payload, role, approved) -> dict:
 ## 第 12 站 HTTP 层 — api/ + main.py
 
 ### 12.1 main.py — 只做装配（约 90 行）
-### 12.1 main.py — 只做装配（约 90 行）
 
-`create_app()` 顺序：settings → engine/会话工厂/建表 → DatabaseStore（默认账号+知识库种子）→ RuntimeServices → SkillRegistry → LLM 客户端 → Orchestrator → Harness → 工具网关 → 队列 worker。全部挂 `app.state`，注册中间件与 5 个路由模块。lifespan 里启停 worker。
 `create_app()` 顺序：settings → engine/会话工厂/建表 → DatabaseStore（默认账号+知识库种子）→ RuntimeServices → SkillRegistry → LLM 客户端 → Orchestrator → Harness → 工具网关 → 队列 worker。全部挂 `app.state`，注册中间件与 5 个路由模块。lifespan 里启停 worker。
 
 
@@ -1286,7 +1240,6 @@ def current_principal(request: Request) -> AuthPrincipal:
 `require_admin = Depends(current_principal) + 角色检查`。路由声明 `principal: AuthPrincipal = Depends(require_admin)` 即完成鉴权——FastAPI 依赖注入的标准用法。
 
 ### 12.3 api/middleware.py — 请求追踪（重构补齐的功能）
-### 12.3 api/middleware.py — 请求追踪（重构补齐的功能）
 
 ```python
 async def attach_request_context(request, call_next):
@@ -1299,20 +1252,13 @@ async def attach_request_context(request, call_next):
 ```
 
 请求方带头则沿用（链路串联），否则生成。配合落库的 Agent trace，一次请求从 HTTP 到 Agent 每一步都可追。
-请求方带头则沿用（链路串联），否则生成。配合落库的 Agent trace，一次请求从 HTTP 到 Agent 每一步都可追。
 
 ### 12.4 其余路由模块
 
 - `schemas.py`：9 个请求模型集中定义。
 - `pages.py`（3 个 HTML）、`system.py`（health/readiness/agent-status/skills）。
-- `auth_routes.py`：register（注册即登录：学生自由注册，教师须凭 `AUTH_TEACHER_INVITE_CODE` 邀请码，防自助获取工作台权限）/login（httpOnly + samesite-lax Cookie，防 XSS/CSRF）/logout/me。`api/errors.py` 提供全局异常处理：治理拒绝→403、ValueError→400、参数校验→422、未知异常→500（日志留完整堆栈，响应不泄露内部细节）。
-- `chat.py`：`POST /api/chat`（限流→归属校验→harness.run）、`/api/chat/stream`（SSE，含异常兜底：流中出错也补发 error+done 事件）、会话 CRUD。
-- `admin.py`：约 20 个后台接口。值得注意 `safe_knowledge_filename`（白名单后缀+字符清洗，防路径穿越）与上传接口的 PDF 解析分支（pypdf 惰性导入）。
 - `schemas.py`：9 个请求模型集中定义。
 - `pages.py`（3 个 HTML）、`system.py`（health/readiness/agent-status/skills）。
-- `auth_routes.py`：register（注册即登录：学生自由注册，教师须凭 `AUTH_TEACHER_INVITE_CODE` 邀请码，防自助获取工作台权限）/login（httpOnly + samesite-lax Cookie，防 XSS/CSRF）/logout/me。`api/errors.py` 提供全局异常处理：治理拒绝→403、ValueError→400、参数校验→422、未知异常→500（日志留完整堆栈，响应不泄露内部细节）。
-- `chat.py`：`POST /api/chat`（限流→归属校验→harness.run）、`/api/chat/stream`（SSE，含异常兜底：流中出错也补发 error+done 事件）、会话 CRUD。
-- `admin.py`：约 20 个后台接口。值得注意 `safe_knowledge_filename`（白名单后缀+字符清洗，防路径穿越）与上传接口的 PDF 解析分支（pypdf 惰性导入）。
 
 ***
 
@@ -1324,25 +1270,25 @@ async def attach_request_context(request, call_next):
 
 ：效果不是「看着不错」，而是可重复度量。
 
-- `evaluation/runner.py`：八套指标——路由准确率、风险（含 high\_recall/误报率）、检索（top1/命中率/MRR/NDCG\@K）、RAG eval、技能选择、安全泄漏检查、多轮一致性、150 条规模化基准。
-- `evaluation/datasets.py`：5 类消息 × 30 轮的确定性基准————生成式数据集——，保证每次评测同分布。
+- `evaluation/runner.py`：真实指标——路由/风险判定准确率、高风险召回率、误报率、HitRate/Recall@4/Precision@4/MRR/NDCG@4、技能选择、安全泄漏检查、多轮一致性、150 条规模化基准；如实标注样本量、数据来源与验证日期（含 95% 置信区间），不再为满分筛选样本。
+- `evaluation/datasets.py`：加载 `eval/fixtures/representative_corpus.json`（150 条唯一真实样本，含隐式高危与第三人称干扰）、`rag_queries.json`（50 条自然语言 RAG 问句）、`multi_turn_corpus.json`（8 组多轮场景）；并提供可复现的随机采样工具，保证评测基于真实代表性数据、不循环造数。
 - `evaluation/report_html.py`：单文件 HTML 报告（内联 CSS），管理端一键可看。
-- `app/rag_eval/runner.py`：RAG 专项（hitRate/recallAtK/precisionAtK/MRR/NDCG\@K），数据集在 `eval/fixtures/aegis-rag-eval.json`（66 条，含期望来源与期望词）。
-- `app/harness/runner.py` + `factory.py`：工程级场景回放——7 套套件（risk/routing/skills/rag/api/tool-queue/scaled）断言言言端到端行为言言（如「审批后 5 个工具任务全部 success」「死信被正确创建」），失败退出码 1，可接 CI。`factory.py` 是重构产物：harness 与 `eval/run_eval.py` 共用一个装配工厂，消除两份漂移的样板。
-- `eval/fixtures/*.json`：路由/风险/检索/安全/多轮的小型金标集。
+- `app/rag_eval/runner.py`：RAG 专项（HitRate/Recall@4/Precision@4/MRR/NDCG@4，独立运行改用一次性 SQLite 评测库、不依赖 MySQL/pymysql），数据集在 `eval/fixtures/rag_queries.json`（50 条自然语言问句，基于真实知识库）。
+- `app/harness/runner.py` + `factory.py`：工程级场景回放——8 套件（risk/routing/skills/rag/api/tool-queue/scaled/runtime-ab）验证端到端行为（如「审批后 5 个工具任务全部 success」「死信被正确创建」），失败退出码 1，可接 CI。`factory.py` 是重构产物：harness 与 `eval/run_eval.py` 共用一个装配工厂，消除两份漂移的样板。
+- `eval/fixtures/`：路由/风险/安全/多轮小型金标集 + `representative_corpus.json`（150 条）/ `rag_queries.json`（50 条）/ `multi_turn_corpus.json`（8 组）真实代表性数据集。
 
 
 
 学习要点
 
-：评测三层——单元（pytest 65 项）/能力（eval runner）/链路（harness 8 套件）；mock LLM 保证全链评测确定性，测的是是是系统是是不是模型运气。三运行时 A/B（`--suite runtime-ab`）对比编排器延迟/trace/调用数，LLM-as-Judge（`evaluation/judge.py`）给回复打共情/安全/结构分——评测从「分对错」升级到「评质量」。
+：评测三层——单元（pytest 约 57 项）/能力（eval runner）/链路（harness 8 套件）；mock LLM 保证全链评测确定性，测的是系统不是模型运气。三运行时 A/B（`--suite runtime-ab`）对比编排器延迟/trace/调用数，LLM-as-Judge（`evaluation/judge.py`）给回复打共情/安全/结构分——评测从「分对错」升级到「评质量」。
 
 ***
 
 ## 第 14 站 收尾 — static/ + tests/
 
 - `static/index.html + login.js`：登录页；`student.html/js`：会话列表 + SSE 流式对话；`admin.html/js`：报告/个案/trace/知识库/工具/评测/审计七大面板。原生 JS，零构建。
-- `tests/` 十四个文件 65 项：orchestrator（提供 `build_orchestrator` 给其他测试复用）、api（TestClient 全链）、agent\_runtime、retrieval\_eval、mcp\_tools、harness、assessment，以及第五轮新增的 risk\_dual\_channel（双通道）、function\_calling（FC）、runtime\_ab（A/B）、judge（LLM 评审）、langgraph\_runtime、langgraph\_checkpoint（跨进程恢复）；第六轮新增 `test_reply_style.py` 守护「提示词自然人设」与「兜底模板不露内部标签」两条底线。
+- `tests/` 十四个文件 约 57 项：orchestrator（提供 `build_orchestrator` 给其他测试复用）、api（TestClient 全链）、agent\_runtime、retrieval\_eval、mcp\_tools、harness、assessment，以及第五轮新增的 risk\_dual\_channel（双通道）、function\_calling（FC）、runtime\_ab（A/B）、judge（LLM 评审）、langgraph\_runtime、langgraph\_checkpoint（跨进程恢复）；第六轮新增 `test_reply_style.py` 守护「提示词自然人设」与「兜底模板不露内部标签」两条底线。
 
 ***
 
@@ -1366,7 +1312,6 @@ async def attach_request_context(request, call_next):
 | 参数化收编        | board.intent\_from\_board(use\_board\_risk/use\_hard\_terms)                     | 去重但显式保留历史语义差异       |
 
 ## 总结二：一次请求的完整数据流
-## 总结二：一次请求的完整数据流
 
 ```
 学生输入
@@ -1389,7 +1334,6 @@ async def attach_request_context(request, call_next):
         → Excel/邮件/预警/交接/审计 全部落记录
 ```
 
-## 总结三：实操建议
 ## 总结三：实操建议
 
 1.   跑起来  ：`python -m app.init_db && uvicorn app.main:app --port 8091`，用 student/student123! 登录发一句「我最近考试压力很大，晚上睡不着」，再去 /admin 看报告与 trace。

@@ -129,3 +129,99 @@ flowchart TD
 - ToolJob、ToolAudit、ExcelRecord、AlertRecord、DeadLetter 独立记录
 - 评测结果 JSON/HTML 输出(含 LLM-as-Judge 评分段)
 - 三运行时 A/B 对比报告(`--suite runtime-ab`)
+
+## 9. 关键增强特性
+
+### 9.1 风险评估双通道（第五轮、第十一轮）
+
+系统采用**规则 ∪ LLM 双通道**的风险评估策略：
+
+- **规则通道（baseline）**：基于关键词和模式匹配，永远兜底，确保显式高危表达不会漏判
+- **LLM 通道（可选增强）**：通过 `RISK_LLM_CHANNEL_ENABLED` 配置，可调用 LLM 识别隐喻式、改写式高危表达
+- **降级保障**：LLM 超时/失败/mock 环境自动回退纯规则，规则永远兜底
+
+**生产环境配置建议**：
+
+根据第十一轮双路径验证（`scripts/eval_risk_dual_path.py`）：
+- **关闭 LLM 通道**（`RISK_LLM_CHANNEL_ENABLED=false`）：压力层风险准确率 0.67，主动暴露规则通道在隐喻式高危识别上的固有边界
+- **开启 LLM 通道**：压力层风险准确率提升至 0.94，高风险召回 1.00，但会掩盖"暴露边界"的工程诚实卖点
+
+建议生产环境保持 `false`，维持评测体系的"暴露边界"策略，同时在关键场景（如夜间值班、特定关键词触发）局部开启 LLM 补强。
+
+### 9.2 Function Calling 技能选择（第五轮）
+
+采用**规则白名单 + LLM 自主挑选**的分层设计：
+
+- **规则决定"允许选什么"**：根据意图和风险等级过滤技能白名单（安全边界）
+- **模型决定"选哪些"**：LLM 通过 Function Calling 从白名单中挑选适用技能（自主性）
+- **降级策略**：
+  - LLM 返回幻觉技能名 → 过滤后回退白名单
+  - LLM 超时/失败 → 直接使用完整规则白名单
+  - Mock 环境 → 跳过 FC，直接使用规则
+
+实现位置：`app/agents/skill_selection.py`
+
+### 9.3 LLM-as-Judge 评测（第五轮）
+
+引入 `app/evaluation/judge.py` 模块，使用 LLM 评审回复质量：
+
+- **评分维度**：共情度、安全性、结构化程度、专业性
+- **应用场景**：评测从"分对错"升级到"评质量"
+- **Mock 环境处理**：自动跳过 Judge 评分，避免无效 API 调用
+
+### 9.4 三运行时 A/B 对比（第五轮）
+
+`app/evaluation/runtime_ab.py` 提供三种 Agent 编排器的横向对比：
+
+- **LangGraph**：状态图编排，支持 checkpoint 恢复
+- **Autonomous**：黑板协作，基于 claim 的多 Agent 自治
+- **Ordered**：简化有序管道
+
+**对比维度**：
+- Agent 调用次数
+- 编排器延迟
+- Trace 复杂度
+- 最终回复一致性
+
+结果输出：`data/eval/runtime-ab-report.json`
+
+### 9.5 双层评测体系（第十轮）
+
+150 条代表性语料按 `layer` 字段拆分为两套独立指标：
+
+- **基础层（base，n=63）**：贴近真实流量，覆盖日常闲聊、典型咨询、显式高危
+  - 准确率：0.97
+  - 风险准确率：1.00
+  - 高风险召回：1.00
+  - **目的**：证明系统在主流场景上的可靠性
+
+- **压力层（stress，n=87）**：刻意堆满隐喻式高危、无关键词咨询、第三人称干扰等边界样本
+  - 准确率：0.39
+  - 风险准确率：0.67（规则通道）
+  - 高风险召回：0.52
+  - **目的**：主动暴露规则引擎的能力缺口，体现工程诚实
+
+**设计理念**：不筛选样本、不为追求满分而人为凑 100%，横向对比基础/压力层能力边界。
+
+### 9.6 记忆与真人化增强（第六轮、第七轮）
+
+- **记忆参数**（第七轮）：
+  - `MEMORY_RECENT_MESSAGES=15`：保留最近 15 条消息
+  - `MEMORY_SUMMARY_MAX_CHARS=3000`：会话摘要上限 3000 字符
+  
+- **真人化回复**（第六轮）：
+  - 温度参数：`llm_support_temperature=0.6`（`config.py:22`）
+  - 兜底模板按意图分流（陪伴/咨询/风险/研究），避免暴露内部标签
+  - 429 重试：指数退避策略，避免批量请求失败
+
+### 9.7 关键配置项速查
+
+| 配置项 | 默认值 | 说明 |
+|---|---|---|
+| `RISK_LLM_CHANNEL_ENABLED` | `true` | 风险 LLM 通道开关，生产建议 `false` |
+| `FUNCTION_CALLING_ENABLED` | `true` | Function Calling 技能选择开关 |
+| `llm_support_temperature` | `0.6` | 支持回复的温度参数 |
+| `MEMORY_RECENT_MESSAGES` | `15` | 保留最近消息数 |
+| `MEMORY_SUMMARY_MAX_CHARS` | `3000` | 会话摘要字符上限 |
+| `LANGGRAPH_CHECKPOINT_ENABLED` | `true` | LangGraph checkpoint 持久化 |
+| `AGENT_RUNTIME` | `autonomous` | 默认 Agent 编排器 |

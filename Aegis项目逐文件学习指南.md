@@ -128,7 +128,7 @@ flowchart LR
 | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------ |
 | `app/config.py`                                          | 全局配置（env / .env 映射，全部带安全默认值）                                                                         | `Settings`、`get_settings()`                                                                      | pydantic-settings  |
 | `app/models.py`                                          | 领域模型（Intent/RiskLevel/ChatResponse 等纯数据词汇表）                                                          | 枚举、`dataclass`、SSE 映射                                                                            | 仅标准库               |
-| `app/entities.py`                                        | ORM 实体（16 张表）                                                                                        | `Base` 下的实体类                                                                                     | SQLAlchemy         |
+| `app/entities.py`                                        | ORM 实体（18 张表）                                                                                        | `Base` 下的实体类                                                                                     | SQLAlchemy         |
 | `app/database.py`                                        | 引擎/会话工厂/建表/迁移/就绪检查                                                                                   | `build_engine`、`build_session_factory`、`create_schema`                                           | SQLAlchemy         |
 | `app/assessment.py`                                      | 确定性风险评估（规则通道单一事实来源）                                                                                  | `assess_message()`                                                                               | 无（纯函数）             |
 | `app/skills.py`                                          | 技能注册表 + 标准化 Skill 选取                                                                                 | `SkillRegistry`、`response_skill_names()`                                                         | store 回调注入         |
@@ -140,13 +140,13 @@ flowchart LR
 | `app/agents/langgraph_runtime.py`                        | LangGraph StateGraph 运行时 + 检查点                                                                       | `LangGraphRuntime`                                                                               | langgraph          |
 | `app/autonomous/`                                        | 自治协作：events（协议）、registry（能力/决策）、board（共享读）、coordinator（认领循环）、agents（六自治 Agent）、runtime（黑板→响应）        | `AutonomousAgentRuntime`                                                                         | llm、rag、store      |
 | `app/rag/`                                               | 检索子系统：text（分词）、scoring（BM25/rerank/融合）、chunking（切块/元数据）、memory（滚动摘要）、vector\_store（Chroma/本地降级）      | `DatabaseStore.search_knowledge`（组装整条流水线）                                                        | chromadb（可选）       |
-| `app/repository/store.py`                                | 持久化总闸（约 950 行，按领域区块组织）                                                                               | `DatabaseStore`                                                                                  | entities、rag       |
+| `app/repository/store.py`                                | 持久化总闸（约 973 行，按领域区块组织）                                                                               | `DatabaseStore`                                                                                  | entities、rag       |
 | `app/tools/`                                             | 工具治理：contracts（契约）、gateway（internal/MCP 网关）、mcp\_client                                              | `governed_payload()`、`build_tool_gateway()`                                                      | store              |
 | `app/services/`                                          | 业务服务：report\_case（审批后编排）、tool\_executor（真实副作用）、tool\_queue（队列/worker）、tool\_records、tool\_governance | `ReportCaseService`、`ToolQueueWorker`                                                            | store、tools        |
 | `app/api/`                                               | HTTP 路由：schemas/deps/middleware/pages/system/auth\_routes/chat/admin                                 | RESTful + SSE 接口                                                                                 | FastAPI、harness    |
 | `app/mcp_tools/server.py`                                | FastMCP 工具服务（可选后端）                                                                                   | `@mcp.tool` 暴露的工具                                                                                | store、contracts    |
 | `app/evaluation/`、`app/harness/`、`app/rag_eval/`、`eval/` | 评测闭环：runner / datasets / report\_html / runtime\_ab / judge / harness 回放                             | `eval.run_eval`、`harness.runner`                                                                 | store、llm          |
-| `static/`、`tests/`                                       | 双端原生前端 + pytest 单测（本地约 57 项通过）                                                                                 | HTML/JS 页面、测试                                                                                    | —                  |
+| `static/`、`tests/`                                       | 双端原生前端 + pytest 单测（本地约 71 项通过）                                                                                 | HTML/JS 页面、测试                                                                                    | —                  |
 
 ## 2.2 学生端对话主流程（时序图）
 
@@ -330,7 +330,7 @@ settings → engine/会话工厂 → create_schema
 
 ### pytest + 自研评测闭环（工程化验证）
 
-- **选了**：pytest 单测（本地约 57 项通过） + `evaluation/runner`（真实指标）+ `harness/runner`（8 套件端到端回放）+ RAG 专项 eval + 三运行时 A/B + LLM-as-Judge。
+- **选了**：pytest 单测（本地约 71 项通过） + `evaluation/runner`（真实指标）+ `harness/runner`（8 套件端到端回放）+ RAG 专项 eval + 三运行时 A/B + LLM-as-Judge。
 - **为什么**：Agent 项目「只看 demo 容易高估完成度」。评测用 **mock LLM 保证确定性**，测的是「系统」不是「模型运气」；harness 失败退出码 1，可接 CI。
 - **替代**：纯手工点 demo（不可重复、不可回归）。
 - **代价/取舍**：维护数据集与套件有成本，但换来「改一个词（如 `HIGH_TERMS`）跑一遍评测就能确认没破坏安全边界」。
@@ -462,7 +462,7 @@ Compose 启动 app + PostgreSQL + Redis + Chroma。若要在容器里启用向�
 # 初始化数据库
 python -m app.init_db
 
-# 后端测试(本地约 57 项)
+# 后端测试(本地约 71 项)
 python -m pytest -q
 
 # 前端脚本语法检查
@@ -495,7 +495,7 @@ python -m app.mcp_tools.server --list
 
 ## 4.9 建议的开发工作流
 
-1. 先 `pytest -q` 确立基线（本地约 57 项通过，test_api 需 MySQL）。
+1. 先 `pytest -q` 确立基线（本地约 71 项通过，test_api 需 MySQL）。
 2. 小步修改 → 跑相关单测 + 对应 harness 套件（如改风险逻辑跑 `--suite risk`）。
 3. 涉及编排/运行时时跑 `runtime-ab` 确认三档判定一致。
 4. 涉及回复质量时跑 LLM-as-Judge（接真模型时）或 `test_reply_style.py` 守底线。
@@ -1123,7 +1123,7 @@ new_line = f"用户提到：{compact_sentence(user_message, 120)}；系统回应
 
 ## 第 10 站 repository/store.py — 持久化仓储
 
-`DatabaseStore` 是所有表的读写总闸（约 950 行，按区块组织）：
+`DatabaseStore` 是所有表的读写总闸（约 973 行，按区块组织）：
 
 -   会话/消息  ：`ensure_session`（不存在则建，支持归属回填）、`list/get/delete/rename_session`、`append_message`（首条用户消息自动成为标题）。
 -   认证  ：`ensure_default_users`（演示账号）、`authenticate_user`（验密 + 发会话令牌）、`get/revoke_auth_session`（过期即删）。
@@ -1286,14 +1286,14 @@ async def attach_request_context(request, call_next):
 
 学习要点
 
-：评测三层——单元（pytest 约 62 项）/能力（eval runner）/链路（harness 8 套件）；mock LLM 保证全链评测确定性，测的是系统不是模型运气。三运行时 A/B（`--suite runtime-ab`）对比编排器延迟/trace/调用数，LLM-as-Judge（`evaluation/judge.py`）给回复打共情/安全/结构分——评测从「分对错」升级到「评质量」。**双路径验证**（`scripts/eval_risk_dual_path.py`）量化 LLM 通道的能力上界：baseline（channel OFF）压力层 risk_acc=0.67 → stub-LLM on（channel ON）0.94，证明 LLM 通道能补齐规则漏判的 12 条隐喻式自杀意念；生产保持 channel OFF 不变，维持"暴露边界"卖点。
+：评测三层——单元（pytest 约 71 项）/能力（eval runner）/链路（harness 8 套件）；mock LLM 保证全链评测确定性，测的是系统不是模型运气。三运行时 A/B（`--suite runtime-ab`）对比编排器延迟/trace/调用数，LLM-as-Judge（`evaluation/judge.py`）给回复打共情/安全/结构分——评测从「分对错」升级到「评质量」。**双路径验证**（`scripts/eval_risk_dual_path.py`）量化 LLM 通道的能力上界：baseline（channel OFF）压力层 risk_acc=0.67 → stub-LLM on（channel ON）0.94，证明 LLM 通道能补齐规则漏判的 12 条隐喻式自杀意念；生产保持 channel OFF 不变，维持"暴露边界"卖点。
 
 ***
 
 ## 第 14 站 收尾 — static/ + tests/
 
 - `static/index.html + login.js`：登录页；`student.html/js`：会话列表 + SSE 流式对话；`admin.html/js`：报告/个案/trace/知识库/工具/评测/审计七大面板。原生 JS，零构建。
-- `tests/` 十四个文件 约 62 项：orchestrator（提供 `build_orchestrator` 给其他测试复用）、api（TestClient 全链）、agent\_runtime、retrieval\_eval、mcp\_tools、harness、assessment，以及第五轮新增的 risk\_dual\_channel（双通道，第十一轮扩展至 **9 项**：4 原有 + 5 新增覆盖 corp-106..130 隐喻双路径，含 `MetaphorAwareStubClient` 模拟 LLM judge）、function\_calling（FC）、runtime\_ab（A/B）、judge（LLM 评审）、langgraph\_runtime、langgraph\_checkpoint（跨进程恢复）；第六轮新增 `test_reply_style.py` 守护「提示词自然人设」与「兜底模板不露内部标签」两条底线。
+- `tests/` 十四个文件 约 71 项：orchestrator（提供 `build_orchestrator` 给其他测试复用）、api（TestClient 全链）、agent\_runtime、retrieval\_eval、mcp\_tools、harness、assessment，以及第五轮新增的 risk\_dual\_channel（双通道，第十一轮扩展至 **9 项**：4 原有 + 5 新增覆盖 corp-106..130 隐喻双路径，含 `MetaphorAwareStubClient` 模拟 LLM judge）、function\_calling（FC）、runtime\_ab（A/B）、judge（LLM 评审）、langgraph\_runtime、langgraph\_checkpoint（跨进程恢复）；第六轮新增 `test_reply_style.py` 守护「提示词自然人设」与「兜底模板不露内部标签」两条底线。
 
 ***
 

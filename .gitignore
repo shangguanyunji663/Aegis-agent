@@ -2,6 +2,7 @@ __pycache__/
 .pytest_cache/
 *.py[cod]
 .venv/
+.venv_run/
 .env
 .DS_Store
 data/state.json
@@ -13,3 +14,5 @@ data/**/*.sqlite-*
 .conda/
 .zcode/
 .mimosa/
+.workbuddy/
+.vscode/

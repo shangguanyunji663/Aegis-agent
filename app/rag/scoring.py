@@ -60,6 +60,22 @@ def fused_score(vector_score: float, bm25_score: float, vector_weight: float, bm
     return vector_score * vector_weight + bm25_score * bm25_weight
 
 
+def rrf_fused_score(vector_rank: int | None, bm25_rank: int | None, k: int = 60) -> float:
+    """Reciprocal Rank Fusion: 按两路排名融合,分数越高越相关。
+
+    Args:
+        vector_rank: 向量召回中的排名(1-based),None 表示未在向量结果中
+        bm25_rank: BM25 召回中的排名(1-based),None 表示未在 BM25 结果中
+        k: RRF 常数,默认 60
+    """
+    score = 0.0
+    if vector_rank is not None:
+        score += 1.0 / (k + vector_rank)
+    if bm25_rank is not None:
+        score += 1.0 / (k + bm25_rank)
+    return score
+
+
 def normalize_scores(scores: dict[Hashable, float]) -> dict[Hashable, float]:
     if not scores:
         return {}

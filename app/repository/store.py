@@ -35,7 +35,10 @@ from app.entities import (
 from app.models import AgentTrace, CaseStatus, PendingReport, ReportStatus, SkillResult, ToolJobStatus, UserRole
 from app.rag.chunking import chunk_text, knowledge_metadata_summary, metadata_matches, parse_knowledge_document, rewrite_query
 from app.rag.memory import build_memory_summary
-from app.rag.scoring import bm25_scores, expand_best_hit, fused_score, normalize_scores, rerank_score
+from collections import OrderedDict
+from datetime import datetime, timedelta
+
+from app.rag.scoring import bm25_scores, expand_best_hit, fused_score, normalize_scores, rerank_score, rrf_fused_score
 from app.rag.vector_store import (
     FALLBACK_RETRIEVAL_LABEL,
     PRIMARY_RETRIEVAL_LABEL,
@@ -55,6 +58,12 @@ class DatabaseStore:
         self.settings = settings or get_settings()
         self.vector_backend = build_vector_backend(self.settings)
         self.vector_error = getattr(self.vector_backend, "last_error", "")
+        self.redis_client = None
+        self._redis_available = False
+        # 查询缓存:LRU (key -> (expires_at, results))
+        self._knowledge_cache: OrderedDict[str, tuple[datetime, list[dict]]] = OrderedDict()
+        self._cache_hits = 0
+        self._cache_misses = 0
         self.redis_client = None
         self._redis_available = False
         if self.settings.redis_url.strip():
@@ -668,6 +677,11 @@ class DatabaseStore:
                 "hybrid_vector_weight": self.settings.knowledge_hybrid_vector_weight,
                 "hybrid_bm25_weight": self.settings.knowledge_hybrid_bm25_weight,
                 "rerank_enabled": self.settings.knowledge_rerank_enabled,
+                "fusion_mode": self.settings.knowledge_fusion_mode,
+                "cache_enabled": self.settings.knowledge_cache_enabled,
+                "cache_hits": self._cache_hits,
+                "cache_misses": self._cache_misses,
+                "cache_hit_rate": round(self._cache_hits / max(1, self._cache_hits + self._cache_misses), 4),
                 "vector_error": self.vector_error or getattr(self.vector_backend, "last_error", ""),
             }
 
@@ -680,6 +694,14 @@ class DatabaseStore:
         audience: str | None = None,
     ) -> list[dict]:
         rewritten_query = rewrite_query(query)
+        cache_key = f"{rewritten_query}|{top_k}|{topic}|{risk_level}|{audience}"
+
+        # 查询缓存命中
+        if self.settings.knowledge_cache_enabled:
+            cached = self._check_cache(cache_key)
+            if cached is not None:
+                return cached
+
         vector_results: list[dict] = []
         if self.vector_backend.enabled():
             try:
@@ -710,6 +732,17 @@ class DatabaseStore:
                 for item in vector_results
                 if item.get("source") is not None and item.get("source_index") is not None
             }
+
+            fusion_mode = self.settings.knowledge_fusion_mode
+            vector_ranked = sorted(vector_results, key=lambda x: -float(x.get("score", 0) or 0))
+            bm25_ranked = sorted(scores.items(), key=lambda x: -x[1])
+            bm25_rank_map = {chunk_id: idx + 1 for idx, (chunk_id, _) in enumerate(bm25_ranked)}
+            vector_rank_map = {}
+            for idx, item in enumerate(vector_ranked):
+                db_id = item.get("db_id")
+                if db_id is not None:
+                    vector_rank_map[int(db_id)] = idx + 1
+
             normalized_bm25 = normalize_scores(
                 {int(chunk.id): scores.get(chunk.id, 0.0) for chunk in chunks if chunk.id is not None}
             )
@@ -720,20 +753,30 @@ class DatabaseStore:
                     if chunk.id is not None
                 }
             )
+
             for chunk in chunks:
                 if chunk.id is None:
                     continue
-                base_bm25 = normalized_bm25.get(int(chunk.id), 0.0)
-                base_vector = normalized_vector.get(int(chunk.id), 0.0)
-                if base_bm25 <= 0 and base_vector <= 0:
-                    continue
-                base = fused_score(
-                    base_vector,
-                    base_bm25,
-                    self.settings.knowledge_hybrid_vector_weight,
-                    self.settings.knowledge_hybrid_bm25_weight,
-                )
-                score = rerank_score(rewritten_query, chunk.content, base) if self.settings.knowledge_rerank_enabled else base
+                chunk_id = int(chunk.id)
+                if fusion_mode == "rrf":
+                    v_rank = vector_rank_map.get(chunk_id)
+                    b_rank = bm25_rank_map.get(chunk_id)
+                    if v_rank is None and b_rank is None:
+                        continue
+                    score = rrf_fused_score(v_rank, b_rank)
+                else:
+                    base_bm25 = normalized_bm25.get(chunk_id, 0.0)
+                    base_vector = normalized_vector.get(chunk_id, 0.0)
+                    if base_bm25 <= 0 and base_vector <= 0:
+                        continue
+                    score = fused_score(
+                        base_vector,
+                        base_bm25,
+                        self.settings.knowledge_hybrid_vector_weight,
+                        self.settings.knowledge_hybrid_bm25_weight,
+                    )
+                if fusion_mode != "rrf" and self.settings.knowledge_rerank_enabled:
+                    score = rerank_score(rewritten_query, chunk.content, score)
                 ranked.append((chunk, score))
             ranked.sort(key=lambda item: item[1], reverse=True)
             ranked = expand_best_hit(ranked, chunks)
@@ -750,7 +793,35 @@ class DatabaseStore:
                         "score": f"{score:.4f}",
                     }
                 )
+            if self.settings.knowledge_cache_enabled:
+                self._set_cache(cache_key, results)
             return results
+
+    def _check_cache(self, key: str) -> list[dict] | None:
+        if not self.settings.knowledge_cache_enabled:
+            return None
+        now = datetime.now()
+        if key in self._knowledge_cache:
+            expires_at, cached = self._knowledge_cache[key]
+            if now < expires_at:
+                self._knowledge_cache.move_to_end(key)
+                self._cache_hits += 1
+                return cached
+            else:
+                del self._knowledge_cache[key]
+        self._cache_misses += 1
+        return None
+
+    def _set_cache(self, key: str, results: list[dict]) -> None:
+        max_entries = max(1, self.settings.knowledge_cache_max_entries)
+        ttl = max(1, self.settings.knowledge_cache_ttl_seconds)
+        expires_at = datetime.now() + timedelta(seconds=ttl)
+        self._knowledge_cache[key] = (expires_at, results)
+        while len(self._knowledge_cache) > max_entries:
+            self._knowledge_cache.popitem(last=False)
+        if self.redis_client and self._redis_available:
+            import json
+            self.redis_client.setex(f"aegis:knowledge-cache:{key}", ttl, json.dumps(results, ensure_ascii=False))
 
     def rebuild_vector_index(self) -> dict:
         with self.db_factory() as db:

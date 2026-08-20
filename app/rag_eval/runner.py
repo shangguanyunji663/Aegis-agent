@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import math
 import tempfile
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -34,6 +35,7 @@ def evaluate(store: DatabaseStore | None = None, settings: Settings | None = Non
     results = [evaluate_case(store, case, settings.knowledge_top_k) for case in cases]
     total = max(1, len(results))
     hits = [item for item in results if item["hit"]]
+    strict_hits = [item for item in results if item["hit_strict"]]
     report = {
         "createdAt": datetime.now(timezone.utc).isoformat(),
         "dataset": str(dataset_path),
@@ -44,7 +46,10 @@ def evaluate(store: DatabaseStore | None = None, settings: Settings | None = Non
         "mrr": round(sum(item["reciprocalRank"] for item in results) / total, 4),
         "ndcgAtK": round(sum(item["ndcgAtK"] for item in results) / total, 4),
         "hitRate": round(len(hits) / total, 4),
+        "hitRateStrict": round(len(strict_hits) / total, 4),
+        "strictSourceMatches": len(strict_hits),
         "averageFirstRelevantRank": round(sum(item["firstRelevantRank"] for item in hits) / max(1, len(hits)), 4),
+        "ablation": run_ablation(store, cases, settings.knowledge_top_k),
         "results": results,
     }
     if output_path is not None:
@@ -61,13 +66,16 @@ def evaluate_case(store: DatabaseStore, case: dict, top_k: int) -> dict:
     expected_terms = [term.lower() for term in case.get("expectedTerms", [])]
     items = []
     first_rank = 0
+    first_strict_rank = 0
     relevant_count = 0
     for index, item in enumerate(retrieved, start=1):
-        relevant = is_relevant(item.get("source", ""), item.get("content", "") or item.get("snippet", ""), expected_sources, expected_terms)
+        relevant, strict = is_relevant(item.get("source", ""), item.get("content", "") or item.get("snippet", ""), expected_sources, expected_terms)
         if relevant:
             relevant_count += 1
             if first_rank == 0:
                 first_rank = index
+        if strict and first_strict_rank == 0:
+            first_strict_rank = index
         items.append(
             {
                 "rank": index,
@@ -75,10 +83,12 @@ def evaluate_case(store: DatabaseStore, case: dict, top_k: int) -> dict:
                 "source": item.get("source"),
                 "score": item.get("score"),
                 "relevant": relevant,
+                "relevant_strict": strict,
                 "preview": " ".join(str(item.get("content") or item.get("snippet") or "").split())[:160],
             }
         )
     hit = first_rank > 0
+    hit_strict = first_strict_rank > 0
     return {
         "id": case["id"],
         "question": case["question"],
@@ -86,6 +96,7 @@ def evaluate_case(store: DatabaseStore, case: dict, top_k: int) -> dict:
         "expectedTerms": case.get("expectedTerms", []),
         "retrieved": items,
         "hit": hit,
+        "hit_strict": hit_strict,
         "firstRelevantRank": first_rank,
         "recallAtK": 1.0 if hit else 0.0,
         "precisionAtK": round(relevant_count / max(1, top_k), 4),
@@ -94,11 +105,98 @@ def evaluate_case(store: DatabaseStore, case: dict, top_k: int) -> dict:
     }
 
 
-def is_relevant(source: str, content: str, expected_sources: set[str], expected_terms: list[str]) -> bool:
-    if source.lower() in expected_sources:
-        return True
+def is_relevant(source: str, content: str, expected_sources: set[str], expected_terms: list[str]) -> tuple[bool, bool]:
+    """返回 (宽松命中, 严格命中)。
+
+    - 宽松命中: 来源文件命中或任意 expected term 出现在内容中(现行口径)
+    - 严格命中: 仅来源文件命中
+    """
+    stripped = source.lower()
+    source_hit = stripped in expected_sources
+    if source_hit:
+        return True, True
     lower = content.lower()
-    return any(len(term) >= 2 and term in lower for term in expected_terms)
+    loose = any(len(term) >= 2 and term in lower for term in expected_terms)
+    return loose, False
+
+
+def run_ablation(store: DatabaseStore, cases: list[dict], top_k: int) -> dict:
+    """检索消融实验:同数据集对比不同检索配置的命中率与耗时。
+
+    配置:
+    - bm25_only: 关闭向量(仅 BM25 + rerank)
+    - hybrid: 开启 local 向量 + BM25 融合
+    - hybrid_rerank: hybrid + rerank(生产默认)
+    - rrf: RRF 融合
+    """
+    from app.rag.vector_store import build_vector_backend
+
+    original_backend = store.vector_backend
+    original_rerank = store.settings.knowledge_rerank_enabled
+    original_fusion = store.settings.knowledge_fusion_mode
+
+    def _swap_vector(enabled: bool) -> None:
+        """按模式重建向量后端;开启时重建索引以填充本地向量记录。"""
+        cloned = Settings(
+            **{
+                **store.settings.model_dump(),
+                "vector_enabled": enabled,
+                "vector_backend": "local",
+                "openai_api_key": "",
+                "vector_required": False,
+            }
+        )
+        store.settings.vector_enabled = enabled
+        store.vector_backend = build_vector_backend(cloned)
+        if enabled:
+            store.rebuild_vector_index()
+
+    modes = ["bm25_only", "hybrid", "hybrid_rerank", "rrf"]
+    ablation = {}
+    try:
+        for mode in modes:
+            if mode == "bm25_only":
+                _swap_vector(False)
+                store.settings.knowledge_rerank_enabled = True
+                store.settings.knowledge_fusion_mode = "weighted"
+            elif mode == "hybrid":
+                _swap_vector(True)
+                store.settings.knowledge_rerank_enabled = False
+                store.settings.knowledge_fusion_mode = "weighted"
+            elif mode == "hybrid_rerank":
+                _swap_vector(True)
+                store.settings.knowledge_rerank_enabled = True
+                store.settings.knowledge_fusion_mode = "weighted"
+            elif mode == "rrf":
+                _swap_vector(True)
+                store.settings.knowledge_rerank_enabled = False
+                store.settings.knowledge_fusion_mode = "rrf"
+
+            hits = 0
+            total_latency = 0.0
+            for case in cases:
+                t0 = time.perf_counter()
+                retrieved = store.search_knowledge(case["question"], top_k)
+                total_latency += time.perf_counter() - t0
+                expected_sources = {source.lower() for source in case.get("expectedSources", [])}
+                expected_terms = [term.lower() for term in case.get("expectedTerms", [])]
+                if any(
+                    is_relevant(item.get("source", ""), item.get("content", "") or item.get("snippet", ""), expected_sources, expected_terms)[0]
+                    for item in retrieved
+                ):
+                    hits += 1
+            ablation[mode] = {
+                "hitRate": round(hits / max(1, len(cases)), 4),
+                "hitCount": hits,
+                "totalCases": len(cases),
+                "avgLatencyMs": round(total_latency / max(1, len(cases)) * 1000, 2),
+            }
+    finally:
+        # 还原原配置
+        store.vector_backend = original_backend
+        store.settings.knowledge_rerank_enabled = original_rerank
+        store.settings.knowledge_fusion_mode = original_fusion
+    return ablation
 
 
 def ndcg(items: list[dict]) -> float:
@@ -119,5 +217,8 @@ if __name__ == "__main__":
     output_path = settings.resolve_path(settings.rag_eval_output)
     report = evaluate(output_path=output_path)
     print("Aegis RAG evaluation completed.")
-    for key in ["totalCases", "topK", "recallAtK", "precisionAtK", "mrr", "ndcgAtK", "hitRate", "averageFirstRelevantRank"]:
+    for key in ["totalCases", "topK", "recallAtK", "precisionAtK", "mrr", "ndcgAtK", "hitRate", "hitRateStrict", "averageFirstRelevantRank"]:
         print(f"{key}={report[key]}")
+    print("\n=== ABLATION (HitRate) ===")
+    for mode, metrics in report["ablation"].items():
+        print(f"{mode:<15} hitRate={metrics['hitRate']} hitCount={metrics['hitCount']}/{metrics['totalCases']} avgLatencyMs={metrics['avgLatencyMs']}")

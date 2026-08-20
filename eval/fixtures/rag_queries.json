@@ -60,5 +60,44 @@
   {"id": "rag-amb-02", "question": "考试压力大导致失眠，怎么同时处理", "expectedSources": ["exam-season-guidance.md", "sleep.md"], "expectedTerms": ["压力真实存在", "固定起床时间", "睡眠变浅"]},
   {"id": "rag-amb-03", "question": "朋友说想自杀，我作为同学该怎么做", "expectedSources": ["crisis.md", "referral-and-resources.md"], "expectedTerms": ["危机热线", "可信任的人", "紧急安全风险"]},
   {"id": "rag-amb-04", "question": "怎么判断自己有没有抑郁倾向", "expectedSources": ["low-mood-depression-support.md"], "expectedTerms": ["持续两周以上", "自伤念头", "影响日常功能"]},
-  {"id": "rag-amb-05", "question": "情绪很糟的时候有哪些立刻能用的方法", "expectedSources": ["anxiety.md", "referral-and-resources.md"], "expectedTerms": ["呼吸放慢", "稳定练习", "5-4-3-2-1 grounding"]}
+  {"id": "rag-amb-05", "question": "情绪很糟的时候有哪些立刻能用的方法", "expectedSources": ["anxiety.md", "referral-and-resources.md"], "expectedTerms": ["呼吸放慢", "稳定练习", "5-4-3-2-1 grounding"]},
+
+	  {"id": "rag-proc-01", "question": "作业总是拖到最后一刻才写，怎么办", "expectedSources": ["academic-procrastination.md"], "expectedTerms": ["拖延", "番茄工作法", "拆解任务"]},
+	  {"id": "rag-proc-02", "question": "拖延症严重到影响学习了，怎么改善", "expectedSources": ["academic-procrastination.md"], "expectedTerms": ["2分钟法则", "拆解任务", "时间管理"]},
+	  {"id": "rag-proc-03", "question": "总是想先玩手机再学习，结果一直没学", "expectedSources": ["academic-procrastination.md", "internet-addiction.md"], "expectedTerms": ["番茄工作法", "手机依赖", "启动门槛"]},
+
+	  {"id": "rag-career-01", "question": "快毕业了很焦虑，不知道找什么工作", "expectedSources": ["career-anxiety.md"], "expectedTerms": ["职业方向", "可控因素", "求职焦虑"]},
+	  {"id": "rag-career-02", "question": "面试前特别紧张，怕表现不好", "expectedSources": ["career-anxiety.md", "anxiety.md"], "expectedTerms": ["面试焦虑", "grounding", "可控因素"]},
+	  {"id": "rag-career-03", "question": "看到同学都找到工作了，自己还没有，很着急", "expectedSources": ["career-anxiety.md"], "expectedTerms": ["比较", "不可控因素", "求职压力"]},
+
+	  {"id": "rag-love-01", "question": "刚分手，走不出来，怎么办", "expectedSources": ["romantic-relationships.md", "grief-and-loss.md"], "expectedTerms": ["失恋", "哀伤", "情绪日记"]},
+	  {"id": "rag-love-02", "question": "喜欢一个人但不敢表白，怕被拒绝", "expectedSources": ["romantic-relationships.md"], "expectedTerms": ["暗恋", "边界", "表达感受"]},
+	  {"id": "rag-love-03", "question": "恋爱中总是没有安全感，怎么办", "expectedSources": ["romantic-relationships.md", "anxiety.md"], "expectedTerms": ["依赖关系", "边界", "不安"]},
+
+	  {"id": "rag-lone-01", "question": "上了大学还是交不到朋友，很孤独", "expectedSources": ["loneliness.md", "adjustment-and-transition.md"], "expectedTerms": ["孤独感", "社交焦虑", "小范围的社交"]},
+	  {"id": "rag-lone-02", "question": "在人多的地方就紧张，不敢说话", "expectedSources": ["loneliness.md", "anxiety.md"], "expectedTerms": ["社交焦虑", "被评价", "关注对方"]},
+
+	  {"id": "rag-perf-01", "question": "什么事都想做到完美，很累", "expectedSources": ["perfectionism.md"], "expectedTerms": ["完美主义", "够好就行", "绝对化思维"]},
+	  {"id": "rag-perf-02", "question": "害怕犯错导致不敢尝试新事物", "expectedSources": ["perfectionism.md", "academic-procrastination.md"], "expectedTerms": ["害怕犯错", "完美主义", "拖延"]},
+
+	  {"id": "rag-net-01", "question": "总是忍不住刷手机，停不下来", "expectedSources": ["internet-addiction.md", "academic-procrastination.md"], "expectedTerms": ["手机依赖", "物理隔离", "替代活动"]},
+	  {"id": "rag-net-02", "question": "睡前刷手机导致天天熬夜", "expectedSources": ["internet-addiction.md", "sleep.md"], "expectedTerms": ["睡前仪式", "固定起床时间", "熬夜"]},
+
+	  {"id": "rag-self-01", "question": "总是对自己很苛刻，怎么学会对自己好一点", "expectedSources": ["self-compassion.md", "perfectionism.md"], "expectedTerms": ["自我关怀", "自我友善", "正念呼吸"]},
+	  {"id": "rag-self-02", "question": "压力大的时候有没有简单的放松练习", "expectedSources": ["self-compassion.md", "anxiety.md"], "expectedTerms": ["正念呼吸", "grounding", "稳定身体反应"]},
+
+	  {"id": "rag-anger-01", "question": "我很容易发火，控制不住情绪", "expectedSources": ["anger-management.md"], "expectedTerms": ["愤怒管理", "冷静策略", "离开现场"]},
+	  {"id": "rag-anger-02", "question": "和室友吵架了，怎么冷静下来", "expectedSources": ["anger-management.md", "relationships-and-family.md"], "expectedTerms": ["离开现场", "表达感受", "深呼吸"]},
+
+	  {"id": "rag-grief-01", "question": "亲人去世了，走不出来", "expectedSources": ["grief-and-loss.md", "low-mood-depression-support.md"], "expectedTerms": ["哀伤", "丧亲", "纪念"]},
+	  {"id": "rag-grief-02", "question": "分手快半年了还是很痛苦", "expectedSources": ["grief-and-loss.md", "romantic-relationships.md"], "expectedTerms": ["哀伤", "丧失", "专业支持"]},
+
+	  {"id": "rag-finan-01", "question": "生活费不够用，又不好意思和家里说", "expectedSources": ["financial-stress.md"], "expectedTerms": ["经济压力", "预算", "勤工俭学"]},
+	  {"id": "rag-finan-02", "question": "同学都穿名牌，我有点自卑", "expectedSources": ["financial-stress.md", "loneliness.md"], "expectedTerms": ["消费差距", "经济压力", "羞耻感"]},
+
+	  {"id": "rag-soma-01", "question": "一到考试就胃疼，检查又没问题", "expectedSources": ["somatization.md", "anxiety.md"], "expectedTerms": ["躯体化", "身心关联", "身体扫描"]},
+	  {"id": "rag-soma-02", "question": "总是头痛心慌，但身体检查没毛病", "expectedSources": ["somatization.md"], "expectedTerms": ["躯体化", "心理压力", "渐进式肌肉放松"]},
+
+	  {"id": "rag-help-01", "question": "努力了很久成绩还是上不去，想放弃了", "expectedSources": ["learned-helplessness.md", "academic-procrastination.md"], "expectedTerms": ["习得性无助", "小目标", "自我效能"]},
+	  {"id": "rag-help-02", "question": "觉得自己什么都做不好，没救了", "expectedSources": ["learned-helplessness.md", "low-mood-depression-support.md"], "expectedTerms": ["习得性无助", "可控和不可控", "重新归因"]}
 ]

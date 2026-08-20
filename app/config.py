@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     knowledge_hybrid_vector_weight: float = 0.65
     knowledge_hybrid_bm25_weight: float = 0.35
     knowledge_rerank_enabled: bool = True
+    knowledge_fusion_mode: str = "weighted"  # weighted | rrf
+    knowledge_cache_enabled: bool = False
+    knowledge_cache_ttl_seconds: int = 300
+    knowledge_cache_max_entries: int = 128
     rag_eval_dataset: str = "eval/fixtures/rag_queries.json"
     rag_eval_output: str = "data/eval/rag-eval-report.json"
     memory_recent_messages: int = 15

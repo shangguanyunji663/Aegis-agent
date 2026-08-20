@@ -18,7 +18,7 @@
 | Agent Runtime Harness | Agent 调用、上下文注入、风险报告和工具计划分散在业务代码里会难以审计 | `AegisAgentHarness` 统一封装输入脱敏、运行时调用、trace 保存、消息持久化、报告生成和工具计划 |
 | 自治多 Agent 协作 | 单个 Lead Agent 串行分派容易变成“伪协作”，复杂场景缺少中间产物 | 基于 append-only blackboard 实现任务发布、Agent claim、artifact 产出、风险 override 和最终验收，不依赖 LangGraph |
 | MemoryAgent | 心理支持需要连续性，单轮回复无法体现对用户状态的理解 | 独立 `MemoryAgent` 维护会话摘要和近期上下文，并将记忆作为 Agent 协作输入 |
-| Agentic RAG | 所有消息都检索知识库会增加噪声，尤其普通陪伴类对话容易被知识文档带偏 | 通过 CHAT / CONSULT / RISK 意图路由决定是否检索，混合 BM25 + 向量检索，并支持元数据过滤和 rerank |
+| Agentic RAG | 所有消息都检索知识库会增加噪声，尤其普通陪伴类对话容易被知识文档带偏 | 通过 CHAT / CONSULT / RISK 意图路由决定是否检索；**多路召回（BM25 + 向量）+ 可选 RRF 融合 + rerank + 邻块扩展**，支持元数据过滤、查询改写、语义/精确缓存与消融评测（详见「评测结果」） |
 | 工具治理与 MCP | 高风险预警、Excel 记录、邮件通知不能由模型越权直接执行 | 工具调用先生成 `ToolJob`，经角色、风险等级、审批、脱敏和审计后进入队列；支持 internal 和 FastMCP 两种后端 |
 | 后台 Tool Queue | 外部工具慢、失败或限流时，不应阻塞学生端流式回复 | 独立 worker 支持依赖调度、重试延迟、邮件限流、dead letter、ExcelRecord 和 AlertRecord 持久化 |
 | Engineering Harness | Agent 项目只看 demo 容易高估完成度，需要可重复验证 | 基于真实代表性数据集的 pytest 单元/接口测试、RAG eval、综合 eval(含 LLM-as-Judge)、harness 8 套件、三运行时 A/B 对比评测，覆盖路由、风险、安全、RAG、API、工具队列与编排器链路（真实指标见下方「评测结果」） |
@@ -95,11 +95,11 @@ flowchart LR
 | --- | --- |
 | 后端 API | Python, FastAPI, Pydantic, SQLAlchemy |
 | Agent Runtime | LangGraph StateGraph(主推)+ 自研 blackboard runtime(认领制兜底)+ ordered 流水线,三档可切换 |
-| RAG | BM25, vector retrieval, Chroma optional backend, metadata filter, rerank |
+| RAG | 多路召回（BM25 + 向量）+ 加权/RRF 融合 + rerank + 邻块扩展，Chroma/local 双后端，元数据过滤，查询缓存（LRU/Redis），四档消融评测 |
 | 工具协议 | FastMCP, governed ToolJob, background worker |
 | 存储 | SQLite local mode, optional PostgreSQL, optional Redis lock |
 | 前端 | 原生 HTML/CSS/JavaScript, student/admin 双端页面 |
-| 工程验证 | pytest, custom eval runner, RAG eval runner, harness runner |
+| 工程验证 | pytest, custom eval runner, RAG eval runner（双口径+消融）, harness runner, 本地性能 benchmark |
 | 部署 | Dockerfile, docker-compose |
 
 ## 快速开始
@@ -163,8 +163,11 @@ node --check static/login.js static/student.js static/admin.js
 # 综合评测
 python -m eval.run_eval
 
-# RAG 独立评测
+# RAG 独立评测(含双口径 + 消融)
 python -m app.rag_eval.runner
+
+# 本地性能 benchmark(并发/延迟/吞吐/缓存/ToolJob)
+python -m scripts.run_benchmark
 
 # 工程 Harness 验证
 python -m app.harness.runner --suite all --output data/harness/latest.json
@@ -181,9 +184,10 @@ python -m app.mcp_tools.server --list
 
 > 数据来源与最近验证日期：**最近验证日期 2026-08-20**。
 > - 路由/风险/规模化基准：`eval/fixtures/representative_corpus.json`（150 条唯一真实样本，**双层拆分**：每条含 `layer`（base 基础层 / stress 压力层）与 `source`（synthetic-representative / synthetic-boundary）字段，含隐式高危与第三人称干扰）
-> - RAG 检索：`eval/fixtures/rag_queries.json`（50 条自然语言问句，基于真实知识库 12 篇文档）
+> - RAG 检索：`eval/fixtures/rag_queries.json`（77 条自然语言问句，基于 24 篇知识文档）
 > - 多轮回归：`eval/fixtures/multi_turn_corpus.json`（8 组多轮场景）
 > - 三运行时 A/B：10 条代表性消息（覆盖四意图 + 中风险 + 显式/隐式高危 + 第三人称干扰）
+> - 性能基准：`python -m scripts.run_benchmark`（并发/延迟/吞吐/缓存/ToolJob，确定性 MockLLM 环境）
 
 | 验证项 | 覆盖内容 | 最近验证结果（2026-08-19） |
 | --- | --- | --- |
@@ -191,9 +195,10 @@ python -m app.mcp_tools.server --list
 | 150 条规模化基准（双层拆分，横向分层） | 150 条唯一真实样本（非循环生成），按 `layer` 拆为 **基础层（贴近真实流量）63 条** 与 **压力层（边界探测）87 条**，runner 分别输出两套独立指标。**目的：横向对比基础层 vs 压力层，衡量规则引擎能力边界** | 整体：联合准确率 **0.63**；意图 **0.63**；风险 **0.81**；高风险召回 **0.60**；误报率 **0.00**。- **基础层（贴近真实流量）**：准确率 **0.97**、意图 **0.97**、风险 **1.00**、高召回 **1.00**（贴近真实校园求助流量，规则引擎表现稳健）。- **压力层（边界探测）**：准确率 **0.39**、意图 **0.39**、风险 **0.67**、高召回 **0.52**（隐喻式高危、无关键词咨询、第三人称干扰等边界样本，如实暴露规则通道的能力缺口）。按难度分层：easy 明显优于 hard |
 | 风险 LLM 通道双路径（第十一轮，纵向对比） | 150 条全量双路径对比：baseline（纯规则 channel OFF，**即上行压力层纯规则结果，此处作为纵向对比起点不重复数字**）→ MetaphorAwareStub ON（rules ∪ LLM 并集）→ GLM-4.7-flash sanity probe。**目的：纵向对比 LLM 通道相对纯规则的补强幅度** | **baseline（channel OFF）**：压力层风险 **0.67**、高召回 **0.52**、误报 **0.00**（同上行压力层，纯规则）。**llm_stub（channel ON）**：压力层风险 **0.94**（↑0.27）、高召回 **1.00**（↑0.48）、误报 **0.03**（corp-106..130 全部 25 条隐喻命中；2 条 medium distress 含"撑不下去"/"不配"属 prompt-vs-corpus 标注张力，如实保留）。**GLM probe**：25 条扩展探针，成功调用 11 条中 10 条正确判 high、1 条判 medium（14 条 429 回退 none；成功调用准确率 0.91，不超 stub 上界 0.94，符合预期）。数据：`data/eval/risk_dual_path.json` + `data/eval/glm_probe_25.json` |
 | 多轮回归 | 8 组多轮场景（含升级到中/高风险、第三人称转自身） | 最终关键内容命中率 **0.875**（7/8） |
-| RAG 检索 | 50 条自然语言问句，Top-4 混合检索（BM25 + 向量 + rerank） | HitRate **0.94**、Recall@4 **0.94**、Precision@4 **0.33**、MRR **0.84**、NDCG@4 **0.86**、Top-1 **0.76** |
+| RAG 检索 | 77 条自然语言问句，Top-4 混合检索（BM25 + 向量 + rerank），24 篇知识文档 | 宽松口径 HitRate@4 **0.935**、严格口径（仅来源命中）**0.883**、Recall@4 **0.935**、Precision@4 **0.351**、MRR **0.820**、NDCG@4 **0.832**。**消融实验**（本地 local-hash 向量后端）：纯 BM25=0.935 > hybrid=0.831 > hybrid+rerank=0.805 > RRF=0.766，说明在零依赖词法 hash 向量下 BM25 已足够强，接入真实语义向量（Chroma/MiniLM）后 hybrid/RRF 才有增量价值 |
 | 三运行时 A/B | langgraph / autonomous / ordered 同数据集对比延迟、trace 步数、LLM 调用数与判定一致性（10 条代表性消息） | 三运行时判定**完全一致**；意图准确率 **0.8**、风险准确率 **0.9**（含 1 条规则引擎当前漏判的隐式高危样本，如实暴露跨运行时一致的缺口） |
 | Harness 验证 | Risk Safety、Agent Routing、Standard Skills、RAG、API、Tool Queue、Runtime A/B 等链路（验证工程行为，**不强制满分**） | **8/8 通过**（行为级断言；已移除 HitRate≥0.9 / 规模化=100% / 风险=100% 等硬性阈值门限） |
+| 本地性能 benchmark | `scripts/run_benchmark.py`，MockLLM 确定性环境，20 条代表性消息 × 并发 [1,4,8]，测量延迟/吞吐/缓存/ToolJob | 并发1：avg 66ms、P95 71ms、吞吐 15.1 req/s；并发4：avg 316ms、P95 729ms、吞吐 12.3 req/s；并发8：avg 517ms、P95 1260ms、吞吐 13.5 req/s（单进程多线程，受 GIL 限制，成功率均 100%）。**检索缓存**：命中延迟 <0.01ms，相比冷查询 18-20ms 提速约 3 个数量级。**ToolJob**：5/5 成功，0 死信。数据：`data/eval/benchmark.json` |
 
 **双层拆分下的真实含义（两个卖点：保住"真实" + 暴露边界，均非"失败"）：**
 - **基础层（贴近真实流量，63 条）准确率 0.97、风险 1.00、高召回 1.00**：覆盖日常闲聊、典型咨询、显式高危等"真实会发生的流量"，规则引擎表现稳健——对应 **"真实"卖点**，证明系统在主流场景上可靠。
@@ -277,10 +282,10 @@ python -m app.mcp_tools.server --list
 ├── skills/                       # 标准化心理支持 Skill 规范(SKILL.md)
 ├── static/                       # 学生端和管理员端页面(login/student/admin)
 ├── tests/                        # pytest 测试
-├── scripts/                      # 启动脚本 + 评测脚本(eval_risk_dual_path/probe_glm/probe_glm_25)
+├── scripts/                      # 启动脚本 + 评测脚本(eval_risk_dual_path/probe_glm/run_benchmark)
 ├── docs/                         # 架构、安全和演示文档
 ├── Aegis项目逐文件学习指南.md      # 从零构建式逐模块学习指南
-├── docs/records/                 # 迭代记录(重构→提速→注册MySQL→LangGraph→深度增强→回复真人化→记忆增强→对抗型对话测试→语料双层拆分→风险LLM通道双路径)
+├── docs/records/                 # 迭代记录(重构→提速→注册MySQL→LangGraph→深度增强→回复真人化→记忆增强→对抗型对话测试→语料双层拆分→风险LLM通道双路径→RAG增强与性能基准)
 ├── Dockerfile
 └── docker-compose.yml
 ```
@@ -312,6 +317,8 @@ python -m app.mcp_tools.server --list
 | `FUNCTION_CALLING_ENABLED` | 技能选择:模型 function calling 在白名单内自主挑选,规则兜底 |
 | `LANGGRAPH_CHECKPOINT_ENABLED` | LangGraph SqliteSaver 检查点持久化(长对话跨进程可恢复) |
 | `VECTOR_BACKEND` | 向量后端，支持本地或 Chroma 配置 |
+| `KNOWLEDGE_FUSION_MODE` | 检索融合方式：`weighted`（线性加权，默认）或 `rrf`（Reciprocal Rank Fusion 排名融合） |
+| `KNOWLEDGE_CACHE_ENABLED` | 是否启用查询缓存（LRU，可配 `KNOWLEDGE_CACHE_TTL_SECONDS`、`KNOWLEDGE_CACHE_MAX_ENTRIES`） |
 | `TOOL_BACKEND` | `internal` 或 `mcp` |
 | `MCP_ENABLED` | 是否启用 MCP 工具路径 |
 | `TOOL_QUEUE_*` | 后台工具 worker 的轮询、批量、线程和重试配置 |
@@ -343,6 +350,7 @@ python -m app.mcp_tools.server --list
 - [第八次对抗型对话测试(10轮配合+10轮对抗)](docs/records/CONFRONTATIONAL-DIALOGUE-TESTING.md)
 - [第十轮代表性语料双层拆分(基础层/压力层)](docs/records/CORPUS-LAYER-SPLIT.md)
 - [第十一轮风险LLM通道双路径验证(stub-LLM on vs MockLLM OFF)](docs/records/ROUND-11-RISK-LLM-DUAL-CHANNEL.md)
+- [第十二轮RAG增强与性能基准(知识库24篇/RRF/缓存/双口径消融/benchmark)](docs/records/ROUND-12-RAG-ENHANCEMENT-BENCHMARK.md)
 
 ## 待改进与优化(Roadmap)
 

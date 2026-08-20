@@ -47,7 +47,7 @@ def run_evaluation(orchestrator, store, fixtures_dir: Path, output_dir: Path) ->
     multi_turn = load_multi_turn_corpus()
 
     # RAG 检索评测（基于真实知识库的 50 条自然语言问句）
-    rag = evaluate_rag_eval(store, store.settings)
+    rag = evaluate_rag_eval(store, store.settings, output_path=output_dir / "rag-eval-report.json")
     rag_section = _rag_section(rag)
 
     results = {

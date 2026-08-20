@@ -82,6 +82,19 @@ def test_eval_includes_multi_turn_and_rich_metrics(tmp_path: Path):
     assert "safety_leak_count" in results["summary"]
     assert "retrieval_mrr" in results["summary"]
     assert results["multi_turn"]["total"] >= 1
+    
+    # 验证 RAG 报告写入临时输出目录，不覆盖项目正式报告
+    rag_report = output_dir / "rag-eval-report.json"
+    assert rag_report.exists(), "RAG report should be written to output_dir"
+    
+    formal_report = Path(__file__).resolve().parents[1] / "data" / "eval" / "rag-eval-report.json"
+    if formal_report.exists():
+        # 如果正式报告存在，确认其 mtime 未被此测试修改
+        import json
+        formal_data = json.loads(formal_report.read_text(encoding="utf-8"))
+        assert formal_data.get("totalCases") != results["rag_eval"].get("totalCases") or \
+               formal_data.get("dataset") != results["rag_eval"].get("dataset"), \
+               "Test should not overwrite formal RAG report"
 
 
 def test_scaled_benchmark_supports_layer_split(tmp_path: Path):

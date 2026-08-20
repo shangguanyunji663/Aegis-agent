@@ -11,7 +11,7 @@ from app.database import build_engine, build_session_factory, create_schema
 from app.repository import DatabaseStore
 
 
-def evaluate(store: DatabaseStore | None = None, settings: Settings | None = None) -> dict:
+def evaluate(store: DatabaseStore | None = None, settings: Settings | None = None, output_path: Path | None = None) -> dict:
     settings = settings or get_settings()
     owned_store = store is None
     if store is None:
@@ -47,9 +47,9 @@ def evaluate(store: DatabaseStore | None = None, settings: Settings | None = Non
         "averageFirstRelevantRank": round(sum(item["firstRelevantRank"] for item in hits) / max(1, len(hits)), 4),
         "results": results,
     }
-    output = settings.resolve_path(settings.rag_eval_output)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    if output_path is not None:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     if owned_store and getattr(store, "redis_client", None) is not None:
         store.redis_client.close()
     return report
@@ -115,7 +115,9 @@ def ndcg(items: list[dict]) -> float:
 
 
 if __name__ == "__main__":
-    report = evaluate()
+    settings = get_settings()
+    output_path = settings.resolve_path(settings.rag_eval_output)
+    report = evaluate(output_path=output_path)
     print("Aegis RAG evaluation completed.")
     for key in ["totalCases", "topK", "recallAtK", "precisionAtK", "mrr", "ndcgAtK", "hitRate", "averageFirstRelevantRank"]:
         print(f"{key}={report[key]}")

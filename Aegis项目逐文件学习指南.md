@@ -105,7 +105,7 @@ flowchart LR
 学生输入
  → HTTP 层(限流 + 归属校验)
  → Harness(输入消毒 + 会话解析)
- → Orchestrator(双运行时开关,默认 autonomous)
+ → Orchestrator(三运行时开关,默认 autonomous)
  → AutonomousRuntime(建黑板 → Coordinator 认领循环)
       Memory 读取 → Lead 路由意图 → Risk 评估风险
       → Knowledge 检索(RAG) → Counselor/Companion 产出回复提案
@@ -131,7 +131,7 @@ flowchart LR
 | `app/entities.py`                                        | ORM 实体（19 张表，含第十三轮新增的 L2 事实表）                                                                                        | `Base` 下的实体类                                                                                     | SQLAlchemy         |
 | `app/database.py`                                        | 引擎/会话工厂/建表/迁移/就绪检查                                                                                   | `build_engine`、`build_session_factory`、`create_schema`                                           | SQLAlchemy         |
 | `app/assessment.py`                                      | 确定性风险评估（规则通道单一事实来源）                                                                                  | `assess_message()`                                                                               | 无（纯函数）             |
-| `app/skills.py`                                          | 技能注册表 + 标准化 Skill 选取                                                                                 | `SkillRegistry`、`response_skill_names()`                                                         | store 回调注入         |
+| `app/skills.py`                                          | 注册式执行 Skill、人工策展 Skill、使用观察器与自动蒸馏/重载                                                                                 | `SkillRegistry`、`response_skill_names()`                                                         | store 回调注入         |
 | `app/core/`                                              | 横切原语：auth（口令/会话）、privacy（脱敏/消毒）、runtime（Redis 限流锁，可降级）、utils                                         | 各类工具函数                                                                                           | redis（可选）          |
 | `app/llm/`                                               | 模型后端：client（Mock/OpenAI/Ollama 三实现 + 工厂）、prompts（提示词）                                                | `LLMClient`(Protocol)、`build_llm_client()`                                                       | httpx/urllib       |
 | `app/agents/classic.py`                                  | 六个单轮智能体（各司其职、无状态）                                                                                    | `MemoryAgent`/`RiskGuardianAgent`/`LeadAgent`/`KnowledgeAgent`/`CounselorAgent`/`CompanionAgent` | llm、skills、rag     |
@@ -139,14 +139,14 @@ flowchart LR
 | `app/agents/harness.py`                                  | Runtime Harness：脱敏/会话解析/报告/trace 收口                                                                  | `AegisAgentHarness`                                                                              | orchestrator、store |
 | `app/agents/langgraph_runtime.py`                        | LangGraph StateGraph 运行时 + 检查点                                                                       | `LangGraphRuntime`                                                                               | langgraph          |
 | `app/autonomous/`                                        | 自治协作：events（协议）、registry（能力/决策）、board（共享读）、coordinator（认领循环）、agents（六自治 Agent）、runtime（黑板→响应）        | `AutonomousAgentRuntime`                                                                         | llm、rag、store      |
-| `app/rag/`                                               | 检索子系统：text（分词）、scoring（BM25/rerank/融合）、chunking（切块/元数据）、memory（滚动摘要）、vector\_store（Chroma/本地降级）      | `DatabaseStore.search_knowledge`（组装整条流水线）                                                        | chromadb（可选）       |
+| `app/rag/`                                               | 检索与记忆子系统：text（分词）、scoring（BM25/rerank/融合）、chunking（切块/元数据）、facts（L2 事实抽取与渲染）、memory（L3 摘要）、vector\_store（Chroma/本地降级） | `DatabaseStore.search_knowledge`（组装检索流水线）                                                        | chromadb（可选）       |
 | `app/repository/store.py`                                | 持久化总闸（约 1146 行，第十三轮新增 L4/L2 方法后更新）                                                                               | `DatabaseStore`                                                                                  | entities、rag       |
 | `app/tools/`                                             | 工具治理：contracts（契约）、gateway（internal/MCP 网关）、mcp\_client                                              | `governed_payload()`、`build_tool_gateway()`                                                      | store              |
 | `app/services/`                                          | 业务服务：report\_case（审批后编排）、tool\_executor（真实副作用）、tool\_queue（队列/worker）、tool\_records、tool\_governance | `ReportCaseService`、`ToolQueueWorker`                                                            | store、tools        |
 | `app/api/`                                               | HTTP 路由：schemas/deps/middleware/pages/system/auth\_routes/chat/admin                                 | RESTful + SSE 接口                                                                                 | FastAPI、harness    |
 | `app/mcp_tools/server.py`                                | FastMCP 工具服务（可选后端）                                                                                   | `@mcp.tool` 暴露的工具                                                                                | store、contracts    |
 | `app/evaluation/`、`app/harness/`、`app/rag_eval/`、`eval/` | 评测闭环：runner / datasets / report\_html / runtime\_ab / judge / harness 回放                             | `eval.run_eval`、`harness.runner`                                                                 | store、llm          |
-| `static/`、`tests/`                                       | 双端原生前端 + pytest 单测（本地约 71 项通过）                                                                                 | HTML/JS 页面、测试                                                                                    | —                  |
+| `static/`、`tests/`                                       | 双端原生前端 + pytest 单测（历史验证结果应以运行日期和环境为准）                                                                                 | HTML/JS 页面、测试                                                                                    | —                  |
 
 ## 2.2 学生端对话主流程（时序图）
 
@@ -296,16 +296,16 @@ settings → engine/会话工厂 → create_schema
 
 ### BM25 + Chroma 本地 MiniLM + Rerank（混合 RAG）
 
-- **选了**：BM25（词频，中文用 bigram）与向量检索融合，Chroma 作向量库，嵌入默认走 **chromadb 内置 MiniLM 本地嵌入**（`EMBEDDING_PROVIDER=local`，离线零 KEY 零费用），最后用纯 Python 四路词法信号加权 rerank。
+- **选了**：BM25（词频，中文用 bigram）与可选向量检索融合，Chroma 作向量库；启用 Chroma 时可选 chromadb 内置 MiniLM 本地嵌入（`EMBEDDING_PROVIDER=local`）或 OpenAI 兼容嵌入，最后用纯 Python 四路词法信号加权 rerank。
 - **为什么**：
   - BM25 可解释、零成本、零延迟，且中文补二元组后词频统计更准（不引 jieba 的轻量取舍）。
-  - 本地 MiniLM 让「向量库是真的、嵌入是离线的」——实测命中正确（考试→exam/sleep、关系→relationships），无需向量模型额度。
-  - rerank 用 `base*0.55 + (余弦*0.75+关键词*0.25)*0.25 + 覆盖率*0.15 + 短语命中*0.05`，纯 Python 显著改善排序。
+  - 本地 MiniLM 可让「向量库是真的、嵌入是离线的」；不需要向量模型额度。
+  - rerank 用 `base*0.55 + (余弦*0.75+关键词*0.25)*0.25 + 覆盖率*0.15 + 短语命中*0.05`，纯 Python，零额外模型成本。
 - **替代**：
   - 纯向量检索：中文语义高度依赖嵌入模型质量——不同模型对中文的理解差异很大（如「考试压力」和「焦虑失眠」在低质量嵌入中可能距离很远），且商业向量模型需要 API 额度，无 KEY 时完全不可用；
-  - 纯 BM25：只做词频匹配，缺乏语义泛化能力——学生说「我最近睡不好」，BM25 无法命中包含「失眠」「睡眠质量」的知识块，因为字面不重叠；
+  - 纯 BM25：只做词频匹配，缺乏语义泛化能力——学生说「我最近睡不好」，可能无法命中包含「失眠」「睡眠质量」的知识块；
   - 引入 jieba/重模型：依赖与成本上升。
-- **代价/取舍**：`LocalVectorBackend`（哈希 bigram 伪向量 + 本地余弦）是向量开关关闭时的降级路径，保证检索始终可用；这是「可选依赖 + 语义一致降级」的标准写法。
+- **代价/取舍**：`VECTOR_ENABLED=false`（代码默认）会禁用向量召回，但仍保留 BM25 + 条件 rerank；`LocalVectorBackend`（哈希 bigram 伪向量 + 本地余弦）是**已启用向量**但 Chroma 不可用、或显式选择 local 后端时的降级实现，不是关闭向量开关后的替代品。`Settings.embedding_provider` 的代码默认是 `openai`，`.env.example` 以 `local` 提供无密钥演示示例，应当区分这两种“默认”。
 
 ### Redis（可选，限流/锁）
 
@@ -330,7 +330,7 @@ settings → engine/会话工厂 → create_schema
 
 ### pytest + 自研评测闭环（工程化验证）
 
-- **选了**：pytest 单测（本地约 71 项通过） + `evaluation/runner`（真实指标）+ `harness/runner`（8 套件端到端回放）+ RAG 专项 eval + 三运行时 A/B + LLM-as-Judge。
+- **选了**：pytest 单测（历史验证数量需附日期/环境） + `evaluation/runner`（真实指标）+ `harness/runner`（8 套件端到端回放）+ RAG 专项 eval + 三运行时 A/B + LLM-as-Judge。
 - **为什么**：Agent 项目「只看 demo 容易高估完成度」。评测用 **mock LLM 保证确定性**，测的是「系统」不是「模型运气」；harness 失败退出码 1，可接 CI。
 - **替代**：纯手工点 demo（不可重复、不可回归）。
 - **代价/取舍**：维护数据集与套件有成本，但换来「改一个词（如 `HIGH_TERMS`）跑一遍评测就能确认没破坏安全边界」。
@@ -402,7 +402,7 @@ uvicorn app.main:app --host 127.0.0.1 --port 8091
 
 ## 4.3 配置 `.env`：最小可运行 vs 进阶
 
-`.env.example` 已给出全部变量。最小可运行只需默认值（`AI_PROVIDER=mock`、SQLite、向量关、Redis 空）。按组理解关键变量：
+`.env.example` 是推荐配置清单；但要区分三类值：**`Settings` 代码默认**、**示例文件建议值**和**部署时由 `.env`/系统环境变量覆盖的值**。例如 `embedding_provider` 的代码默认是 `openai`，`.env.example` 则推荐 `local` 以便无外部密钥演示；本地开发者自己的 `.env` 不属于仓库默认。最小可运行可直接使用代码默认（`AI_PROVIDER=mock`、SQLite、`VECTOR_ENABLED=false`、Redis 空）。按组理解关键变量：
 
 | 分组  | 变量                                                           | 作用                                 | 默认                               |
 | --- | ------------------------------------------------------------ | ---------------------------------- | -------------------------------- |
@@ -413,10 +413,11 @@ uvicorn app.main:app --host 127.0.0.1 --port 8091
 | 模型  | `LLM_SUPPORT_TEMPERATURE`                                    | 支持性回复采样温度（偏高更真人）                   | `0.6`                            |
 | 风险  | `RISK_LLM_CHANNEL_ENABLED`                                   | 规则 ∪ LLM 双通道                       | `true`                           |
 | 技能  | `FUNCTION_CALLING_ENABLED`                                   | 模型在白名单内自主选技能                       | `true`                           |
-| 检索  | `EMBEDDING_PROVIDER`                                         | `local`(MiniLM 离线) / `openai`      | `local`                          |
+| 检索  | `EMBEDDING_PROVIDER`                                         | `openai`（代码默认）/ `local`（离线 MiniLM 示例）      | `openai`（`.env.example` 推荐 `local`）                          |
 | 检索  | `VECTOR_ENABLED` / `VECTOR_BACKEND`                          | 是否启用向量 / 后端                        | `false` / `chroma`               |
-| 检索  | `KNOWLEDGE_TOP_K` / `KNOWLEDGE_HYBRID_*_WEIGHT`              | 召回数与融合权重                           | 4 / 0.65:0.35                    |
-| 记忆  | `MEMORY_RECENT_MESSAGES` / `MEMORY_SUMMARY_MAX_CHARS`        | 滚动摘要容量                             | 15 / 3000                        |
+| 检索  | `KNOWLEDGE_FUSION_MODE` / `KNOWLEDGE_CACHE_ENABLED`          | 加权/RRF 融合 / 进程内缓存开关              | `weighted` / `false`             |
+| 记忆  | `MEMORY_RECENT_MESSAGES` / `MEMORY_SUMMARY_MAX_CHARS`        | L4 原话窗口 / L3 摘要上限                  | 15 / 3000                        |
+| 技能  | `SKILL_DISTILL_ENABLED` / `SKILL_DISTILL_MIN_REPEAT` / `SKILL_DISTILL_DIR` | 是否蒸馏 / 重复阈值 / 输出目录 | `true` / 3 / `skills/auto` |
 | 运行时 | `AGENT_RUNTIME`                                              | `autonomous`/`ordered`/`langgraph` | `autonomous`                     |
 | 运行时 | `AGENT_MAX_ROUNDS` / `AGENT_FINAL_ACCEPTANCE_MIN_CONFIDENCE` | 预算护栏                               | 8 / 0.6                          |
 | 限流  | `CHAT_RATE_LIMIT_PER_MINUTE` / `REDIS_URL`                   | 聊天限流 / 可选 Redis                    | 40 / 空                           |
@@ -440,13 +441,13 @@ DATABASE_URL=mysql+pymysql://root:你的密码@localhost:3306/aegis?charset=utf8
 
 ## 4.4 初始化到底做了什么
 
-`python -m app.init_db` → `create_schema()` 惰性导入全部 ORM 实体后 `create_all`；`DatabaseStore` 在 `create_app` 时还会 `ensure_default_users()`（建演示账号）与 `seed_knowledge_dir()`（把 `knowledge/` 下 12 篇 `.md` 切块、可选嵌入、写入 `KnowledgeChunk`）。所以「启动即带知识库」。
+`python -m app.init_db` → `create_schema()` 惰性导入全部 ORM 实体后 `create_all`；`DatabaseStore` 在 `create_app` 时还会 `ensure_default_users()`（建演示账号）与 `seed_knowledge_dir()`（遍历 `knowledge/` 下的 `.md`/`.txt`，当前仓库提交 24 篇 Markdown 文档，切块、可选嵌入、写入 `KnowledgeChunk`）。所以「启动即带知识库」。
 
 ## 4.5 验证：三步跑通闭环
 
 1.   普通对话  ：学生端登录 `student/student123!`，发「我最近考试压力很大，晚上睡不着」。管理端 `/admin` 应能搜到对应知识、看到会话 trace。
 2.   风险闭环  ：发「我不想活了」。观察：学生端得到本地安全模板回复（mock 下也是）→ 管理端出现「待审报告」→ 审批 → 「工具任务」全部 `success`（可在死信/审计页核对）。
-3.   代码护栏  ：往 `app/assessment.py` 的 `HIGH_TERMS` 加一个词，跑 `pytest` 与 `python -m app.harness.runner --suite risk`——体会「单一来源 + 评测护栏」让修改变安全。
+3.   代码护栏  ：往 `app/assessment.py` 的 `HIGH_TERMS` 加一个词，跑 `python -m pytest tests -q` 与 `python -m app.harness.runner --suite risk`——体会「单一来源 + 评测护栏」让修改变安全。
 
 ## 4.6 方式二：Docker Compose
 
@@ -454,7 +455,7 @@ DATABASE_URL=mysql+pymysql://root:你的密码@localhost:3306/aegis?charset=utf8
 docker compose up --build
 ```
 
-Compose 启动 app + PostgreSQL + Redis + Chroma。若要在容器里启用向量检索，在 `.env` 设 `VECTOR_ENABLED=true`、`VECTOR_BACKEND=chroma`、`EMBEDDING_PROVIDER=local`，并注入 `OPENAI_API_KEY`（如用 OpenAI 嵌入）。访问地址同 4.2。
+Compose 启动 app + MySQL 8.0 + Redis + Chroma。若要在容器里启用向量检索，在 `.env` 设 `VECTOR_ENABLED=true`、`VECTOR_BACKEND=chroma`、`EMBEDDING_PROVIDER=local`；若使用 OpenAI 兼容嵌入，再额外注入 `OPENAI_API_KEY`。PostgreSQL 驱动可供自行部署的数据库使用，但不在当前 Compose 拓扑内。访问地址同 4.2。
 
 ## 4.7 常用命令速查
 
@@ -462,8 +463,8 @@ Compose 启动 app + PostgreSQL + Redis + Chroma。若要在容器里启用向�
 # 初始化数据库
 python -m app.init_db
 
-# 后端测试(本地约 71 项)
-python -m pytest -q
+# 后端测试（仅 tests/；根目录 test_chat.py 会执行外部 HTTP 请求）
+python -m pytest tests -q
 
 # 前端脚本语法检查
 node --check static/login.js static/student.js static/admin.js
@@ -488,18 +489,19 @@ python -m app.mcp_tools.server --list
 
 -   `ModuleNotFoundError`  ：没激活 venv 或没装依赖——回到 4.2 第 2、3 步。
 -   SQLite 多线程报错  ：确认用的是 `sqlite:///...` 且 `check_same_thread=False`（代码已处理；若自改 engine 注意这点）。
--   向量检索不工作  ：`VECTOR_ENABLED=false` 时用 `LocalVectorBackend` 降级，检索仍可用；想要真向量需 `EMBEDDING_PROVIDER=local` + 装好 chromadb。
+-   向量检索不工作  ：`VECTOR_ENABLED=false` 会关闭向量召回，但 BM25 + 条件 rerank 仍可用；想要向量召回需设 `VECTOR_ENABLED=true`，再选择 Chroma 或 local-hash 后端。`LocalVectorBackend` 是已开启向量时的本地降级，不是关闭向量后的替代品。
 -   邮件/预警没发出  ：默认 `ALERT_EMAIL_DELIVERY_MODE=log`，只写日志；要真发需配 `SMTP_*`。
 -   限流误伤  ：本地演示调小 `CHAT_RATE_LIMIT_PER_MINUTE` 或调大；Redis 为空时走进程内限流。
--   改代码后行为异常  ：优先跑 `pytest` + harness，再用 4.5 的「风险闭环」手动验证，避免只信 demo。
+-   改代码后行为异常  ：优先跑 `python -m pytest tests -q` + harness，再用 4.5 的「风险闭环」手动验证，避免只信 demo。
 
 ## 4.9 建议的开发工作流
 
-1. 先 `pytest -q` 确立基线（本地约 71 项通过，test_api 需 MySQL）。
+1. 先 `python -m pytest tests -q` 确立基线；历史“约 71 项通过”只对应特定日期和依赖环境，当前数量以实际收集结果为准。
 2. 小步修改 → 跑相关单测 + 对应 harness 套件（如改风险逻辑跑 `--suite risk`）。
 3. 涉及编排/运行时时跑 `runtime-ab` 确认三档判定一致。
 4. 涉及回复质量时跑 LLM-as-Judge（接真模型时）或 `test_reply_style.py` 守底线。
-5. 提交前 `python -m app.harness.runner --suite all`。
+5. 需要可重复的 eval/Harness 时，显式关闭 `SKILL_DISTILL_ENABLED` 或把自动 Skill 输出目录隔离；否则重复调用可能写入 `data/skill-usage.json` 和 `skills/auto/`，污染后续基线。
+6. 提交前 `python -m app.harness.runner --suite all`。
 
 ***
 
@@ -767,7 +769,7 @@ ANXIETY_TERMS = ["焦虑", "压力", "考试", "睡不着", "失眠", "panic", "
 
 （风险双通道）：`assess_message` 是规则通道；`RiskGuardianAgent` 会再用轻量 LLM 通道（`llm.assess_risk`，严格 JSON、8s 短超时）复核，两通道取并集——任一判 high 即 high，弥补关键词召回不足；LLM 失败/超时/mock 一律回退纯规则，输出 `risk_channels` 溯源。
 
-- **双路径验证（第十一轮）**：150 条语料双路径对比——baseline（channel OFF，纯规则）压力层 risk_acc=**0.67**、high_recall=**0.52**；stub-LLM on（`MetaphorAwareStubClient` + channel ON）risk_acc=**0.94**、high_recall=**1.00**（corp-106..130 全部 25 条隐喻式自杀意念命中）。生产保持 channel OFF 不变（保"暴露边界"卖点），LLM 通道只在 dev/能力验证时开启。GLM-4.7-flash sanity probe 2/2 成功调用正确（3 条 429 限流回退），验证 endpoint 兼容、judge prompt 有效、stub 是 LLM 的合理代理。数据：`data/eval/risk_dual_path.json`，脚本：`scripts/eval_risk_dual_path.py`。
+- **双路径验证（第十一轮）**：150 条语料双路径对比——baseline（channel OFF，纯规则）压力层 risk_acc=**0.67**、high_recall=**0.52**；stub-LLM on（`MetaphorAwareStubClient` + channel ON）risk_acc=**0.94**、high_recall=**1.00**（corp-106..130 全部 25 条隐喻式自杀意念命中）。`RISK_LLM_CHANNEL_ENABLED` 在代码与 `.env.example` 中默认 `true`；需要纯规则、可复现 baseline 时可显式设置为 `false`。真实 GLM-4.7-flash sanity probe 对 25 条扩展样本的 11 条非 fallback 判断中有 10 条判 high、1 条判 medium，另 14 条受 429/超时回退。数据：`data/eval/risk_dual_path.json`，脚本：`scripts/eval_risk_dual_path.py`。
 - `HIGH_TERMS` 是单一事实来源——`autonomous/board.py` 的 `hard_high_risk()` 也引用它，改关键词只改一处。
 - 规则评估可解释（命中了哪个词一目了然）、可单测、零成本零延迟。代价是召回有限——25 条隐喻式自杀意念中仅命中 13 条（corp-106..130），剩余 12 条需 LLM 语义理解才能捕捉，这是关键词路线的固有上限。
 
@@ -804,13 +806,35 @@ class SkillSpec:
 注意构造参数的依赖注入：
 
 ```python
-SkillRegistry(knowledge_dir, store.add_report, store.search_knowledge)
-#                    ↑目录            ↑报告落库回调        ↑检索回调
+SkillRegistry(knowledge_dir, store.add_report, store.search_knowledge, settings=settings)
+#                    ↑目录            ↑报告落库回调        ↑检索回调              ↑自动蒸馏配置
 ```
 
 技能层不 import 仓储，而是接收函数——测试时可以塞假函数，这就是它可单测的原因。
 
-另一条线：标准化 Skill（7 个 `skills/*/SKILL.md` 文档，带 frontmatter）。`response_skill_names(intent, risk, text)` 按规则选中（高风险 → 安全计划 + 交接摘要；命中「失眠」→ 睡眠支持……），`standard_context(names)` 拼成提示词注入。这是「用文档约束模型输出结构」的轻量做法。
+另一条线是**人工策展 Skill**：当前仓库有 7 个 `skills/*/SKILL.md` 文档，带 frontmatter。`response_skill_names(intent, risk, text)` 先按规则给出白名单（高风险 → 安全计划 + 交接摘要；命中「失眠」→ 睡眠支持……），`standard_context(names)` 再拼成提示词注入。这是「用文档约束模型输出结构」的轻量做法。
+
+### 4.1 Skill 自动蒸馏闭环（第十三轮）
+
+第十三轮在“注册式执行 Skill”和“人工策展 Skill”外增加第三层：**自动 Skill**。它的目标不是让模型随意改写业务逻辑，而是把被反复使用的、已经受规则白名单约束的基础 Skill 组合沉淀为一份可检查的 `SKILL.md`。
+
+```text
+规则/Function Calling 选出基础 Skill
+    ↓
+SkillUsageObserver 记录 intent|risk|sorted-manual-skill-names
+    ↓（同一模式默认第 3 次出现）
+_distill_skill() 写入 skills/auto/<slug>/SKILL.md
+    ↓
+重载标准 Skill 索引；后续相同模式自动追加该 auto Skill
+```
+
+关键实现点：
+
+- 使用计数持久化为单个 JSON 对象：`data/skill-usage.json`；它记录的是组合模式的出现次数，而不是逐行日志。
+- 自动 Skill frontmatter 带 `origin: auto`、触发意图/风险和包含的基础 Skill；正文是确定性模板，重复组合会获得相同的融合约束，而不是让模型自由生成未审查建议。
+- 自动 Skill 会参与**后续**的匹配；当前触发蒸馏的那一轮不会把刚生成的名称回填到当次白名单。
+- `record_skill_usage()` 会先过滤 `origin=auto` 的 Skill，因此 auto Skill 不会触发下一层 auto Skill，避免递归膨胀。
+- 当前实现达到阈值后会直接写文件、重载并参与后续注入；**尚未实现**人工审核状态、管理员启停、版本回滚或审计工作台。正式部署应限制 `skills/auto/` 写权限、纳入版本控制，并在启用前增加审核门禁。
 
 `_split_frontmatter` 手写解析 YAML 头——不引入 yaml 依赖的取舍（知识文档的 frontmatter 解析在 `rag/chunking.py`，两者格式相似但容错策略不同：技能解析遇到坏文档直接跳过，知识解析静默忽略坏行）。
 
@@ -839,7 +863,7 @@ class LLMClient(Protocol):
     def judge_reply(self, message, reply) -> dict | None: ...                 # LLM-as-Judge
 ```
 
-`LLMContext` 是喂给模型的结构化上下文包：用户消息、意图、风险等级、记忆摘要、知识片段、稳定练习、技能约束——回复生成所需的一切都显式传入，模型不自己「想」。
+`LLMContext` 是喂给模型的结构化上下文包：用户消息、意图、风险等级、**L2 当前有效用户事实、L3 会话摘要、L4 最近原话窗口**、知识片段、稳定练习、技能约束——回复生成所需的一切都显式传入，模型不自己「想」。
 
 协议从最初的「一问一答」长成了多通道客户端：回复生成（阻塞）、回复直播（流式）、查询改写（RAG）、风险复核（双通道）、技能选择（FC）、质量评审（Judge）。新增通道全部遵守同一条铁律：失败/超时/mock 返回 None，调用方优雅降级——这正是全系统「LLM 永远不是安全关键路径」的落点。
 
@@ -866,7 +890,7 @@ system = (
 )
 ```
 
-四句话分别划定：能力边界 / 禁止事项 / 与规则层的分工 / 输出风格。用户消息模板把记忆、意图、风险、知识、练习、技能逐块拼装——上下文工程就是把「该给的信息」按结构喂给模型——。
+四句话分别划定：能力边界 / 禁止事项 / 与规则层的分工 / 输出风格。用户消息模板把 **L2 当前有效状态、L3 摘要、L4 原话**、意图、风险、知识、练习、技能逐块拼装，并显式要求“L2 优先，和摘要冲突的旧状态视为过期”；上下文工程就是把「该给的信息」按结构喂给模型。
 
 第六轮把提示词从「机器人模板」改成「真人陪伴风格」：不再自称「咨询回复生成器」，改为「你是 Aegis，校园心理支持助手」；指令从「先共情→1-3步骤→开放问题」改成灵活对话指导（短句口语、长度匹配用户消息、一次最多一个问题、建议最多两条且只在合适时给）。历史摘要/知识/练习字段仍动态注入，但加了防泄漏指示——禁止把「用户提到/系统回应重点」等内部标签原文放进回复里。
 
@@ -884,8 +908,8 @@ system = (
 
 | Agent               | 方法                                         | 职责                                                             |
 | ------------------- | ------------------------------------------ | -------------------------------------------------------------- |
-| `MemoryAgent`       | `load / update`                            | 读写会话记忆摘要                                                       |
-| `RiskGuardianAgent` | `assess / create_report`                   | 调 assess\_risk 技能（规则∪LLM 双通道取并集（，详见第 3 站）；HIGH 时建待审报告       |
+| `MemoryAgent`       | `load / update`                            | 加载 L2 当前事实、L3 摘要和 L4 原话窗口；回复后更新 L3 并抽取 L2 事实 |
+| `RiskGuardianAgent` | `assess / create_report`                   | 调 assess\_risk 技能（规则∪LLM 双通道取并集，详见第 3 站）；HIGH 时建待审报告       |
 | `LeadAgent`         | `route`                                    | 关键词路由：高危→RISK；资料词→RESEARCH；咨询词或 MEDIUM→COUNSELING；否则 COMPANION |
 | `KnowledgeAgent`    | `search / rewrite_query`                   | LLM 改写检索词（失败退化原文前 60 字）+ 检索                                    |
 | `CounselorAgent`    | `grounding / compose_plan / finalize_plan` | 组装 ResponsePlan 并生成最终回复                                        |
@@ -905,7 +929,7 @@ def finalize_plan(self, plan: ResponsePlan) -> tuple[str, AgentTrace]:
     return fallback, ...                           # ⑤ 模型不可用/mock:模板兜底
 ```
 
-`_fallback_answer` 的模板按风险分三档开头（高危段直接给出「联系可信任的人/心理中心/紧急服务」），再拼记忆回显、稳定练习、知识首条、意图化收尾——这就是 mock 模式下学生看到的回复来源——。
+`_fallback_answer` 的模板按风险分三档开头（高危段直接给出「联系可信任的人/心理中心/紧急服务」），再拼 L3 摘要回显、稳定练习、知识首条、意图化收尾——这就是 mock 模式下学生看到的回复来源。注意边界：L2/L4 已传入真实 LLM Prompt，但当前模板兜底主要读取 L3 摘要；因此 L2/L4 对“贴着原话、避免引用过期状态”的改善主要体现于真实 LLM 可用的路径。
 
 
 
@@ -1100,18 +1124,61 @@ new_line = f"用户提到：{compact_sentence(user_message, 120)}；系统回应
 
 滚动摘要：每轮一行，超预算从最旧开始丢——心理对话「最近的上下文最重要」，这个丢弃方向是对的。
 
-### 9.5 vector\_store.py — 向量后端
+### 9.5 L1/L2/L3/L4 记忆分层、冲突规则与 Prompt 注入（第十三轮）
+
+长对话不能只靠“把全部历史塞进 Prompt”，也不能只靠“滚动摘要”。Aegis 将记忆拆成四层：每层回答不同问题，并在注入模型时明确优先级。
+
+| 层级 | 存储与作用域 | 存什么 | 读写时机 | 是否进入回复 Prompt |
+| --- | --- | --- | --- | --- |
+| **L1 Agent 私有记忆** | `agent_private_memories`；`agent_name + session_id` 隔离 | Agent 的协作策略、已完成任务等内部记录 | 各自治 Agent 按需读写 | 不作为统一用户画像直接注入 |
+| **L2 用户事实** | `user_memory_facts`；登录用户按 `owner_user_id` 跨会话聚合，匿名会话以 `session_id` 隔离 | 睡眠、情绪、学业/人际压力、求助进展，以及有限的年级/专业背景 | 每轮回复后确定性抽取并写入；下一轮加载 | **是，且优先级最高** |
+| **L3 会话摘要** | `session_memories`；会话级 | 历史对话压缩要点 | 每轮追加并按字符预算裁剪 | 是，但可能含过期状态 |
+| **L4 原话窗口** | `chat_messages`；会话级精确读取 | 最近 `MEMORY_RECENT_MESSAGES` 条角色/内容原文 | 每轮加载，默认 15 条 | 是，用于贴近近期措辞 |
+
+#### L2：为什么要采用 SCD-2（有效期版本）
+
+`UserMemoryFact` 不会物理删除旧状态，而是维护：
+
+```text
+fact_key       同一事实槽位，例如 sleep_state
+fact_value     当前值，例如 “睡眠困扰:睡不着”
+effective_from 该值开始生效的时间
+effective_until NULL 表示当前有效；被新值替代后写入截止时间
+superseded_by  替代它的新事实 public_id
+```
+
+写入规则是一个简化版 Slowly Changing Dimension Type 2：
+
+1. 当前有效行的值相同 → 判定重复，不写新行；
+2. 当前有效行的值不同 → 截断旧行 `effective_until`，再插入新行；
+3. 没有当前有效行 → 直接插入新行；
+4. 正常回复 Prompt 只读取 `effective_until IS NULL` 的行，完整历史仅供审计/回溯。
+
+所以“上周睡不着”后来变为“睡眠已经恢复”时，旧事实仍可追溯，却不会和新事实同时喂给模型。L3 摘要仍可能保留旧文本，因此 prompt 明确规定：**L2 当前有效状态优先；L3 与 L2 冲突时视 L3 为过期。**
+
+#### `facts.py`：确定性抽取，而不是诊断模型
+
+`app/rag/facts.py` 使用规则模式抽取睡眠、情绪、学业压力、人际困扰与求助进展；同时抽取有限的年级/专业背景。它不对用户进行医学诊断，也不从模糊表达推断人格或病史。这样做的收益是成本低、结果稳定、可复核；代价是遇到新表达时需要补规则，未来可以增加“LLM 候选 + 规则审查”的可选增强层。
+
+#### L4 与当前消息去重：三运行时为何不同
+
+- **ordered** 路径在当前用户消息落库前读取 L4，因此窗口天然不含本轮消息；
+- **autonomous / langgraph** 路径先落库再加载记忆，因此将 `exclude_current=message` 传给 `recent_messages()`，只移除末尾与当前输入一致的用户消息；
+- 三条路径都会将 L2/L3/L4 传给 `compose_plan()`，再进入 `LLMContext` 和 `build_messages()`。
+
+这一细节避免同一句话既出现在“当前用户消息”又出现在“近期对话原文”中，降低模型重复回应的概率。
+
+### 9.6 vector\_store.py — 向量后端
 
 `build_vector_backend(settings)` 按配置返回：
 
+- `VECTOR_ENABLED=false`（代码默认）：返回禁用向量后端，检索仍继续执行 BM25、加权融合/条件 rerank 和邻块扩展，只是不产生向量候选。
 - `ChromaVectorBackend`：真向量库，chromadb 持久化（cosine 空间），支持快照。嵌入有两种来源，由 `EMBEDDING_PROVIDER` 决定：
-  - `local`（默认推荐）：chromadb 内置 MiniLM 本地嵌入  ——离线、零 KEY、零费用；中文语义主要靠 BM25 主导、向量补充
-  - `openai`：OpenAI 兼容 `/embeddings` API（需向量模型额度）
-- `LocalVectorBackend`：哈希 bigram 伪向量： + 本地余弦——向量开关关掉时的降级路径，保证检索始终可用。
+  - `local`（`.env.example` 的推荐示例）：chromadb 内置 MiniLM 本地嵌入——离线、零 KEY、零费用；
+  - `openai`（`Settings` 代码默认）：OpenAI 兼容 `/embeddings` API（需向量模型额度）。
+- `LocalVectorBackend`：哈希 bigram 伪向量 + 本地余弦；当向量已启用但 Chroma 不可用、或显式选择 local 回退时使用，不是 `VECTOR_ENABLED=false` 时的默认替代。
 
-> 取舍实录：本项目接入真实 GLM 聊天模型但没有向量模型额度，于是把 Chroma 的嵌入源切到本地 MiniLM——向量库是真的、嵌入是离线的，检索质量经实测命中正确（考试→exam/sleep、关系→relationships）。
-
-`store.search_knowledge`（第 10 站）把 9.1–9.5 串成完整流水线：改写查询 → 向量候选（可选）→ 元数据过滤 → BM25 → 双路归一融合 → 重排 → 邻块扩展 → 截 top\_k。
+`store.search_knowledge`（第 10 站）把 9.1–9.6 串成完整流水线：改写查询 → 向量候选（可选）→ 元数据过滤 → BM25 → 双路融合 → **weighted 模式才执行本地 rerank** → 邻块扩展 → 截 top\_k。RRF 模式走“排名融合 + 邻块扩展”，当前不会继续叠加 `rerank_score()`。
 
 
 
@@ -1119,9 +1186,9 @@ new_line = f"用户提到：{compact_sentence(user_message, 120)}；系统回应
 
 ：RAG 不神秘，它是一条「分词→打分→融合→重排」的确定性流水线；每一环都可以单独替换成更强的实现（如 embedding 模型），这就是分层的好处。
 
-### 9.6 混合检索深度剖析（第十二轮扩充）
+### 9.7 混合检索深度剖析（第十二轮扩充）
 
-#### 9.6.1 为什么需要混合检索
+#### 9.7.1 为什么需要混合检索
 
 **单一检索方式的局限**：
 - **纯 BM25（词频统计）**：只看字面匹配，"睡不好"检索不到"失眠"文档，因为词不重叠；对同义词、语义泛化无能为力。
@@ -1129,7 +1196,7 @@ new_line = f"用户提到：{compact_sentence(user_message, 120)}；系统回应
 
 **混合检索的核心思想**：让 BM25 的**精确召回**（关键词命中）与向量的**语义泛化**（理解同义/近义）互补，两路各自检索后融合排序。
 
-#### 9.6.2 双路召回与融合策略
+#### 9.7.2 双路召回与融合策略
 
 **第 1 步：双路各自召回**
 ```python
@@ -1162,11 +1229,12 @@ rrf_score(doc) = sum(1 / (k + rank_in_bm25), 1 / (k + rank_in_vector))
 # k=60 是经验常数，防止分母为 0
 ```
 
-- **优点**：对分数尺度鲁棒，只依赖相对排名，企业 RAG 高频选择
-- **缺点**：丢失了绝对分数信息（如 BM25=0.01 和 0.9 都只看排名）
-- **配置**：`KNOWLEDGE_FUSION_MODE=rrf` 切换（默认 `weighted`）
+- **优点**：对分数尺度鲁棒，只依赖相对排名，企业 RAG 高频选择。
+- **缺点**：丢失绝对分数信息（如 BM25=0.01 和 0.9 都只看排名）。
+- **当前分支行为**：`KNOWLEDGE_FUSION_MODE=rrf` 时，仓储在 RRF 融合后直接做邻块扩展，不叠加本地 `rerank_score()`；因此 RRF 和 weighted+rerrank 的结果应分开评测，不应假设它们走同一重排链路。
+- **配置**：`KNOWLEDGE_FUSION_MODE=rrf` 切换（默认 `weighted`）。
 
-#### 9.6.3 Rerank 四路词法信号
+#### 9.7.3 Rerank 四路词法信号
 
 融合后的候选块进入 **rerank 阶段**（`rerank_score`），用纯 Python 四路信号加权：
 
@@ -1178,14 +1246,14 @@ final = base_score * 0.55                          # 融合分保底
 ```
 
 **各信号解释**：
-- `cosine`：query 与 doc 的 bigram token 余弦相似度（本地计算，无需向量模型）
-- `keyword`：query 中高频词（> 1 次）在 doc 中的命中比例
-- `coverage`：query 的 token 集合被 doc 覆盖的比例（set intersection / set union）
-- `phrase_bonus`：query 中的 2-gram 短语在 doc 中完整出现的次数（如"考试压力"作为整体命中）
+- `cosine`：query 与 doc 的 bigram token 余弦相似度（本地计算，无需向量模型）。
+- `keyword`：查询 token 在内容中的命中比例，不要求 token 在 query 中重复出现。
+- `coverage`：被内容覆盖的查询 token 比例，即 `len(query_tokens ∩ content_tokens) / len(query_tokens)`；不是 Jaccard 的并集分母。
+- `phrase_bonus`：规整后的**完整 query**是内容子串时为 1，否则为 0；不是累计多个 2-gram 的出现次数。
 
 **为什么不用模型 rerank**：纯 Python 零成本零延迟，实测已显著改善排序（见消融实验）；模型 rerank（如 BGE-reranker）可作后续增强。
 
-#### 9.6.4 邻块扩展（Expand Best Hit）
+#### 9.7.4 邻块扩展（Expand Best Hit）
 
 **问题**：固定步长切块（512 字符，重叠 64）会把一段完整答案拦腰截断，用户看到的是"半句话"。
 
@@ -1198,7 +1266,7 @@ final = base_score * 0.55                          # 融合分保底
 
 **效果**：用户问"如何缓解考试焦虑"，原本只返回"可以尝试深呼吸...[截断]"，扩展后返回"可以尝试深呼吸、肌肉放松，必要时寻求辅导员支持"（完整建议）。
 
-#### 9.6.5 消融实验（Ablation Study）
+#### 9.7.5 消融实验（Ablation Study）
 
 第十二轮新增 `app/rag_eval/runner.py:run_ablation()`，在**同一 77 条查询**上对比 4 种检索配置：
 
@@ -1206,42 +1274,43 @@ final = base_score * 0.55                          # 融合分保底
 | --- | --- | --- | --- |
 | `bm25_only` | 关向量，开 rerank | **0.9351** | 20.59 |
 | `hybrid` | 开 local-hash 向量，关 rerank | 0.8312 | 7.73 |
-| `hybrid_rerank` | 开向量 + rerank（生产默认） | 0.8052 | 19.14 |
+| `hybrid_rerank` | 开向量 + rerank（向量开启的可选生产配置，不是代码默认） | 0.8052 | 19.14 |
 | `rrf` | RRF 融合 | 0.7662 | 8.16 |
 
 **结论（如实呈现）**：
 - 在**零依赖的 `local-hash` 词法向量**下，纯 BM25 已足够强，混入哈希向量反而稀释分数
 - hybrid / RRF 的增量价值需要**真实语义向量**（Chroma + MiniLM / OpenAI embeddings）才能体现
-- 这一结果明确了"为什么生产要开语义向量、演示模式退化为 BM25"的配置边界
+- 这一结果明确了“演示默认 `VECTOR_ENABLED=false` 时走 BM25 路径；生产若启用语义向量应重新评测”的配置边界。
 
 **运行方式**：
 ```bash
 python -m app.rag_eval.runner  # 输出双口径 HitRate + 消融对比
 ```
 
-#### 9.6.6 查询缓存（第十二轮新增）
+#### 9.7.6 查询缓存（第十二轮新增）
 
 **动机**：RAG 检索（尤其向量 + rerank）延迟 15-20ms，重复查询浪费算力。
 
 **实现**：
 ```python
-# 进程内 LRU 缓存（OrderedDict，key=规范化查询+top_k+过滤条件）
+# 有 Redis 时当前只写入 Redis（TTL=300s），知识检索的 read-through 读取仍走进程内 LRU；因此暂不能宣称跨进程 Redis 命中
+# 进程内 LRU：key=规范化查询+top_k+过滤条件
 self._knowledge_cache: OrderedDict[str, tuple[datetime, list[dict]]] = ...
-
-# 有 Redis 时同时写入 Redis（TTL=300s），跨进程共享
 ```
 
 **配置**：
-- `KNOWLEDGE_CACHE_ENABLED=true`（默认 false）
+- `KNOWLEDGE_CACHE_ENABLED=true`（代码默认 `false`）
 - `KNOWLEDGE_CACHE_TTL_SECONDS=300`
 - `KNOWLEDGE_CACHE_MAX_ENTRIES=128`
+
+**当前实现边界**：有效命中来自进程内 LRU；Redis 缓存键会被写入以预留后续能力，但 `_check_cache()` 尚未读取 Redis，因此当前没有跨进程查询缓存。
 
 **效果**：
 - 冷查询 avg ~18-20ms
 - 命中后 <0.01ms，**加速约 3 个数量级**
 - 命中率 0.667（30 条 warmup + 60 次命中，基准测试数据）
 
-#### 9.6.7 双口径评测
+#### 9.7.7 双口径评测
 
 `app/rag_eval/runner.py` 的 `is_relevant()` 拆为两层：
 
@@ -1409,27 +1478,28 @@ async def attach_request_context(request, call_next):
 
 ：效果不是「看着不错」，而是可重复度量。
 
-- `evaluation/runner.py`：真实指标——路由/风险判定准确率、高风险召回率、误报率、HitRate/Recall@4/Precision@4/MRR/NDCG@4、技能选择、安全泄漏检查、多轮一致性、150 条规模化基准；如实标注样本量、数据来源与验证日期（含 95% 置信区间），不再为满分筛选样本。**150 条规模化基准按 `layer` 字段双层拆分**：`base`（基础层·贴近真实流量）/ `stress`（压力层·边界探测），runner 分别输出两套独立指标（`scaled_benchmark.base` / `scaled_benchmark.stress`），零删改、不凑分——既保住"真实"卖点，也主动暴露规则通道的边界缺口。
-- `evaluation/datasets.py`：加载 `eval/fixtures/representative_corpus.json`（150 条唯一真实样本，**每条含 `layer`（base/stress）与 `source`（synthetic-representative/synthetic-boundary）字段**，含隐式高危与第三人称干扰）、`rag_queries.json`（50 条自然语言 RAG 问句）、`multi_turn_corpus.json`（8 组多轮场景）；并提供可复现的随机采样工具，保证评测基于真实代表性数据、不循环造数。
+- `evaluation/runner.py`：真实指标——路由/风险判定准确率、高风险召回率、误报率、HitRate/Recall@4/Precision@4/MRR/NDCG@4、技能选择、安全泄漏检查、多轮一致性、150 条规模化基准；如实标注样本量、数据来源与验证日期（含 95% 置信区间），不再为满分筛选样本。**150 条规模化基准按 `layer` 字段双层拆分**：`base`（基础层·贴近主流场景）/ `stress`（压力层·边界探测），runner 分别输出两套独立指标（`scaled_benchmark.base` / `scaled_benchmark.stress`），零删改、不凑分——既保住“代表性”卖点，也主动暴露规则通道的边界缺口。
+- `evaluation/datasets.py`：加载 `eval/fixtures/representative_corpus.json`（150 条人工构造、人工标注、贴近校园心理求助语料的代表性金标样本，**每条含 `layer`（base/stress）与 `source`（synthetic-representative/synthetic-boundary）字段**，含隐式高危与第三人称干扰）、`rag_queries.json`（77 条自然语言 RAG 问句）、`multi_turn_corpus.json`（8 组多轮场景）；并提供可复现的随机采样工具。
 - `evaluation/report_html.py`：单文件 HTML 报告（内联 CSS），管理端一键可看。
-- `app/rag_eval/runner.py`：RAG 专项（HitRate/Recall@4/Precision@4/MRR/NDCG@4，独立运行改用一次性 SQLite 评测库、不依赖 MySQL/pymysql），数据集在 `eval/fixtures/rag_queries.json`（50 条自然语言问句，基于真实知识库）。
-- `app/harness/runner.py` + `factory.py`：工程级场景回放——8 套件（risk/routing/skills/rag/api/tool-queue/scaled/runtime-ab）验证端到端行为（如「审批后 5 个工具任务全部 success」「死信被正确创建」），失败退出码 1，可接 CI。`factory.py` 是重构产物：harness 与 `eval/run_eval.py` 共用一个装配工厂，消除两份漂移的样板。
-- `scripts/eval_risk_dual_path.py`（第十一轮新增）：风险 LLM 通道双路径评测——同 150 条语料分别跑 baseline（MockLLM + channel OFF）与 llm_stub（`MetaphorAwareStubClient` + channel ON），直调 `RiskGuardianAgent.assess()` 避免 response 生成/judge 等额外 LLM 调用。含真实 GLM-4.7-flash sanity probe（5 条隐喻样本 best-effort）。产出 `data/eval/risk_dual_path.json`。
+- `app/rag_eval/runner.py`：RAG 专项（HitRate/Recall@4/Precision@4/MRR/NDCG@4，独立运行改用一次性 SQLite 评测库、不依赖 MySQL/pymysql），数据集在 `eval/fixtures/rag_queries.json`（77 条自然语言问句，基于当前 24 篇知识文档）。
+- `app/harness/runner.py` + `factory.py`：工程级场景回放——8 套件（risk/routing/skills/rag/api/tool-queue/scaled/runtime-ab）验证端到端行为（如“审批后 5 个工具任务全部 success”“死信被正确创建”），失败退出码 1，可接 CI。`factory.py` 是重构产物：harness 与 `eval/run_eval.py` 共用一个装配工厂，消除两份漂移的样板。
+- `scripts/eval_risk_dual_path.py`（第十一轮新增）：风险 LLM 通道双路径评测——同 150 条语料分别跑 baseline（MockLLM + channel OFF）与 llm_stub（`MetaphorAwareStubClient` + channel ON），直调 `RiskGuardianAgent.assess()` 避免 response 生成/judge 等额外 LLM 调用；另有真实 GLM-4.7-flash 的 25 条扩展 best-effort probe。产出 `data/eval/risk_dual_path.json`。
 - `scripts/probe_glm.py`（第十一轮新增）：GLM 端点探针——验证 endpoint/model/api_key 可用性，不打印 API key，退出码 0=可用。
-- `eval/fixtures/`：路由/风险/安全/多轮小型金标集 + `representative_corpus.json`（150 条）/ `rag_queries.json`（50 条）/ `multi_turn_corpus.json`（8 组）真实代表性数据集。
+- `eval/fixtures/`：路由/风险/安全/多轮小型金标集 + `representative_corpus.json`（150 条）/ `rag_queries.json`（77 条）/ `multi_turn_corpus.json`（8 组）人工构造、人工标注的代表性数据集。
 
 
 
 学习要点
 
-：评测三层——单元（pytest 约 71 项）/能力（eval runner）/链路（harness 8 套件）；mock LLM 保证全链评测确定性，测的是系统不是模型运气。三运行时 A/B（`--suite runtime-ab`）对比编排器延迟/trace/调用数，LLM-as-Judge（`evaluation/judge.py`）给回复打共情/安全/结构分——评测从「分对错」升级到「评质量」。**双路径验证**（`scripts/eval_risk_dual_path.py`）量化 LLM 通道的能力上界：baseline（channel OFF）压力层 risk_acc=0.67 → stub-LLM on（channel ON）0.94，证明 LLM 通道能补齐规则漏判的 12 条隐喻式自杀意念；生产保持 channel OFF 不变，维持"暴露边界"卖点。
+：评测三层——单元（pytest；数量随版本变化）/能力（eval runner）/链路（harness 8 套件）；mock LLM 让主链评测可复现，测的是系统不是模型运气。三运行时 A/B（`--suite runtime-ab`）对比编排器延迟/trace/调用数，LLM-as-Judge（`evaluation/judge.py`）给回复打共情/安全/结构分——评测从「分对错」升级到「评质量」。**双路径验证**（`scripts/eval_risk_dual_path.py`）量化 LLM 通道的能力上界：baseline（channel OFF）压力层 risk_acc=0.67 → stub-LLM on（channel ON）0.94，证明 LLM 通道能补齐规则漏判的隐喻式风险表达。自动 Skill 蒸馏会写入使用统计与 `skills/auto/`；做 hermetic 评测时应显式关闭蒸馏或隔离输出目录，避免运行状态污染下次基线。
 
 ***
 
 ## 第 14 站 收尾 — static/ + tests/
 
 - `static/index.html + login.js`：登录页；`student.html/js`：会话列表 + SSE 流式对话；`admin.html/js`：报告/个案/trace/知识库/工具/评测/审计七大面板。原生 JS，零构建。
-- `tests/` 十四个文件 约 71 项：orchestrator（提供 `build_orchestrator` 给其他测试复用）、api（TestClient 全链）、agent\_runtime、retrieval\_eval、mcp\_tools、harness、assessment，以及第五轮新增的 risk\_dual\_channel（双通道，第十一轮扩展至 **9 项**：4 原有 + 5 新增覆盖 corp-106..130 隐喻双路径，含 `MetaphorAwareStubClient` 模拟 LLM judge）、function\_calling（FC）、runtime\_ab（A/B）、judge（LLM 评审）、langgraph\_runtime、langgraph\_checkpoint（跨进程恢复）；第六轮新增 `test_reply_style.py` 守护「提示词自然人设」与「兜底模板不露内部标签」两条底线。
+- `tests/` 当前包含多个模块化测试文件：orchestrator（提供 `build_orchestrator` 给其他测试复用）、api（TestClient 全链）、agent\_runtime、retrieval\_eval、mcp\_tools、harness、assessment、risk\_dual\_channel（双通道，覆盖 corp-106..130 隐喻双路径并含 `MetaphorAwareStubClient`）、function\_calling（FC）、runtime\_ab（A/B）、judge（LLM 评审）、langgraph\_runtime、langgraph\_checkpoint（跨进程恢复）、reply\_style（真人化提示词与模板标签守护）。历史“约 71 项通过”应附带日期与环境，执行时统一使用 `python -m pytest tests -q`，避免根目录 `test_chat.py` 的外部 HTTP 副作用。
+- 第十三轮新增的 L2/L4 与 auto Skill 已做烟雾验证，但尚缺少专门 pytest 回归：SCD-2 冲突截断、匿名命名空间隔离、三运行时 L4 去重、仅 L2/L4 时 LangGraph `memory_used`、第 3 次自动蒸馏及 auto Skill 防递归等都应补成独立用例。
 
 ***
 
@@ -1480,9 +1550,9 @@ async def attach_request_context(request, call_next):
 1.   跑起来  ：`python -m app.init_db && uvicorn app.main:app --port 8091`，用 student/student123! 登录发一句「我最近考试压力很大，晚上睡不着」，再去 /admin 看报告与 trace。
 2.   看一次安全闭环  ：发「我不想活了」，观察：回复是本地安全模板（mock 下也是）→ 管理端出现待审报告 → 审批 → 工具任务全部 success。
 3.   读一次黑板  ：`tests/test_orchestrator.py` 里的高风险用例断言了 SAFETY\_OVERRIDE 的传播；再对照 `autonomous/runtime.py` 的 `_trace_from_board` 看事件如何变成 trace。
-4.   改一个小东西试试  ：往 `assessment.HIGH_TERMS` 加一个词，跑 `pytest` 与 `python -m app.harness.runner --suite risk`——体会「单一来源 + 评测护栏」如何让修改变得安全。
+4.   改一个小东西试试  ：往 `assessment.HIGH_TERMS` 加一个词，跑 `python -m pytest tests -q` 与 `python -m app.harness.runner --suite risk`——体会「单一来源 + 评测护栏」如何让修改变得安全。
 5.   换个模型  ：设 `AI_PROVIDER=ollama` 起服务，其余什么都不用改。
-6.   跑一次双路径验证  ：`python scripts/eval_risk_dual_path.py`——看 baseline（channel OFF）与 stub-LLM on（channel ON）在 150 条语料上的风险准确率对比，体会「生产纯规则保暴露边界、LLM 通道补齐隐喻缺口」的设计取舍。
+6.   跑一次双路径验证  ：`python scripts/eval_risk_dual_path.py`——看 baseline（channel OFF）与 stub-LLM on（channel ON）在 150 条语料上的风险准确率对比，体会「纯规则 baseline 与 LLM 通道补齐隐喻缺口」的设计取舍。
 
 ## 总结四：按引导式路线「从零重建」的检查清单
 
@@ -1505,12 +1575,4 @@ async def attach_request_context(request, call_next):
 ***
 
 
-本指南对应仓库
-&#x20;
-`main`
-&#x20;
-分支第十一轮之后的状态（REFACTORING → OPTIMIZATION → AUTH-MYSQL → LANGGRAPH-DOCKER → DEEP-ENHANCEMENTS → LLM-RESPONSE-HUMANIZATION → MEMORY-ENHANCEMENT → CONFRONTATIONAL-DIALOGUE-TESTING → ROUND-9-CONSOLIDATION → CORPUS-LAYER-SPLIT → ROUND-11-RISK-LLM-DUAL-CHANNEL）。各轮详细变更见
-&#x20;
-[docs/records/](docs/records/)
-&#x20;
-系列文档。
+本指南对应 `main` 分支第十三轮之后的已提交状态（REFACTORING → OPTIMIZATION → AUTH-MYSQL → LANGGRAPH-DOCKER → DEEP-ENHANCEMENTS → LLM-RESPONSE-HUMANIZATION → MEMORY-ENHANCEMENT → CONFRONTATIONAL-DIALOGUE-TESTING → ROUND-9-CONSOLIDATION → CORPUS-LAYER-SPLIT → ROUND-11-RISK-LLM-DUAL-CHANNEL → ROUND-12-RAG-ENHANCEMENT-BENCHMARK → ROUND-13-MEMORY-SKILL-DISTILLATION）。各轮详细变更见 [docs/records/](docs/records/) 系列文档。

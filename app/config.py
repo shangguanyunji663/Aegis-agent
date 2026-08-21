@@ -91,6 +91,9 @@ class Settings(BaseSettings):
     agent_max_claims_per_round: int = 4
     agent_max_claims_per_agent: int = 3
     agent_final_acceptance_min_confidence: float = 0.6
+    skill_distill_enabled: bool = True
+    skill_distill_min_repeat: int = 3
+    skill_distill_dir: str = "skills/auto"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

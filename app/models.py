@@ -85,6 +85,10 @@ class ResponsePlan:
     grounding_steps: list[str] = field(default_factory=list)
     skill_context: str = ""
     prompt_messages: list[dict[str, str]] = field(default_factory=list)
+    # L4 近期对话原文滑动窗口(角色+内容,时间正序),弥补 L3 摘要的有损压缩
+    recent_messages: list[dict[str, str]] = field(default_factory=list)
+    # L2 当前有效用户事实(已过有效期截断,只含 effective_until IS NULL 的行)
+    user_facts: list[str] = field(default_factory=list)
 
 
 @dataclass

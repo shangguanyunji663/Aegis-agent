@@ -252,6 +252,30 @@ class AuthSession(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=now)
 
 
+class UserMemoryFact(Base):
+    """L2 用户结构化记忆事实:跨会话、可精确查询、带有效期(状态冲突规则载体)。
+
+    设计要点:
+    - 只增不删(add-only):信息变更时旧行保留,仅把 effective_until 置为变更日(掐断有效期);
+    - 新行 effective_from=变更日、effective_until=NULL(当前有效);
+    - 重复事实(与当前有效行值相同)直接丢弃,不写新行;
+    - 查询只取 effective_until IS NULL 的行,天然规避"新旧信息同时被读取导致模型混淆"。
+    """
+
+    __tablename__ = "user_memory_facts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    public_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    user_public_id: Mapped[str] = mapped_column(String(64), index=True, default="")
+    session_public_id: Mapped[str] = mapped_column(String(64), index=True, default="")
+    fact_key: Mapped[str] = mapped_column(String(128), index=True)
+    fact_value: Mapped[str] = mapped_column(Text, default="")
+    effective_from: Mapped[datetime] = mapped_column(DateTime, default=now)
+    effective_until: Mapped[datetime] = mapped_column(DateTime, nullable=True)  # NULL = 当前有效
+    superseded_by: Mapped[str] = mapped_column(String(64), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+
+
 class AdminAuditLog(Base):
     __tablename__ = "admin_audit_logs"
 

@@ -23,6 +23,10 @@ class LLMContext:
     knowledge_snippets: list[str]
     grounding_steps: list[str]
     response_skill_context: str = ""
+    # L4 滑动窗口:近期对话原文( [{"role","content"},...] 时间正序),供模型贴着原话回应
+    recent_messages: tuple[dict[str, str], ...] = ()
+    # L2 当前有效用户状态事实(已按有效期截断,与摘要冲突时以此为准)
+    user_facts: tuple[str, ...] = ()
 
 
 class LLMClient(Protocol):

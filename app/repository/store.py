@@ -30,6 +30,7 @@ from app.entities import (
     PsychologicalReport,
     SessionMemory,
     ToolAuditRecord,
+    UserMemoryFact,
     ToolJob,
 )
 from app.models import AgentTrace, CaseStatus, PendingReport, ReportStatus, SkillResult, ToolJobStatus, UserRole
@@ -100,6 +101,28 @@ class DatabaseStore:
             db.add(session)
             db.commit()
             return public_id
+
+    def recent_messages(self, session_public_id: str, limit: int = 15, exclude_current: str | None = None) -> list[dict]:
+        """L4 滑动窗口:返回该会话最近 limit 条原始对话(角色+内容),按时间正序。
+
+        仅在历史对话真正需要时调用——对话原文存 SQLite、按需精确读取,不入向量库。
+        exclude_current 用于剔除"当前这条已落库的用户消息",避免与 prompt 末尾的当前消息重复。
+        """
+        with self.db_factory() as db:
+            session = self._get_session(db, session_public_id)
+            if session is None:
+                return []
+            rows = (
+                db.query(ChatMessage)
+                .filter(ChatMessage.session_id == session.id)
+                .order_by(ChatMessage.created_at.desc(), ChatMessage.id.desc())
+                .limit(max(1, limit + (1 if exclude_current else 0)))
+                .all()
+            )
+            messages = [{"role": row.role.lower(), "content": row.content} for row in reversed(rows)]
+            if exclude_current is not None and messages and messages[-1]["role"] == "user" and messages[-1]["content"] == exclude_current:
+                messages = messages[:-1]
+            return messages[-limit:] if limit and len(messages) > limit else messages
 
     def list_sessions(self, owner_user_public_id: str | None = None) -> list[dict]:
         with self.db_factory() as db:
@@ -338,6 +361,70 @@ class DatabaseStore:
             result = self._memory_row_dict(memory) | {"updated": True}
             self._redis_set_session_memory(public_id, result)
             return result
+
+    # ---------------- L2 用户结构化记忆事实(状态冲突规则) ----------------
+    def upsert_user_fact(self, user_public_id: str, fact_key: str, fact_value: str, session_public_id: str = "") -> dict:
+        """写入/更新一条用户事实,落实"只增不删 + 有效期截断 + 重复丢弃"冲突规则。
+
+        逻辑:
+        - 存在当前有效(effective_until IS NULL)且值相同 -> 视为重复,直接返回原行(丢弃本次写入);
+        - 存在当前有效但值不同 -> 把旧行 effective_until 掐断为现在、记录 superseded_by,再插入新行;
+        - 无当前有效行 -> 直接插入新行(当前有效)。
+        全程物理删除,历史可追溯。
+        """
+        with self.db_factory() as db:
+            active = (
+                db.query(UserMemoryFact)
+                .filter(
+                    UserMemoryFact.user_public_id == user_public_id,
+                    UserMemoryFact.fact_key == fact_key,
+                    UserMemoryFact.effective_until.is_(None),
+                )
+                .first()
+            )
+            if active is not None and active.fact_value == fact_value:
+                return self._user_fact_dict(active)  # 重复事实,丢弃
+            new_id = random_id("ufact")
+            if active is not None:
+                active.effective_until = now_utc_naive()
+                active.superseded_by = new_id
+                db.add(active)
+            row = UserMemoryFact(
+                public_id=new_id,
+                user_public_id=user_public_id,
+                session_public_id=session_public_id,
+                fact_key=fact_key,
+                fact_value=fact_value,
+                effective_from=now_utc_naive(),
+                effective_until=None,
+                superseded_by="",
+            )
+            db.add(row)
+            db.commit()
+            db.refresh(row)
+            return self._user_fact_dict(row)
+
+    def active_user_facts(self, user_public_id: str) -> list[dict]:
+        """只读取当前有效(未过期)的用户事实——检索侧规避新旧同现。"""
+        with self.db_factory() as db:
+            rows = (
+                db.query(UserMemoryFact)
+                .filter(UserMemoryFact.user_public_id == user_public_id, UserMemoryFact.effective_until.is_(None))
+                .order_by(UserMemoryFact.created_at.asc())
+                .all()
+            )
+            return [self._user_fact_dict(row) for row in rows]
+
+    def user_facts_history(self, user_public_id: str) -> list[dict]:
+        """全量历史(含已掐断的旧行),仅供审计/回溯。"""
+        with self.db_factory() as db:
+            rows = (
+                db.query(UserMemoryFact)
+                .filter(UserMemoryFact.user_public_id == user_public_id)
+                .order_by(UserMemoryFact.created_at.asc())
+                .all()
+            )
+            return [self._user_fact_dict(row) for row in rows]
 
     def add_report(self, report: PendingReport) -> None:
         with self.db_factory() as db:
@@ -1036,6 +1123,20 @@ class DatabaseStore:
             "enabled": row.enabled == "true",
             "created_at": row.created_at.isoformat(),
             "updated_at": row.updated_at.isoformat(),
+        }
+
+    def _user_fact_dict(self, row: UserMemoryFact) -> dict:
+        return {
+            "id": row.id,
+            "public_id": row.public_id,
+            "user_public_id": row.user_public_id,
+            "session_public_id": row.session_public_id,
+            "fact_key": row.fact_key,
+            "fact_value": row.fact_value,
+            "effective_from": row.effective_from.isoformat() if row.effective_from else None,
+            "effective_until": row.effective_until.isoformat() if row.effective_until else None,
+            "superseded_by": row.superseded_by,
+            "active": row.effective_until is None,
         }
 
 

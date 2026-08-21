@@ -44,7 +44,7 @@ def create_app(runtime_settings: Settings | None = None) -> FastAPI:
     store.ensure_default_users()
     store.seed_knowledge_dir(knowledge_dir)
     runtime = RuntimeServices(settings)
-    registry = SkillRegistry(knowledge_dir, store.add_report, store.search_knowledge)
+    registry = SkillRegistry(knowledge_dir, store.add_report, store.search_knowledge, settings=settings)
     llm_client = build_llm_client(settings)
     orchestrator = PsychOrchestrator(registry, store, llm_client)
     agent_harness = AegisAgentHarness(orchestrator, store)

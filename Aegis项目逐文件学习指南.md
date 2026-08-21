@@ -128,7 +128,7 @@ flowchart LR
 | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------ |
 | `app/config.py`                                          | 全局配置（env / .env 映射，全部带安全默认值）                                                                         | `Settings`、`get_settings()`                                                                      | pydantic-settings  |
 | `app/models.py`                                          | 领域模型（Intent/RiskLevel/ChatResponse 等纯数据词汇表）                                                          | 枚举、`dataclass`、SSE 映射                                                                            | 仅标准库               |
-| `app/entities.py`                                        | ORM 实体（18 张表）                                                                                        | `Base` 下的实体类                                                                                     | SQLAlchemy         |
+| `app/entities.py`                                        | ORM 实体（19 张表，含第十三轮新增的 L2 事实表）                                                                                        | `Base` 下的实体类                                                                                     | SQLAlchemy         |
 | `app/database.py`                                        | 引擎/会话工厂/建表/迁移/就绪检查                                                                                   | `build_engine`、`build_session_factory`、`create_schema`                                           | SQLAlchemy         |
 | `app/assessment.py`                                      | 确定性风险评估（规则通道单一事实来源）                                                                                  | `assess_message()`                                                                               | 无（纯函数）             |
 | `app/skills.py`                                          | 技能注册表 + 标准化 Skill 选取                                                                                 | `SkillRegistry`、`response_skill_names()`                                                         | store 回调注入         |
@@ -140,7 +140,7 @@ flowchart LR
 | `app/agents/langgraph_runtime.py`                        | LangGraph StateGraph 运行时 + 检查点                                                                       | `LangGraphRuntime`                                                                               | langgraph          |
 | `app/autonomous/`                                        | 自治协作：events（协议）、registry（能力/决策）、board（共享读）、coordinator（认领循环）、agents（六自治 Agent）、runtime（黑板→响应）        | `AutonomousAgentRuntime`                                                                         | llm、rag、store      |
 | `app/rag/`                                               | 检索子系统：text（分词）、scoring（BM25/rerank/融合）、chunking（切块/元数据）、memory（滚动摘要）、vector\_store（Chroma/本地降级）      | `DatabaseStore.search_knowledge`（组装整条流水线）                                                        | chromadb（可选）       |
-| `app/repository/store.py`                                | 持久化总闸（约 973 行，按领域区块组织）                                                                               | `DatabaseStore`                                                                                  | entities、rag       |
+| `app/repository/store.py`                                | 持久化总闸（约 1146 行，第十三轮新增 L4/L2 方法后更新）                                                                               | `DatabaseStore`                                                                                  | entities、rag       |
 | `app/tools/`                                             | 工具治理：contracts（契约）、gateway（internal/MCP 网关）、mcp\_client                                              | `governed_payload()`、`build_tool_gateway()`                                                      | store              |
 | `app/services/`                                          | 业务服务：report\_case（审批后编排）、tool\_executor（真实副作用）、tool\_queue（队列/worker）、tool\_records、tool\_governance | `ReportCaseService`、`ToolQueueWorker`                                                            | store、tools        |
 | `app/api/`                                               | HTTP 路由：schemas/deps/middleware/pages/system/auth\_routes/chat/admin                                 | RESTful + SSE 接口                                                                                 | FastAPI、harness    |
@@ -280,7 +280,7 @@ settings → engine/会话工厂 → create_schema
 - **替代**：裸 `sqlite3`/SQL 字符串（无类型、易 SQL 注入、难迁移）、Django ORM（绑定框架）。
 - **代价/取舍**：手写 `migrate_legacy_schema()` 与 ORM 是「两份 schema 真相」的遗留债（正路是 Alembic）；小项目手写迁移能用，正规项目应上 Alembic。
 
-### LangGraph（主推运行时之一）
+### LangGraph（三档运行时之一）
 
 - **选了**：`langgraph` 的 `StateGraph` 作声明式状态图编排，挂 `SqliteSaver` 检查点。
 - **为什么**：条件边、声明式节点、`TypedDict` 状态 + `Annotated[list, operator.add]` 增量合并、图编译一次后每次 `invoke` 新状态（天然线程安全）、检查点支持长对话跨进程恢复（`get_state(session_id)` 可读最近终态）。
@@ -1053,9 +1053,9 @@ def _prepare(self, message, session_id, owner_user_public_id):
 
 `DEFAULT_AGENT_MODEL_PROFILES` 为六个 Agent 声明默认温度（记忆/路由/安全 0.0、知识 0.1、咨询 0.2、陪伴 0.3）与系统提示词，启动时写入 `agent_model_profiles` 表。`client_for(agent_name)`：档案是 `inherit` 就返回全局客户端，否则按档案的 provider/model 现造一个——让「安全评估用小模型、回复生成用大模型」成为一行配置——。
 
-### 8.4 langgraph\_runtime.py — LangGraph StateGraph（主推运行时之一）
+### 8.4 langgraph\_runtime.py — LangGraph StateGraph（三档运行时之一）
 
-`LangGraphRuntime` 用 LangGraph 的声明式状态图编排同一批单轮 Agent：`START → load_memory → assess_risk → route_intent →（条件边：companion+low 直接跳 compose，否则）→ context → report（仅 HIGH）→ compose → finalize → END`。状态 `GraphState` 是 TypedDict，`trace/skills` 字段用 `Annotated[list, operator.add]` 让节点返回增量自动合并；图只编译一次，每次对话 invoke 新状态，天然线程安全；finalize 仅低风险传 `on_token` 直播回调，安全门控与另两个运行时一致。`AGENT_RUNTIME=langgraph|autonomous|ordered` 三档切换，是「同一业务、三种编排」的活教材。图还挂了 SqliteSaver 检查点（thread\_id=会话 ID，`LANGGRAPH_CHECKPOINT_ENABLED`），`get_state(session_id)` 可读取最近终态——长对话跨进程断点可恢复。
+`LangGraphRuntime` 用 LangGraph 的声明式状态图编排同一批单轮 Agent：`START → load_memory → assess_risk → route_intent →（条件边：companion+low 直接跳 compose，否则）→ context → report（仅 HIGH）→ compose → finalize → END`。状态 `GraphState` 是 TypedDict，`trace/skills` 字段用 `Annotated[list, operator.add]` 让节点返回增量自动合并；图只编译一次，每次对话 invoke 新状态，天然线程安全；finalize 仅低风险传 `on_token` 直播回调，安全门控与另两个运行时一致。`AGENT_RUNTIME=langgraph|autonomous|ordered` 三档切换（默认 **autonomous**），是「同一业务、三种编排」的活教材。图还挂了 SqliteSaver 检查点（thread\_id=会话 ID，`LANGGRAPH_CHECKPOINT_ENABLED`），`get_state(session_id)` 可读取最近终态——长对话跨进程断点可恢复。
 
 ### 8.5 runtime.py — AgentRegistry / AgentRuntimeRunner
 
@@ -1119,15 +1119,151 @@ new_line = f"用户提到：{compact_sentence(user_message, 120)}；系统回应
 
 ：RAG 不神秘，它是一条「分词→打分→融合→重排」的确定性流水线；每一环都可以单独替换成更强的实现（如 embedding 模型），这就是分层的好处。
 
+### 9.6 混合检索深度剖析（第十二轮扩充）
+
+#### 9.6.1 为什么需要混合检索
+
+**单一检索方式的局限**：
+- **纯 BM25（词频统计）**：只看字面匹配，"睡不好"检索不到"失眠"文档，因为词不重叠；对同义词、语义泛化无能为力。
+- **纯向量检索**：中文语义高度依赖嵌入模型质量，低质量模型会把"考试压力"和"焦虑失眠"判为远距离；且商业 API 需要额度，无 KEY 时完全不可用。
+
+**混合检索的核心思想**：让 BM25 的**精确召回**（关键词命中）与向量的**语义泛化**（理解同义/近义）互补，两路各自检索后融合排序。
+
+#### 9.6.2 双路召回与融合策略
+
+**第 1 步：双路各自召回**
+```python
+# BM25 路：对所有文档计算词频分数，取 top-N
+bm25_results = [(doc_id, bm25_score), ...]
+
+# 向量路：query embedding 与文档 embedding 余弦相似度，取 top-N
+vector_results = [(doc_id, cosine_score), ...]
+```
+
+**第 2 步：分数融合（两种模式）**
+
+**加权融合（Weighted，默认）**：
+```python
+# 各路分数先 min-max 归一化到 [0,1]
+normalized_bm25 = (score - min) / (max - min)
+normalized_vector = ...
+
+# 按权重线性加权（默认 0.65 向量 + 0.35 BM25）
+final_score = w_vector * normalized_vector + w_bm25 * normalized_bm25
+```
+
+- **优点**：直观，权重可调（`KNOWLEDGE_HYBRID_VECTOR_WEIGHT` / `KNOWLEDGE_HYBRID_BM25_WEIGHT`）
+- **缺点**：对分数分布敏感，BM25 分数范围差异大时归一化会失真
+
+**RRF 融合（Reciprocal Rank Fusion，第十二轮新增）**：
+```python
+# 不看分数，只看排名
+rrf_score(doc) = sum(1 / (k + rank_in_bm25), 1 / (k + rank_in_vector))
+# k=60 是经验常数，防止分母为 0
+```
+
+- **优点**：对分数尺度鲁棒，只依赖相对排名，企业 RAG 高频选择
+- **缺点**：丢失了绝对分数信息（如 BM25=0.01 和 0.9 都只看排名）
+- **配置**：`KNOWLEDGE_FUSION_MODE=rrf` 切换（默认 `weighted`）
+
+#### 9.6.3 Rerank 四路词法信号
+
+融合后的候选块进入 **rerank 阶段**（`rerank_score`），用纯 Python 四路信号加权：
+
+```python
+final = base_score * 0.55                          # 融合分保底
+      + (cosine * 0.75 + keyword * 0.25) * 0.25    # 余弦相似度 + 关键词匹配
+      + coverage * 0.15                             # 查询词覆盖率
+      + phrase_bonus * 0.05                         # 完整短语命中奖励
+```
+
+**各信号解释**：
+- `cosine`：query 与 doc 的 bigram token 余弦相似度（本地计算，无需向量模型）
+- `keyword`：query 中高频词（> 1 次）在 doc 中的命中比例
+- `coverage`：query 的 token 集合被 doc 覆盖的比例（set intersection / set union）
+- `phrase_bonus`：query 中的 2-gram 短语在 doc 中完整出现的次数（如"考试压力"作为整体命中）
+
+**为什么不用模型 rerank**：纯 Python 零成本零延迟，实测已显著改善排序（见消融实验）；模型 rerank（如 BGE-reranker）可作后续增强。
+
+#### 9.6.4 邻块扩展（Expand Best Hit）
+
+**问题**：固定步长切块（512 字符，重叠 64）会把一段完整答案拦腰截断，用户看到的是"半句话"。
+
+**解决**：`expand_best_hit(top_chunk, all_chunks)`
+```python
+# 找到排名第一的块（冠军块）
+# 查找同源文件（source 相同）且位置相邻的块（offset 连续）
+# 合并为一段完整上下文（最多 3 个块，约 1500 字符）
+```
+
+**效果**：用户问"如何缓解考试焦虑"，原本只返回"可以尝试深呼吸...[截断]"，扩展后返回"可以尝试深呼吸、肌肉放松，必要时寻求辅导员支持"（完整建议）。
+
+#### 9.6.5 消融实验（Ablation Study）
+
+第十二轮新增 `app/rag_eval/runner.py:run_ablation()`，在**同一 77 条查询**上对比 4 种检索配置：
+
+| 配置 | 说明 | HitRate@4 | 平均延迟(ms) |
+| --- | --- | --- | --- |
+| `bm25_only` | 关向量，开 rerank | **0.9351** | 20.59 |
+| `hybrid` | 开 local-hash 向量，关 rerank | 0.8312 | 7.73 |
+| `hybrid_rerank` | 开向量 + rerank（生产默认） | 0.8052 | 19.14 |
+| `rrf` | RRF 融合 | 0.7662 | 8.16 |
+
+**结论（如实呈现）**：
+- 在**零依赖的 `local-hash` 词法向量**下，纯 BM25 已足够强，混入哈希向量反而稀释分数
+- hybrid / RRF 的增量价值需要**真实语义向量**（Chroma + MiniLM / OpenAI embeddings）才能体现
+- 这一结果明确了"为什么生产要开语义向量、演示模式退化为 BM25"的配置边界
+
+**运行方式**：
+```bash
+python -m app.rag_eval.runner  # 输出双口径 HitRate + 消融对比
+```
+
+#### 9.6.6 查询缓存（第十二轮新增）
+
+**动机**：RAG 检索（尤其向量 + rerank）延迟 15-20ms，重复查询浪费算力。
+
+**实现**：
+```python
+# 进程内 LRU 缓存（OrderedDict，key=规范化查询+top_k+过滤条件）
+self._knowledge_cache: OrderedDict[str, tuple[datetime, list[dict]]] = ...
+
+# 有 Redis 时同时写入 Redis（TTL=300s），跨进程共享
+```
+
+**配置**：
+- `KNOWLEDGE_CACHE_ENABLED=true`（默认 false）
+- `KNOWLEDGE_CACHE_TTL_SECONDS=300`
+- `KNOWLEDGE_CACHE_MAX_ENTRIES=128`
+
+**效果**：
+- 冷查询 avg ~18-20ms
+- 命中后 <0.01ms，**加速约 3 个数量级**
+- 命中率 0.667（30 条 warmup + 60 次命中，基准测试数据）
+
+#### 9.6.7 双口径评测
+
+`app/rag_eval/runner.py` 的 `is_relevant()` 拆为两层：
+
+- **宽松口径（loose）**：来源命中**或**任一 expected term 出现在内容（原口径）
+- **严格口径（strict）**：**仅** expected source 命中
+
+**报告新增**：`hitRateStrict` / `strictSourceMatches`，同时输出两口径值。
+
+**第十二轮实测（77 条查询，Top-4）**：
+- 宽松口径 HitRate@4：**0.9351**（72/77）
+- 严格口径 HitRateStrict：**0.8831**（68/77）
+- MRR / NDCG@4：0.8203 / 0.8323
+
 ***
 
 ## 第 10 站 repository/store.py — 持久化仓储
 
-`DatabaseStore` 是所有表的读写总闸（约 973 行，按区块组织）：
+`DatabaseStore` 是所有表的读写总闸（约 1146 行，第十三轮新增 L4/L2 方法后更新，按区块组织）：
 
--   会话/消息  ：`ensure_session`（不存在则建，支持归属回填）、`list/get/delete/rename_session`、`append_message`（首条用户消息自动成为标题）。
+-   会话/消息  ：`ensure_session`（不存在则建，支持归属回填）、`list/get/delete/rename_session`、`append_message`（首条用户消息自动成为标题）、**`recent_messages`**（L4 滑动窗口，第十三轮新增，支持 `exclude_current` 排除当前消息）。
 -   认证  ：`ensure_default_users`（演示账号）、`authenticate_user`（验密 + 发会话令牌）、`get/revoke_auth_session`（过期即删）。
--   记忆  ：`get_memory`（Redis 缓存 → SQLite）、`update_memory`（调 `rag/memory.build_memory_summary` 后双写）。Agent 私有记忆同理（`append/load_agent_private_memory`，Redis list 缓存最近 50 条）。
+-   记忆  ：`get_memory`（Redis 缓存 → SQLite）、`update_memory`（调 `rag/memory.build_memory_summary` 后双写）。Agent 私有记忆同理（`append/load_agent_private_memory`，Redis list 缓存最近 50 条）。**L2 用户事实（第十三轮新增）**：`upsert_user_fact`（只增不删 + 有效期截断 + 重复丢弃，SCD-2 模式）、`active_user_facts`（只读 `effective_until IS NULL` 的当前有效行）、`user_facts_history`（完整历史版本）。
 -   知识库  ：`seed/rebuild_knowledge_dir`（目录全量重建）、`ingest_knowledge`（内容未变则跳过重嵌）、`search_knowledge`（第 9 站流水线）、`rebuild_vector_index`、`backup_knowledge_dir`。
 -   报告/个案  ：自身只剩薄委托——`list_reports` 等一行转给 `ReportCaseService`（第 11 站），服务持有同一个 Session。
 -   工具任务  ：`create_tool_job`（先过契约校验，被拒也写审计！）、`run_pending_tool_jobs`、`retry_tool_job`、死信列表。

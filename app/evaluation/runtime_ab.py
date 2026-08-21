@@ -71,7 +71,7 @@ def _build_orchestrator(data_dir: Path, runtime: str, llm_client: CountingLLMCli
     )
     store = DatabaseStore(session_factory, settings=settings)
     store.seed_knowledge_dir(knowledge_dir)
-    registry = SkillRegistry(knowledge_dir, store.add_report, store.search_knowledge)
+    registry = SkillRegistry(knowledge_dir, store.add_report, store.search_knowledge, settings=settings)
     orchestrator = PsychOrchestrator(registry, store, llm_client)
     orchestrator.settings = settings
     if runtime == "langgraph":

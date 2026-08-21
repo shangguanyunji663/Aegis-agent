@@ -37,5 +37,5 @@ def build_harness_orchestrator(data_dir: Path | None = None, knowledge_dir: Path
     store = DatabaseStore(session_factory, settings=hermetic)
     knowledge_dir = knowledge_dir or KNOWLEDGE_DIR
     store.rebuild_knowledge_dir(knowledge_dir)
-    registry = SkillRegistry(knowledge_dir, store.add_report, store.search_knowledge)
+    registry = SkillRegistry(knowledge_dir, store.add_report, store.search_knowledge, settings=hermetic)
     return PsychOrchestrator(registry, store, MockLLMClient())

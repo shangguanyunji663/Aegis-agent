@@ -42,6 +42,8 @@ def select_response_skills(
     if not whitelist:
         return [], "rules"
     if not _supports_function_calling(llm_client, enabled):
+        # 记录规则选择
+        registry.record_skill_usage(intent, risk_level, whitelist)
         return whitelist, "rules"
 
     tools = [
@@ -65,11 +67,14 @@ def select_response_skills(
         chosen = None
     if chosen is None:
         # None = mock/未配置/异常:行为不可信,回退规则白名单
+        registry.record_skill_usage(intent, risk_level, whitelist)
         return whitelist, "rules"
     if not chosen:
         # 空列表 = 模型明确判断都不需要
         return [], "fc"
     allowed = [name for name in chosen if name in whitelist]
     if not allowed:  # 模型幻觉防护:全不在白名单 → 兜底
+        registry.record_skill_usage(intent, risk_level, whitelist)
         return whitelist, "rules"
+    registry.record_skill_usage(intent, risk_level, allowed)
     return allowed, "fc"

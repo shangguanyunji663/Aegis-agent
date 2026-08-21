@@ -48,16 +48,43 @@ def format_source_label(source: str) -> str:
 class MemoryAgent:
     name = "MemoryAgent"
 
-    def load(self, store, session_id: str) -> tuple[dict, AgentTrace | None]:
+    def load(self, store, session_id: str, exclude_current: str | None = None) -> tuple[dict, AgentTrace | None]:
         memory = store.get_memory(session_id)
         summary = memory.get("summary", "")
-        if not summary:
+        recent_messages = store.recent_messages(
+            session_id,
+            limit=max(1, int(getattr(store.settings, "memory_recent_messages", 15))),
+            exclude_current=exclude_current,
+        )
+        session = store.get_session(session_id) or {}
+        # 未登录演示会话也要有隔离的事实命名空间；正式会话优先使用用户 ID。
+        user_public_id = str(session.get("owner_user_id") or session_id)
+        active_facts = store.active_user_facts(user_public_id)
+        memory = memory | {"recent_messages": recent_messages, "active_user_facts": active_facts}
+        used = bool(summary or recent_messages or active_facts)
+        if not used:
             return memory, None
-        return memory, AgentTrace(self.name, "load_memory", f"covered_messages={memory.get('covered_message_count', 0)}")
+        return memory, AgentTrace(
+            self.name,
+            "load_memory",
+            f"covered_messages={memory.get('covered_message_count', 0)};recent={len(recent_messages)};active_facts={len(active_facts)}",
+        )
 
     def update(self, store, session_id: str, user_message: str, assistant_answer: str) -> tuple[dict, AgentTrace]:
         memory = store.update_memory(session_id, user_message, assistant_answer)
-        return memory, AgentTrace(self.name, "update_memory", f"covered_messages={memory.get('covered_message_count', 0)}")
+        session = store.get_session(session_id) or {}
+        user_public_id = str(session.get("owner_user_id") or session_id)
+        fact_count = 0
+        from app.rag.facts import extract_user_facts
+
+        for fact_key, fact_value in extract_user_facts(user_message):
+            store.upsert_user_fact(user_public_id, fact_key, fact_value, session_id)
+            fact_count += 1
+        return memory, AgentTrace(
+            self.name,
+            "update_memory",
+            f"covered_messages={memory.get('covered_message_count', 0)};facts_observed={fact_count}",
+        )
 
 
 class RiskGuardianAgent:
@@ -197,6 +224,8 @@ class CounselorAgent:
         knowledge: SkillResult | None = None,
         grounding: SkillResult | None = None,
         standard_skill_context: str = "",
+        recent_messages: list[dict[str, str]] | None = None,
+        user_facts: list[str] | None = None,
     ) -> tuple[ResponsePlan, AgentTrace]:
         """构造一个简单的 ResponsePlan，供后续 `finalize_plan` 使用。
 
@@ -218,6 +247,8 @@ class CounselorAgent:
         if grounding and isinstance(grounding.output, dict):
             plan.grounding_steps = grounding.output.get("steps") or []
         plan.skill_context = standard_skill_context or ""
+        plan.recent_messages = list(recent_messages or [])
+        plan.user_facts = list(user_facts or [])
         plan.prompt_messages = [
             {"role": "system", "content": "你是一个温和而负责的心理支持助手。"},
             {"role": "user", "content": message},
@@ -245,6 +276,8 @@ class CounselorAgent:
             knowledge_snippets=plan.knowledge_snippets,
             grounding_steps=plan.grounding_steps,
             response_skill_context=plan.skill_context,
+            recent_messages=tuple(plan.recent_messages),
+            user_facts=tuple(plan.user_facts),
         )
         generated = None
         if on_token is not None:

@@ -104,12 +104,22 @@ class MemoryAutonomousAgent(BaseAutonomousAgent):
         return AgentDecision(False, reason="task does not require memory")
 
     def act(self, task: AgentTask, board: CollaborationBlackboard) -> AgentTurnResult:
-        memory, _ = self.agent.load(self.services.store, self.services.session_id)
+        memory, _ = self.agent.load(
+            self.services.store,
+            self.services.session_id,
+            exclude_current=board.user_input,
+        )
         summary = memory.get("summary", "")
+        from app.rag.facts import render_user_facts
+
+        recent_messages = memory.get("recent_messages", [])
+        user_facts = render_user_facts(memory.get("active_user_facts", []))
         payload = {
             "summary": summary,
+            "recent_messages": recent_messages,
+            "user_facts": user_facts,
             "covered_message_count": memory.get("covered_message_count", 0),
-            "memory_used": bool(summary),
+            "memory_used": bool(summary or recent_messages or user_facts),
             "private_memory": self.private_memory(),
         }
         self.remember(f"loaded session memory; used={bool(summary)}", {"covered_message_count": payload["covered_message_count"]})
@@ -303,6 +313,8 @@ class KnowledgeAutonomousAgent(BaseAutonomousAgent):
         standard_context = self.services.registry.standard_context(standard_skills)
         payload = {
             "memory_summary": memory_summary,
+            "recent_messages": list((memory_artifact.payload if memory_artifact else {}).get("recent_messages", [])),
+            "user_facts": list((memory_artifact.payload if memory_artifact else {}).get("user_facts", [])),
             "knowledge": knowledge,
             "grounding": grounding,
             "skills": skills,
@@ -356,6 +368,8 @@ class CounselorAutonomousAgent(BaseAutonomousAgent):
             context.get("knowledge"),
             context.get("grounding"),
             context.get("standard_context", ""),
+            context.get("recent_messages", []),
+            context.get("user_facts", []),
         )
         live_cb = self.services.on_reply_token if risk is RiskLevel.LOW else None
         answer, trace = self.agent.finalize_plan(response_plan, on_token=live_cb)
@@ -408,6 +422,8 @@ class CompanionAutonomousAgent(BaseAutonomousAgent):
             None,
             None,
             "",
+            list((memory_artifact.payload if memory_artifact else {}).get("recent_messages", [])),
+            list((memory_artifact.payload if memory_artifact else {}).get("user_facts", [])),
         )
         response_plan.response_agent = self.name
         # Companion 路径仅在 intent=companion 且 risk=low 时被认领,可安全直播

@@ -49,6 +49,8 @@ class GraphState(TypedDict, total=False):
     session_id: str
     message: str
     memory_summary: str
+    recent_messages: list[dict[str, str]]
+    user_facts: list[str]
     memory_used: bool
     risk: SkillResult
     risk_level: RiskLevel
@@ -152,9 +154,22 @@ class LangGraphRuntime:
 
     # ---------------- 节点实现(复用单轮 Agent,逻辑与 ordered 路径一致) ----------------
     def _node_load_memory(self, state: GraphState) -> dict:
-        memory, memory_trace = self.memory_agent.load(self.store, state["session_id"])
+        memory, memory_trace = self.memory_agent.load(
+            self.store,
+            state["session_id"],
+            exclude_current=state.get("message"),
+        )
         summary = memory.get("summary", "")
-        updates: dict = {"memory_summary": summary, "memory_used": bool(summary)}
+        recent_messages = list(memory.get("recent_messages", []))
+        from app.rag.facts import render_user_facts
+
+        user_facts = render_user_facts(memory.get("active_user_facts", []))
+        updates: dict = {
+            "memory_summary": summary,
+            "recent_messages": recent_messages,
+            "user_facts": user_facts,
+            "memory_used": bool(summary or recent_messages or user_facts),
+        }
         if memory_trace is not None:
             updates["trace"] = [memory_trace]
         return updates
@@ -221,6 +236,8 @@ class LangGraphRuntime:
             state.get("knowledge"),
             state.get("grounding"),
             standard_context,
+            state.get("recent_messages", []),
+            state.get("user_facts", []),
         )
         skill_traces = [AgentTrace("SkillRegistry", "select_standard_skills", ",".join(standard_skills) or "none")]
         if skill_mode != "rules":

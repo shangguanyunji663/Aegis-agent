@@ -87,6 +87,10 @@ class PsychOrchestrator:
             lambda agent: agent.load(self.store, session_id),
         )
         memory_summary = memory["summary"]
+        recent_messages = list(memory.get("recent_messages", []))
+        from app.rag.facts import render_user_facts
+
+        user_facts = render_user_facts(memory.get("active_user_facts", []))
         if memory_trace is not None:
             trace.append(memory_trace)
             self._emit_agent_trace(runtime_events, emit, memory_trace)
@@ -185,7 +189,17 @@ class PsychOrchestrator:
         response_plan, plan_trace = self.runtime_runner.run_step(
             "counselor",
             "compose_plan",
-            lambda agent: agent.compose_plan(message, intent, risk_level, memory_summary, knowledge, grounding, standard_skill_context),
+            lambda agent: agent.compose_plan(
+                message,
+                intent,
+                risk_level,
+                memory_summary,
+                knowledge,
+                grounding,
+                standard_skill_context,
+                recent_messages,
+                user_facts,
+            ),
         )
         trace.append(plan_trace)
         self._emit_agent_trace(runtime_events, emit, plan_trace)
@@ -229,7 +243,7 @@ class PsychOrchestrator:
             trace=trace,
             pending_report=None if pending_report is None else PendingReport.from_dict(pending_report),
             memory_summary=updated_memory["summary"],
-            memory_used=bool(memory_summary),
+            memory_used=bool(memory_summary or recent_messages or user_facts),
             response_plan=response_plan,
         )
         self._record_runtime(runtime_events, emit, RuntimeEventType.RUN_COMPLETED, {"response": asdict(response)})

@@ -1,0 +1,11 @@
+# 训练专用依赖；不要合并到项目根 requirements.txt。
+# 安装前须单独安装与本机 CUDA/驱动匹配的 GPU PyTorch wheel。
+# Qwen3.5 原生 Transformers 支持始于 5.2.0，训练前运行 base_model_gate 验证。
+transformers>=5.2.0
+peft>=0.18.0
+bitsandbytes>=0.49.0
+accelerate>=1.12.0
+datasets>=4.4.0
+safetensors>=0.6.2
+PyYAML>=6.0.2
+scikit-learn>=1.6.0

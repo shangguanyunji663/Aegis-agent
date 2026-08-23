@@ -8,6 +8,7 @@ import json
 import os
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -26,7 +27,26 @@ def load_env(env_path: Path) -> dict[str, str]:
 
 
 def probe(base_url: str, api_key: str, model: str) -> int:
-    url = base_url.rstrip("/") + "/chat/completions"
+    # SSRF 防护:仅 http(s) 且带主机名;解析后拒绝私网/环回/链路本地 IP(公网 API 放行)
+    import ipaddress
+    import socket
+
+    parsed = urllib.parse.urlparse(base_url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        print(f"[probe] 非法 base_url: {base_url!r}(仅支持 http/https 并带主机名)")
+        return 2
+    if parsed.hostname.lower() in {"localhost", "127.0.0.1", "::1"}:
+        print(f"[probe] 拒绝本机地址: {base_url!r}")
+        return 2
+    try:
+        resolved = ipaddress.ip_address(socket.gethostbyname(parsed.hostname))
+    except (socket.gaierror, ValueError):
+        print(f"[probe] 无法解析主机: {parsed.hostname}")
+        return 2
+    if resolved.is_private or resolved.is_loopback or resolved.is_link_local:
+        print(f"[probe] 拒绝内网目标({resolved}): {base_url!r}")
+        return 2
+    url = f"{parsed.scheme}://{parsed.netloc}/chat/completions"
     payload = {
         "model": model,
         "temperature": 0.0,

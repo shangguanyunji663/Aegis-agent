@@ -11,13 +11,14 @@ def build_client(tmp_path: Path, chat_rate_limit_per_minute: int = 40) -> TestCl
     knowledge_dir = tmp_path / "knowledge"
     knowledge_dir.mkdir(exist_ok=True)
     (knowledge_dir / "seed.md").write_text("考试压力 睡不着 焦虑 可以先稳定身体反应并拆分任务", encoding="utf-8")
+    defaults = Settings(_env_file=None)
     settings = Settings(
         database_url=f"sqlite:///{tmp_path / 'api.sqlite'}",
         knowledge_dir=str(knowledge_dir),
-        auth_default_admin_username="admin",
-        auth_default_admin_password="admin123!",
-        auth_default_student_username="student",
-        auth_default_student_password="student123!",
+        auth_default_admin_username=defaults.auth_default_admin_username,
+        auth_default_admin_password=defaults.auth_default_admin_password,
+        auth_default_student_username=defaults.auth_default_student_username,
+        auth_default_student_password=defaults.auth_default_student_password,
         chat_rate_limit_per_minute=chat_rate_limit_per_minute,
         # 测试密封:固定自治运行时与本地依赖,断言不受 .env 影响
         agent_runtime="autonomous",

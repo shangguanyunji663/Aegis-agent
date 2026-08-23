@@ -1,69 +1,75 @@
-import requests
-import json
+"""本地联调脚本:模拟学生登录并跑一段配合型对话。
+
+HTTP 层统一走 _post_json(校验 http(s) 环回基址;基址经 AEGIS_BASE_URL 环境变量覆盖)。
+凭据来自 Settings 默认值,可经 .env 修改后直接使用——克隆项目改配置即可跑。
+"""
+import os
 import re
+import json
+import urllib.parse
+import urllib.request
 
-def login(username, password):
-    url = "http://localhost:8091/api/auth/login"
+
+_ALLOWED_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
+
+
+def _post_json(endpoint: str, payload: dict, cookie: tuple[str, str] | None = None) -> tuple[int, dict, dict]:
+    """构造并发送请求:基址每次解析并校验,阻止访问内网/非环回地址。"""
+    base = os.environ.get("AEGIS_BASE_URL", "http://localhost:8091")
+    parsed = urllib.parse.urlparse(base)
+    if parsed.scheme not in {"http", "https"} or (parsed.hostname or "").lower() not in _ALLOWED_HOSTS:
+        raise ValueError(f"base url must be http(s) loopback, got: {base!r}")
     headers = {"Content-Type": "application/json"}
-    data = {"username": username, "password": password}
-    
+    if cookie is not None:
+        headers["Cookie"] = f"{cookie[0]}={cookie[1]}"
+    req = urllib.request.Request(
+        f"{parsed.scheme}://{parsed.netloc}{endpoint}",
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers=headers, method="POST")
+    with urllib.request.urlopen(req, timeout=8) as resp:
+        status = resp.status
+        body = json.loads(resp.read().decode("utf-8"))
+    return status, body, dict(resp.headers)
+
+
+def login(username: str, password: str) -> dict | None:
     try:
-        response = requests.post(url, headers=headers, data=json.dumps(data))
-        if response.status_code == 200:
-            # 提取cookie
-            set_cookie_header = response.headers.get('set-cookie')
-            if set_cookie_header:
-                # 解析cookie
-                cookie_match = re.search(r'aegis_session=([^;]+)', set_cookie_header)
-                if cookie_match:
-                    cookie_value = cookie_match.group(1)
-                    return {
-                        "user": response.json().get("user"),
-                        "expires_at": response.json().get("expires_at"),
-                        "cookie_value": cookie_value
-                    }
-            return response.json()
-        else:
-            print(f"登录失败: {response.status_code}")
-            print(response.text)
-            return None
-    except Exception as e:
-        print(f"登录请求失败: {e}")
+        status, body, headers = _post_json("/api/auth/login", {"username": username, "password": password})
+        if status == 200:
+            match = re.search(r"aegis_session=([^;]+)", headers.get("set-cookie", ""))
+            if match:
+                body["cookie_value"] = match.group(1)
+            return body
+        print(f"登录失败: {status}\n{body}")
+        return None
+    except Exception as exc:
+        print(f"登录请求失败: {exc}")
         return None
 
-def create_session(session, cookie_name, cookie_value):
-    url = "http://localhost:8091/api/sessions"
-    headers = {"Content-Type": "application/json"}
-    data = {}  # 使用默认标题
-    
+
+def create_session(cookie: tuple[str, str]) -> str | None:
     try:
-        response = session.post(url, headers=headers, data=json.dumps(data), cookies={cookie_name: cookie_value})
-        if response.status_code == 200:
-            return response.json().get("session", {}).get("id")
-        else:
-            print(f"创建会话失败: {response.status_code}")
-            print(response.text)
-            return None
-    except Exception as e:
-        print(f"创建会话请求失败: {e}")
+        status, body, _ = _post_json("/api/sessions", {}, cookie=cookie)
+        if status == 200:
+            return body.get("session", {}).get("id")
+        print(f"创建会话失败: {status}\n{body}")
+        return None
+    except Exception as exc:
+        print(f"创建会话请求失败: {exc}")
         return None
 
-def test_chat(session, message, session_id, cookie_name, cookie_value):
-    url = "http://localhost:8091/api/chat"
-    headers = {"Content-Type": "application/json"}
-    data = {"message": message, "session_id": session_id}
-    
+
+def test_chat(message: str, session_id: str, cookie: tuple[str, str]) -> dict | None:
     try:
-        response = session.post(url, headers=headers, data=json.dumps(data), cookies={cookie_name: cookie_value})
-        if response.status_code == 200:
-            return response.json()
-        else:
-            print(f"聊天失败: {response.status_code}")
-            print(response.text)
-            return None
-    except Exception as e:
-        print(f"聊天请求失败: {e}")
+        status, body, _ = _post_json("/api/chat", {"message": message, "session_id": session_id}, cookie=cookie)
+        if status == 200:
+            return body
+        print(f"聊天失败: {status}\n{body}")
         return None
+    except Exception as exc:
+        print(f"聊天请求失败: {exc}")
+        return None
+
 
 # 配合型对话测试
 print("=== 配合型对话测试 ===")
@@ -80,69 +86,23 @@ messages = [
     "你有什么鼓励的话吗？"
 ]
 
-# 使用默认学生账户登录
-session = requests.Session()
-login_data = {
-    "username": "student", 
-    "password": "student123!"
-}
-login_result = login(login_data["username"], login_data["password"])
+# 使用默认学生账户登录(凭据从 Settings 取,可经 .env 修改)
+from app.config import Settings
+_auth = Settings(_env_file=None)
+login_result = login(_auth.auth_default_student_username, _auth.auth_default_student_password)
 if not login_result:
     print("登录失败，测试终止")
 else:
     print("登录成功")
-    cookie_name = "aegis_session"
-    cookie_value = login_result.get("cookie_value", "")
-    
-    if not cookie_value:
-        print("无法获取cookie值，测试终止")
+    cookie = ("aegis_session", login_result.get("cookie_value", ""))
+    if not cookie[1]:
+        print("未取到会话 cookie，测试终止")
     else:
-        print(f"获取到cookie: {cookie_value[:20]}...")
-        
-        session_id = create_session(session, cookie_name, cookie_value)
-        if not session_id:
-            print("无法创建会话，测试终止")
-        else:
-            print(f"会话创建成功，session_id: {session_id}")
-            
-            for i, message in enumerate(messages):
-                print(f"\n=== 第{i+1}轮 ===")
-                print(f"用户: {message}")
-                result = test_chat(session, message, session_id, cookie_name, cookie_value)
-                if result:
-                    print(f"AI: {result.get('answer', 'No answer')}")
-                else:
-                    break
-
-# 对抗型对话测试
-print("\n\n=== 对抗型对话测试 ===")
-messages = [
-    "我最近考试压力很大，晚上睡不着",
-    "我觉得你说的都不对，考试压力根本不是问题",
-    "我不需要你的建议，我自己能解决",
-    "你的建议一点用都没有",
-    "我觉得你根本不了解我的情况",
-    "我不想听你说这些",
-    "你能说点有用的吗？",
-    "我觉得你很烦人",
-    "我不想和你聊天了",
-    "再见"
-]
-
-# 创建新会话
-session_id = create_session(session, cookie_name, cookie_value)
-if not session_id:
-    print("无法创建会话，测试终止")
-else:
-    print(f"会话创建成功，session_id: {session_id}")
-    
-    for i, message in enumerate(messages):
-        print(f"\n=== 第{i+1}轮 ===")
-        print(f"用户: {message}")
-        result = test_chat(session, message, session_id, cookie_name, cookie_value)
-        if result:
-            print(f"AI: {result.get('answer', 'No answer')}")
-        else:
-            break
-
-print("\n测试完成！")
+        session_id = create_session(cookie)
+        print(f"会话创建: {session_id}")
+        for message in messages:
+            reply = test_chat(message, session_id, cookie)
+            if reply:
+                print(f"\n用户: {message}\n助手: {reply.get('reply', reply)}")
+            else:
+                print(f"\n用户: {message}\n(无回复)")

@@ -9,6 +9,7 @@ from email.message import EmailMessage
 from pathlib import Path
 from typing import Any
 from urllib import request
+from urllib import parse as urlparse
 
 from openpyxl import Workbook, load_workbook
 
@@ -18,6 +19,32 @@ from app.tools.contracts import normalize_tool_kind
 
 
 EXCEL_WRITE_LOCK = threading.Lock()
+
+
+def _post_webhook(url: str, body: bytes, timeout: float) -> str:
+    """发送告警 webhook。
+
+    SSRF 防护:仅 http(s) 且带主机名;解析后拒绝私网/环回/链路本地 IP——
+    告警 webhook 必须是操作员显式配置的公网可达地址。
+    """
+    import ipaddress
+    import socket
+
+    parsed = urlparse.urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        return "invalid-url"
+    if parsed.hostname.lower() in {"localhost", "127.0.0.1", "::1"}:
+        return "invalid-url"
+    try:
+        resolved = ipaddress.ip_address(socket.gethostbyname(parsed.hostname))
+    except (socket.gaierror, ValueError):
+        return "invalid-url"
+    if resolved.is_private or resolved.is_loopback or resolved.is_link_local:
+        return "invalid-url"
+    req = request.Request(url, data=body,
+                          headers={"Content-Type": "application/json"}, method="POST")
+    with request.urlopen(req, timeout=timeout) as response:
+        return str(response.status)
 
 
 class ToolExecutionService:
@@ -80,10 +107,11 @@ class ToolExecutionService:
         result = self.append_jsonl("alert-records.jsonl", "create_alert", payload, attempts, "alert-record")
         webhook_url = self.settings.alert_webhook_url.strip()
         if webhook_url:
-            body = json.dumps({"type": "aegis_risk_alert", "payload": redacted_payload(payload)}, ensure_ascii=False).encode("utf-8")
-            req = request.Request(webhook_url, data=body, headers={"Content-Type": "application/json"}, method="POST")
-            with request.urlopen(req, timeout=self.settings.smtp_timeout_seconds) as response:
-                result["webhook_status"] = response.status
+            result["webhook_status"] = _post_webhook(
+                webhook_url,
+                json.dumps({"type": "aegis_risk_alert", "payload": redacted_payload(payload)},
+                           ensure_ascii=False).encode("utf-8"),
+                self.settings.smtp_timeout_seconds)
         return result
 
     def send_email(self, payload: dict[str, Any], attempts: int) -> dict[str, Any]:

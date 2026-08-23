@@ -15,8 +15,8 @@
 """
 from __future__ import annotations
 
+import hashlib
 import json
-import random
 from pathlib import Path
 from typing import Any
 
@@ -52,15 +52,16 @@ def load_multi_turn_corpus() -> list[dict]:
 
 
 def sample_cases(cases: list[dict], n: int, seed: int = 20240819) -> list[dict]:
-    """可复现随机抽样：从大规模语料中抽取固定规模子集。
+    """确定性抽样：从大规模语料中抽取固定规模子集。
 
-    使用固定种子的 ``random.Random``，保证同一 ``(cases, n, seed)`` 始终得到相同子集，
-    使评测结果可复现、可审计。
+    以 ``sha256(seed|样本内容)`` 排序再截取前 n 条，不用随机数——
+    同一 ``(cases, n, seed)`` 始终得到相同子集，使评测结果可复现、可审计。
     """
     if n >= len(cases):
         return list(cases)
-    rng = random.Random(seed)
-    return rng.sample(cases, n)
+    digest = lambda case: hashlib.sha256(
+        f"{seed}|{json.dumps(case, ensure_ascii=False, sort_keys=True)}".encode("utf-8")).hexdigest()
+    return sorted(cases, key=digest)[:n]
 
 
 def generated_benchmark_cases() -> list[dict]:

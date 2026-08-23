@@ -5,6 +5,7 @@ import re
 import time
 import logging
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from typing import Callable, Protocol
@@ -48,7 +49,7 @@ class LLMClient(Protocol):
 
 RISK_ASSESS_SYSTEM_PROMPT = (
     "你是校园心理支持系统的风险评估器,只依据当下说话人的**自身意向**判断风险:"
-    "high(自伤/自杀意念或计划,包括隐喻式表达如想消失/活着多余/从没出生过/不配/撑不下去/永远睡过去/离开这个世界/结束这一切/不愿再醒来/要是不在了就好了),"
+    "high(自伤/自杀意念或计划,包括隐喻式表达如想消失/从没出生过/撑不下去/永远睡过去/离开这个世界/结束这一切/不愿再醒来/要是不在了就好了),"
     "medium(强烈痛苦、绝望、功能受损但无直接自伤)、"
     "low(一般困扰,包括提及他人/虚构情境的高危词,如\"新闻里有人轻生/写论文提到自杀/朋友直播自杀\"——这些不应升为自身风险)。"
     "判定原则:仅评估说话人自身;他人或虚构内容提及自杀/伤害不视为自身 high。"
@@ -148,6 +149,52 @@ class MockLLMClient:
 
     def judge_reply(self, message: str, reply: str) -> dict | None:
         return None
+
+
+class RiskQloraClient:
+    """RiskGuardian 专用 QLoRA 客户端:assess_risk 走隔离推理服务,其余能力委托原客户端。
+
+    服务不可达/超时/返回非法 JSON 时 assess_risk 返回 None,
+    RiskGuardian 将自动回退纯规则通道(只升不降融合契约不变)。
+    SSRF 防护:仅允许 http(s) 且主机名为本机环回地址——推理服务按设计以独立进程常驻本机。
+    """
+
+    provider = "qlora"
+    model = "aegis-risk-qwen3.5-2b-v9"
+    _ALLOWED_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
+
+    def __init__(self, base_client, url: str, timeout: float):
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in {"http", "https"} or (parsed.hostname or "").lower() not in self._ALLOWED_HOSTS:
+            raise ValueError(f"risk_qlora_url must be http(s) loopback, got: {url!r}")
+        self.base_client = base_client
+        self.url = f"{parsed.scheme}://{parsed.netloc}"
+        self.timeout = timeout
+
+    def status(self) -> dict:
+        base = self.base_client.status() if self.base_client else {}
+        base["risk_qlora"] = {"url": self.url, "enabled": True, "model": self.model}
+        return base
+
+    def assess_risk(self, text: str) -> dict | None:
+        payload = json.dumps({"message": text}, ensure_ascii=False).encode("utf-8")
+        request = urllib.request.Request(
+            f"{self.url}/assess", data=payload,
+            headers={"Content-Type": "application/json; charset=utf-8"},
+            method="POST")
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                data = json.loads(response.read().decode("utf-8"))
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+            return None
+        level = str(data.get("risk_level") or "").strip().lower()
+        if level not in {"low", "medium", "high"}:
+            return None
+        return {"risk_level": level, "reason": str(data.get("reason", ""))[:120]}
+
+    def __getattr__(self, name):
+        # 其余能力(支持回复/改写/工具调用/评审)全部委托原客户端
+        return getattr(self.base_client, name)
 
 
 class OpenAICompatibleClient:

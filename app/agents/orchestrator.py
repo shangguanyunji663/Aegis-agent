@@ -22,10 +22,23 @@ class PsychOrchestrator:
         self.model_registry = AgentModelRegistry(self.settings, self.store, self.llm_client)
         self.model_registry.ensure_defaults()
         self.memory_agent = MemoryAgent()
+        risk_client = self.model_registry.client_for("RiskGuardianAgent")
+        risk_channel_enabled = bool(getattr(self.settings, "risk_llm_channel_enabled", False))
+        # QLoRA 增强通道:开启时 RiskGuardian 的 LLM 通道换用微调模型(隔离推理服务)。
+        # URL 非法时构造抛错,由上层启动失败暴露配置问题,而非静默回退。
+        if bool(getattr(self.settings, "risk_qlora_enabled", False)):
+            from app.llm.client import RiskQloraClient
+
+            risk_client = RiskQloraClient(
+                risk_client,
+                url=str(getattr(self.settings, "risk_qlora_url", "http://127.0.0.1:8301")),
+                timeout=float(getattr(self.settings, "risk_qlora_timeout_seconds", 8.0)),
+            )
+            risk_channel_enabled = True
         self.risk_agent = RiskGuardianAgent(
             registry,
-            llm_client=self.model_registry.client_for("RiskGuardianAgent"),
-            llm_channel_enabled=bool(getattr(self.settings, "risk_llm_channel_enabled", False)),
+            llm_client=risk_client,
+            llm_channel_enabled=risk_channel_enabled,
         )
         self.lead_agent = LeadAgent()
         self.knowledge_agent = KnowledgeAgent(registry, self.llm_client)

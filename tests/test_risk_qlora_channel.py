@@ -1,14 +1,22 @@
 """QLoRA 风险增强通道接入测试:开关、回退、只升不降与 URL 防护。"""
 import json
 import threading
+import urllib.parse
+import urllib.request
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 from app.agents.classic import RiskGuardianAgent
 from app.config import Settings
 from app.llm.client import MockLLMClient, RiskQloraClient
+import app.llm.client as llm_client_module
 from app.models import RiskLevel
 from app.skills import SkillRegistry
+
+
+def _allow_local_qlora_for_test(monkeypatch):
+    monkeypatch.setattr(llm_client_module, "validate_public_http_url", urllib.parse.urlparse)
+    monkeypatch.setattr(llm_client_module, "safe_urlopen", urllib.request.urlopen)
 
 
 def _build_agent(tmp_path: Path, client, enabled: bool = True) -> RiskGuardianAgent:
@@ -44,8 +52,9 @@ def _start_stub_server(responses: dict) -> tuple[HTTPServer, str]:
     return server, f"http://127.0.0.1:{server.server_port}"
 
 
-def test_qlora_channel_upgrades_rules_to_high(tmp_path: Path):
+def test_qlora_channel_upgrades_rules_to_high(tmp_path: Path, monkeypatch):
     """隐喻高危:规则 low,QLoRA 判 high -> 只升不降融合为 high 并触发报告资格。"""
+    _allow_local_qlora_for_test(monkeypatch)
     message = "我好想让这一切永远地停下"
     server, url = _start_stub_server({message: {"risk_level": "high", "reason": "隐喻式暂停意愿"}})
     try:
@@ -59,8 +68,9 @@ def test_qlora_channel_upgrades_rules_to_high(tmp_path: Path):
         server.shutdown()
 
 
-def test_qlora_channel_never_downgrades_rules(tmp_path: Path):
+def test_qlora_channel_never_downgrades_rules(tmp_path: Path, monkeypatch):
     """规则已判 high,QLoRA 判 medium -> 维持 high(只升不降)。"""
+    _allow_local_qlora_for_test(monkeypatch)
     message = "我想结束自己的生命"  # 规则引擎必然命中 high
     server, url = _start_stub_server({message: {"risk_level": "medium", "reason": "误判"}})
     try:
@@ -72,8 +82,9 @@ def test_qlora_channel_never_downgrades_rules(tmp_path: Path):
         server.shutdown()
 
 
-def test_qlora_service_down_falls_back_to_rules(tmp_path: Path):
+def test_qlora_service_down_falls_back_to_rules(tmp_path: Path, monkeypatch):
     """服务不可达 -> 回退纯规则,不抛异常,通道标记 llm=skipped。"""
+    _allow_local_qlora_for_test(monkeypatch)
     client = RiskQloraClient(MockLLMClient(), url="http://127.0.0.1:1", timeout=0.2)
     agent = _build_agent(tmp_path, client)
     result, level, _ = agent.assess("今天心情不太好")
@@ -81,8 +92,9 @@ def test_qlora_service_down_falls_back_to_rules(tmp_path: Path):
     assert result.output["risk_channels"]["llm"] == "skipped"
 
 
-def test_qlora_invalid_payload_treated_as_fallback(tmp_path: Path):
+def test_qlora_invalid_payload_treated_as_fallback(tmp_path: Path, monkeypatch):
     """服务返回非法 risk_level -> 视为通道失败,回退规则。"""
+    _allow_local_qlora_for_test(monkeypatch)
     message = "最近总是睡不好"
     server, url = _start_stub_server({message: {"risk_level": None, "reason": ""}})
     try:
@@ -109,4 +121,4 @@ def test_qlora_disabled_by_default():
     """默认关闭:未开启时行为与既有通道完全一致。"""
     settings = Settings()
     assert settings.risk_qlora_enabled is False
-    assert settings.risk_qlora_url.startswith("http://127.0.0.1")
+    assert isinstance(settings.risk_qlora_url, str)

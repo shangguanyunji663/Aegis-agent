@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Callable, Protocol
 
 from app.config import Settings
+from app.core.network import safe_urlopen, validate_public_http_url
 from app.llm.prompts import build_messages, build_rewrite_messages
 from app.models import Intent, RiskLevel
 
@@ -156,17 +157,16 @@ class RiskQloraClient:
 
     服务不可达/超时/返回非法 JSON 时 assess_risk 返回 None,
     RiskGuardian 将自动回退纯规则通道(只升不降融合契约不变)。
-    SSRF 防护:仅允许 http(s) 且主机名为本机环回地址——推理服务按设计以独立进程常驻本机。
+    SSRF 防护:仅允许 http(s) 公网地址，拒绝 localhost、环回、私有和保留地址。
     """
 
     provider = "qlora"
     model = "aegis-risk-qwen3.5-2b-v9"
-    _ALLOWED_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
-
     def __init__(self, base_client, url: str, timeout: float):
-        parsed = urllib.parse.urlparse(url)
-        if parsed.scheme not in {"http", "https"} or (parsed.hostname or "").lower() not in self._ALLOWED_HOSTS:
-            raise ValueError(f"risk_qlora_url must be http(s) loopback, got: {url!r}")
+        try:
+            parsed = validate_public_http_url(url)
+        except ValueError as exc:
+            raise ValueError(f"risk_qlora_url must be a public http(s) endpoint, got: {url!r}") from exc
         self.base_client = base_client
         self.url = f"{parsed.scheme}://{parsed.netloc}"
         self.timeout = timeout
@@ -183,7 +183,7 @@ class RiskQloraClient:
             headers={"Content-Type": "application/json; charset=utf-8"},
             method="POST")
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+            with safe_urlopen(request, timeout=self.timeout) as response:
                 data = json.loads(response.read().decode("utf-8"))
         except (urllib.error.URLError, TimeoutError, OSError, ValueError):
             return None
@@ -474,7 +474,7 @@ def post_json(url: str, payload: dict, headers: dict[str, str], timeout: float) 
     start = time.time()
     for attempt in range(1 + _MAX_RETRIES):
         try:
-            with urllib.request.urlopen(request, timeout=timeout) as response:
+            with safe_urlopen(request, timeout=timeout) as response:
                 raw = response.read().decode("utf-8")
                 elapsed_ms = int((time.time() - start) * 1000)
                 try:
@@ -512,7 +512,7 @@ def post_json_stream(url: str, payload: dict, headers: dict[str, str], timeout: 
     last_exc: Exception | None = None
     for attempt in range(1 + _MAX_RETRIES):
         try:
-            with urllib.request.urlopen(request, timeout=timeout) as response:
+            with safe_urlopen(request, timeout=timeout) as response:
                 for raw_line in response:
                     line = raw_line.decode("utf-8").strip()
                     if not line.startswith("data:"):
@@ -555,7 +555,7 @@ def post_ndjson_stream(url: str, payload: dict, headers: dict[str, str], timeout
     start = time.time()
     for attempt in range(1 + _MAX_RETRIES):
         try:
-            with urllib.request.urlopen(request, timeout=timeout) as response:
+            with safe_urlopen(request, timeout=timeout) as response:
                 for raw_line in response:
                     line = raw_line.decode("utf-8").strip()
                     if not line:

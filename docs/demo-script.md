@@ -59,7 +59,7 @@ python -m app.harness.runner --suite runtime-ab   # 三运行时 A/B 对比报�
 
 ## 7. 深度能力演示(第五轮)
 
-1. **风险双通道**：发送“我觉得自己是家人的负担，活着没什么意思”。规则通道先执行；当 `RISK_QLORA_ENABLED=true` 且隔离推理服务可用时，RiskGuardian 还会调用 v9 QLoRA 通道，并在管理端 trace 的 `risk_channels` 中记录 `rules` 与 `llm` 来源。关闭 QLoRA 或服务超时/异常时自动回退规则，行为不变。
+1. **风险双通道**：发送“我觉得自己是家人的负担，活着没什么意思”。规则通道先执行；本地可单独启动隔离服务并调用 `/health`、`/assess` 做 smoke test。应用集成时，只有配置受保护公网 HTTPS endpoint 才启用 `RISK_QLORA_ENABLED=true`，RiskGuardian 才会调用 v9 QLoRA 通道；服务超时/异常时自动回退规则。
 2. **Function Calling**:咨询消息回复后,trace 中 `skill_selection_mode` 显示 `function-calling`,技能列表是模型自主挑选的白名单子集;断网/失败时自动回退规则全量。
 3. **LLM-as-Judge**:管理端触发综合评测,报告中出现 judge 段(共情/安全/结构三维均分);mock 环境下该段自动省略。
 4. **LangGraph Checkpoint**:`data/langgraph-checkpoints.sqlite` 记录每会话最近检查点;重启服务后同一会话继续对话,`get_state(session_id)` 可读回上一轮终态。

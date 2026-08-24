@@ -129,7 +129,7 @@ DATABASE_URL=mysql+pymysql://root:你的密码@localhost:3306/aegis?charset=utf8
 
 ### 使用已验收的 QLoRA 风险模型（可选）
 
-普通启动默认**不会加载训练模型**：`RISK_QLORA_ENABLED=false`，RiskGuardian 保持现有规则/通用 LLM 行为。要启用第四版验收后的 v9 QLoRA 模型，需要先在独立训练环境启动服务，再启动项目：
+普通启动默认**不会加载训练模型**：`RISK_QLORA_ENABLED=false`，RiskGuardian 保持现有规则/通用 LLM 行为。训练服务可以在本机独立启动并用 `/health`、`/assess` 做 smoke test；应用侧的 QLoRA HTTP 集成只接受经过保护的公网 HTTPS endpoint，不直接访问 localhost、环回或内网地址：
 
 ```bash
 # Windows 示例；其他机器把这些路径改成自己的训练根目录
@@ -148,15 +148,15 @@ set AEGIS_QLORA_MODEL_DIR=%AEGIS_TRAINING_ROOT%\exports\aegis-risk-qwen3.5-2b-v9
 curl http://127.0.0.1:8301/health
 ```
 
-然后在项目 `.env` 中配置：
+本地服务的 HTTP 地址只用于独立 smoke test，不填入应用 `.env`。要接入应用，先将推理服务部署到受保护的公网 HTTPS 地址，再配置：
 
 ```ini
 RISK_QLORA_ENABLED=true
-RISK_QLORA_URL=http://127.0.0.1:8301
+RISK_QLORA_URL=https://your-approved-qlora.example.com
 RISK_QLORA_TIMEOUT_SECONDS=8
 ```
 
-最后按普通方式启动 FastAPI。QLoRA 服务必须先启动；服务不可达、超时或返回非法 JSON 时，RiskGuardian 自动回退规则。其他 Agent 仍使用各自原有模型通道。该服务路径不依赖 Ollama，训练文件和模型仍放在外部 `AEGIS_TRAINING_ROOT`，不写入项目仓库。
+服务不可达、超时或返回非法 JSON 时，RiskGuardian 自动回退规则。其他 Agent 仍使用各自原有模型通道。训练文件和模型仍放在外部 `AEGIS_TRAINING_ROOT`，不写入项目仓库。
 
 > 生产部署默认建议使用 bf16（与验收口径一致）；显存不足时可加 `--load-4bit`，但需要重新验证边界样本结果。`RISK_QLORA_ENABLED` 默认关闭。
 >

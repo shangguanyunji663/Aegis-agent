@@ -21,10 +21,11 @@ class Settings(BaseSettings):
     llm_thinking_enabled: bool = False
     llm_support_temperature: float = 0.6  # 支持性回复采样温度(偏高更像真人);风险/改写/评审仍固定 0.0
     risk_llm_channel_enabled: bool = True
-    # QLoRA 风险增强通道:指向隔离 Transformers 推理服务(见 D:\AegisTraining\training\scripts\serve_risk_qlora.py)。
-    # 开启后 RiskGuardian 的 LLM 通道改用微调模型;关闭则完全保持既有行为。
+    # QLoRA 风险增强通道:指向受保护的公网 HTTPS 推理服务。
+    # 本机 serve_risk_qlora.py 仅用于独立 smoke test;关闭则保持既有行为。
     risk_qlora_enabled: bool = False
-    risk_qlora_url: str = "http://127.0.0.1:8301"
+    # Must be an approved public HTTPS endpoint; local QLoRA HTTP is smoke-test only.
+    risk_qlora_url: str = "https://qlora-endpoint.example.invalid"
     risk_qlora_timeout_seconds: float = 8.0
     function_calling_enabled: bool = True
     langgraph_checkpoint_enabled: bool = True

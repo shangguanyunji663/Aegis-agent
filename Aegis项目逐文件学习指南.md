@@ -396,11 +396,11 @@ set AEGIS_QLORA_MODEL_DIR=%AEGIS_TRAINING_ROOT%\exports\aegis-risk-qwen3.5-2b-v9
   --model-dir "%AEGIS_QLORA_MODEL_DIR%"
 ```
 
-确认 `http://127.0.0.1:8301/health` 返回 `status=ok` 后，在项目 `.env` 写入：
+确认 `http://127.0.0.1:8301/health` 返回 `status=ok` 后即可完成本地 smoke test；该 localhost 地址不要写入应用 `.env`。应用集成必须使用受保护的公网 HTTPS endpoint：
 
 ```ini
 RISK_QLORA_ENABLED=true
-RISK_QLORA_URL=http://127.0.0.1:8301
+RISK_QLORA_URL=https://your-approved-qlora.example.com
 RISK_QLORA_TIMEOUT_SECONDS=8
 ```
 

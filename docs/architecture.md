@@ -138,7 +138,7 @@ flowchart TD
 
 - **规则通道（baseline）**：基于关键词和模式匹配，永远兜底，确保显式高危表达不会漏判
 - **LLM 通道（可选增强）**：通过 `RISK_LLM_CHANNEL_ENABLED` 配置，可调用 LLM 识别隐喻式、改写式高危表达
-- **QLoRA 微调通道（第十四轮）**：由 `RISK_QLORA_ENABLED` 开关控制，开启后 RiskGuardian 的 LLM 通道改用 **v9 QLoRA 微调模型**（`aegis-risk-qwen3.5-2b-v9`），以独立 Transformers 推理服务（`serve_risk_qlora.py`，由 `AEGIS_TRAINING_ROOT` / `AEGIS_QLORA_MODEL_DIR` 配置模型路径）代替原始 Ollama 裸模型调用。`RISK_QLORA_ENABLED=true` 时自动接管 LLM 通道，`RISK_LLM_CHANNEL_ENABLED` 在 QLoRA 模式下始终为 true
+- **QLoRA 微调通道（第十四轮）**：由 `RISK_QLORA_ENABLED` 开关控制，开启后 RiskGuardian 的 LLM 通道改用 **v9 QLoRA 微调模型**（`aegis-risk-qwen3.5-2b-v9`），以独立 Transformers 推理服务（`serve_risk_qlora.py`，由 `AEGIS_TRAINING_ROOT` / `AEGIS_QLORA_MODEL_DIR` 配置模型路径）代替原始 Ollama 裸模型调用。训练服务的 localhost 地址只用于独立 smoke test；应用 HTTP 集成要求受保护公网 HTTPS endpoint，且会拒绝 localhost、环回、私有和保留地址。
 - **降级保障**：LLM 超时/失败/mock 环境自动回退纯规则，规则永远兜底
 
 **生产环境配置建议**：

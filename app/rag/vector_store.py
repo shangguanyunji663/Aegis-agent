@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Iterable
 
 from app.config import Settings
+from app.core.network import validate_public_http_url
 
 PRIMARY_RETRIEVAL_LABEL = "Chroma vector + BM25 hybrid + local reranker"
 FALLBACK_RETRIEVAL_LABEL = "local BM25 + hybrid_score reranker"
@@ -293,8 +294,10 @@ class ChromaVectorBackend(VectorSearchBackend):
             "input": [text if text.strip() else " " for text in texts],
         }
         headers = {"Authorization": f"Bearer {self.settings.openai_api_key}"}
+        endpoint = f"{self.settings.openai_base_url.rstrip('/')}/embeddings"
+        validate_public_http_url(endpoint)
         response = httpx.post(
-            f"{self.settings.openai_base_url.rstrip('/')}/embeddings",
+            endpoint,
             headers=headers,
             json=payload,
             timeout=self.settings.embedding_timeout_seconds,

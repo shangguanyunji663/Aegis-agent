@@ -14,6 +14,7 @@ from urllib import parse as urlparse
 from openpyxl import Workbook, load_workbook
 
 from app.config import Settings
+from app.core.network import safe_urlopen, validate_public_http_url
 from app.core.privacy import redacted_payload
 from app.tools.contracts import normalize_tool_kind
 
@@ -27,23 +28,13 @@ def _post_webhook(url: str, body: bytes, timeout: float) -> str:
     SSRF 防护:仅 http(s) 且带主机名;解析后拒绝私网/环回/链路本地 IP——
     告警 webhook 必须是操作员显式配置的公网可达地址。
     """
-    import ipaddress
-    import socket
-
-    parsed = urlparse.urlparse(url)
-    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-        return "invalid-url"
-    if parsed.hostname.lower() in {"localhost", "127.0.0.1", "::1"}:
-        return "invalid-url"
     try:
-        resolved = ipaddress.ip_address(socket.gethostbyname(parsed.hostname))
-    except (socket.gaierror, ValueError):
-        return "invalid-url"
-    if resolved.is_private or resolved.is_loopback or resolved.is_link_local:
+        validate_public_http_url(url)
+    except ValueError:
         return "invalid-url"
     req = request.Request(url, data=body,
                           headers={"Content-Type": "application/json"}, method="POST")
-    with request.urlopen(req, timeout=timeout) as response:
+    with safe_urlopen(req, timeout=timeout) as response:
         return str(response.status)
 
 

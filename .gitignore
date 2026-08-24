@@ -1,18 +1,72 @@
+# Python caches and test artifacts
 __pycache__/
-.pytest_cache/
+**/__pycache__/
 *.py[cod]
+*.pyd
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+
+# Local environments and dependency caches
 .venv/
 .venv_run/
-.env
-.DS_Store
-data/state.json
-data/
-data/*.sqlite
-data/*.sqlite-*
-data/**/*.sqlite
-data/**/*.sqlite-*
 .conda/
+.uv/
+.pip-cache/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.local
+
+# Runtime state, local databases, generated application data
+/data/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+
+# Logs and temporary output
+*.log
+*.out
+*.err
+*.tmp
+*.temp
+*.swp
+*.swo
+
+# Build and packaging artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Model weights and training artifacts (training lives outside this repo)
+*.safetensors
+*.safetensors.index.json
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.gguf
+checkpoints/
+exports/
+
+# IDE, editor and local assistant state
+.vscode/
+.idea/
+.vscode-test/
 .zcode/
 .mimosa/
 .workbuddy/
-.vscode/
+
+# Operating-system files
+.DS_Store
+.DS_Store?
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/

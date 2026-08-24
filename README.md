@@ -159,6 +159,8 @@ RISK_QLORA_TIMEOUT_SECONDS=8
 最后按普通方式启动 FastAPI。QLoRA 服务必须先启动；服务不可达、超时或返回非法 JSON 时，RiskGuardian 自动回退规则。其他 Agent 仍使用各自原有模型通道。该服务路径不依赖 Ollama，训练文件和模型仍放在外部 `AEGIS_TRAINING_ROOT`，不写入项目仓库。
 
 > 生产部署默认建议使用 bf16（与验收口径一致）；显存不足时可加 `--load-4bit`，但需要重新验证边界样本结果。`RISK_QLORA_ENABLED` 默认关闭。
+>
+> 后续生产化学习与改进路线（异步/并发/HTTP/SSE/WebSocket、部署、MCP/JSON-RPC/A2A、权限、流式工具调用、错误恢复、KV Cache/vLLM/SGLang、Reranker、GraphRAG）见 [`docs/QLORA-SSE-PRODUCTION-IMPROVEMENTS.md`](docs/QLORA-SSE-PRODUCTION-IMPROVEMENTS.md)。
 
 **QLoRA 训练目标**：不是训练通用聊天能力，而是把 Qwen3.5-2B-Base 微调成 RiskGuardian 的 `low / medium / high` JSON 风险评估器。基座 4-bit NF4 量化并冻结，LoRA `r=8/alpha=16` 只训练约 840 万参数（总参数约 18.9 亿的 0.445%）；训练样本只覆盖风险判定、理由长度和主体/意图裁决，不改变 Counselor、RAG、工具治理或审批链路。
 

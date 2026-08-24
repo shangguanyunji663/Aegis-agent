@@ -22,7 +22,7 @@
 | 工具治理与 MCP | 高风险预警、Excel 记录、邮件通知不能由模型越权直接执行 | 工具调用先生成 `ToolJob`，经角色、风险等级、审批、脱敏和审计后进入队列；支持 internal 和 FastMCP 两种后端 |
 | 后台 Tool Queue | 外部工具慢、失败或限流时，不应阻塞学生端流式回复 | 独立 worker 支持依赖调度、重试延迟、邮件限流、dead letter、ExcelRecord 和 AlertRecord 持久化 |
 | Engineering Harness | Agent 项目只看 demo 容易高估完成度，需要可重复验证 | 基于真实代表性数据集的 pytest 单元/接口测试、RAG eval、综合 eval(含 LLM-as-Judge)、harness 8 套件、三运行时 A/B 对比评测，覆盖路由、风险、安全、RAG、API、工具队列与编排器链路（真实指标见下方「评测结果」） |
-| 风险双通道 | 关键词规则召回有限，单靠模型又不可控 | 规则 ∪ 轻量 LLM 取并集、任一判高危即高危，并以规则兜底回退保证安全边界（落地细节见 Roadmap） |
+| 风险双通道 | 关键词规则召回有限，单靠模型又不可控 | 规则 ∪ QLoRA/通用 LLM 取并集、任一判高危即高危，并以规则兜底回退保证安全边界（落地细节见 Roadmap） |
 
 ## 架构概览
 
@@ -178,7 +178,7 @@ python -m app.mcp_tools.server --list
 
 ## 评测结果
 
-当前仓库的评测体系基于**人工构造、人工标注且贴近校园心理求助语料的代表性金标集**，不筛选样本、不为追求满分而人为凑 100%。路由、RAG、综合评测、Harness 与 benchmark 的主指标在确定性 MockLLM 环境下产出，衡量规则和编排链路的能力边界；风险双路径另含真实 GLM-4.7-flash 的 best-effort sanity probe，受限流影响单列呈现。
+当前仓库的评测体系基于**人工构造、人工标注且贴近校园心理求助语料的代表性金标集**，不筛选样本、不为追求满分而人为凑 100%。路由、RAG、综合评测、Harness 与 benchmark 的主指标在确定性 MockLLM 环境下产出，衡量规则和编排链路的能力边界；风险评测另含真实 GLM sanity probe 与隔离 Transformers QLoRA v9 的冻结验收结果。
 
 > **注意**：评测指标反映测试集表现，非真实用户流量验证，不等同于临床有效性评估。
 
@@ -193,7 +193,7 @@ python -m app.mcp_tools.server --list
 | --- | --- | --- |
 | 单元与接口测试 | API、认证、风险双通道、Function Calling、Agent runtime、LangGraph checkpoint、MCP tools、评测 runner | **历史记录**：第十三轮于 2026-08-21 记录 `python -m pytest tests/ -q` 为 **71 passed, 8 warnings**。`tests/test_api.py` 使用临时 SQLite；测试数量与结果应以当前环境重跑为准。 |
 | 150 条规模化基准（双层拆分，横向分层） | 150 条人工构造、人工标注的代表性金标样本，按 `layer` 拆为基础层（贴近主流场景）63 条与压力层（边界探测）87 条；runner 分别输出两套独立指标。 | **2026-08-19，`data/eval/latest.json`**：整体联合准确率 **0.63**；意图 **0.63**；风险 **0.81**；高风险召回 **0.60**；误报率 **0.00**。基础层：准确率 **0.97**、风险 **1.00**、高召回 **1.00**；压力层：准确率 **0.39**、风险 **0.67**、高召回 **0.52**。 |
-| 风险 LLM 通道双路径（第十一轮，纵向对比） | 150 条全量双路径对比：baseline（纯规则 channel OFF）→ MetaphorAwareStub ON（rules ∪ LLM 并集）→ GLM-4.7-flash sanity probe。 | **2026-08-20**：baseline 压力层风险 **0.67**、高召回 **0.52**；stub ON 风险 **0.94**、高召回 **1.00**、误报 **0.03**；GLM 25 条扩展探针中 14 条 429/超时回退，11 条非 fallback 判断中 10 条判为 high、1 条为 medium。数据：`data/eval/risk_dual_path.json`、`data/eval/glm_probe_25.json`。 |
+| 风险 LLM 通道双路径（第十一轮历史快照） + QLoRA 微调（第十四轮当前实现） | 历史规则/stub/GLM sanity 与当前真实 v9 QLoRA 冻结 stress 87 条验收。 | **当前以 v9 QLoRA 为准**：`RISK_QLORA_ENABLED=true` 时八门槛全过；第十一轮 stub/GLM 数字仅作历史复现。 |
 | 多轮回归 | 8 组多轮场景（含升级到中/高风险、第三人称转自身） | **2026-08-19，`data/eval/latest.json`**：最终关键内容命中率 **0.875**（7/8）。 |
 | RAG 检索 | 77 条自然语言问句，Top-4；专项消融使用 local-hash 向量配置。 | **2026-08-20，`data/eval/rag-eval-report.json`**：宽松 HitRate@4 **0.935**、严格来源命中 **0.883**、Recall@4 **0.935**、Precision@4 **0.351**、MRR **0.820**、NDCG@4 **0.832**。消融：纯 BM25=0.935 > hybrid=0.831 > hybrid+rerank=0.805 > RRF=0.766；真实语义向量下应重新评测。 |
 | 三运行时 A/B | langgraph / autonomous / ordered 同数据集对比延迟、trace 步数、LLM 调用数与判定一致性（10 条代表性消息） | **2026-08-20，`data/harness/runtime-ab-report.md`**：三运行时判定完全一致；意图准确率 **0.8**、风险准确率 **0.9**，含 1 条规则引擎漏判的隐式高危边界样本。 |
@@ -208,45 +208,49 @@ python -m app.mcp_tools.server --list
 - **路由准确率 0.63**：许多真实咨询/研究诉求**无明显关键词**（如"我和男朋友吵架了，心里不舒服"），纯关键词兜底路由必然漏判；已扩充通用中文求助表达词表，但彻底解决需 LLM 意图通道。
 - **误报率 0.00**：第三人称提及高危词（"新闻里有人轻生""直播自杀"）已通过说话人消歧修复，不再误判为自身高危。
 
+> **当前推荐引用（真实 QLoRA）**：第十四轮 v9 冻结 stress 87 条八门槛全过，FPR 0、medium 召回 0.88、第三人称准确率 0.82、P95 0.95s；报告 `D:\AegisTraining\reports\risk-qlora-eval-v9.json`。以下第十一轮 stub/GLM 数字保留为历史可复现快照，不应与 v9 真实模型数字混用。
+>
 > **📊 简历/面试引用建议**：
-> - ✅ **推荐引用**："150 条双层评测，基础层准确率 0.97、压力层 0.39（含隐喻式高危等边界样本）"、"风险双通道 0.67→0.94"、"RAG HitRate@4 = 0.94"
-> - ⚠️ **需补充说明**：引用"整体 0.63"或"风险 0.81"时必须同时说明"压力层 0.39 主动暴露能力边界"
-> - ❌ **避免单独引用**："高危召回 100%"（仅基础层 5/5 或某单一场景）、"路由准确率 100%"（4 条金标准样本，非代表性验证）
-> - 💡 **强调工程价值**："零筛选样本、横向对比基础/压力层、纵向验证 LLM 补强幅度"更能体现评测体系成熟度
+> - ✅ 推荐："v9 QLoRA 风险模型冻结 stress 87 条八门槛全过，FPR 0、隐喻新增 +6、medium 召回 0.88、P95 0.95s"；同时说明该结果不是临床有效性评估
+> - ✅ 可补充："真实原始 qwen3.5:2b 通道对照 FPR 14.5%，QLoRA 候选降为 0；JSON 有效率 93.1%→100%"
+> - ⚠️ 历史双层规则/Stub 指标（0.63/0.81/0.94 等）只作为能力边界留痕，不作为当前生产模型成绩
+> - 💡 训练谱系、数据审计与提示词契约变更见 `D:\AegisTraining\reports\TRAINING-HISTORY-INDEX.md`
 
-**风险 LLM 通道双路径验证（第十一轮，2026-08-19）：**
+**风险 LLM 通道双路径验证（第十一轮，2026-08-19） + QLoRA 微调投产（第十四轮，2026-08-24）：**
 - **规则基线配置**：显式设置 `RISK_LLM_CHANNEL_ENABLED=false` 时只跑规则通道，压力层风险准确率 **0.67**、高风险召回 **0.52**；该设置适合需要纯规则、可复现 baseline 的场景。
-- **能力上界**（`MetaphorAwareStubClient` + channel ON，rules ∪ LLM 并集）：压力层风险准确率 **0.94**、高风险召回 **1.00**（25 条隐喻式自杀意念 corp-106..130 全部命中）、误报率 **0.03**（2 条 medium distress 含"撑不下去"/"不配"被 prompt 列为 high，属 prompt-vs-corpus 标注张力，如实保留）。
-- **真实 GLM sanity check**：GLM-4.7-flash 对压力层全部 **25 条**隐喻式自杀意念样本做扩展探针（2026-08-20，`data/eval/glm_probe_25.json`）。受免费档限流影响，14 条命中 429/超时回退 none；**11 条非 fallback 判断中 10 条判 high、1 条判 medium（corp-130）**，显示真实模型的 best-effort 表现接近但不超过 stub 上界。
-- **配置事实**：`Settings` 与 `.env.example` 当前都默认 `RISK_LLM_CHANNEL_ENABLED=true`；是否关闭应由部署的安全、成本和可复现性策略显式决定，而不是由本文档隐含指定。
+- **QLoRA 微调模型（生产级，第十四轮）**：经过多轮有效版本迭代（第一版至第七版，旧 v2 编号作废；数据 720→2867 条，提示词契约 v2），最终候选 **`aegis-risk-qwen3.5-2b-v9`** 在冻结 stress 87 条验收集上**八门槛全部通过**——**FPR 0（零误升级）、隐喻新增 +6（13→19/25）、medium 召回 0.88、第三人称准确率 0.82、整体 accuracy 0.782**。格式 100%、P95 延迟 0.95s，由隔离 Transformers 服务（`serve_risk_qlora.py`，`RISK_QLORA_ENABLED` 开关控制）提供推理。提示词契约 v2 同步移除「不配」「活着多余」两个与金标细线冲突的高危示例，三处副本（client.py / data_contract.py / 数据管线）已同步更新。
+- **训练隔离约定**：训练脚本、数据、adapter、merged 模型、GGUF 与报告全部位于 `AEGIS_TRAINING_ROOT` 指向的外部目录（本机为 `D:\AegisTraining`），不进入项目仓库；克隆项目只需配置 `AEGIS_TRAINING_ROOT`、`AEGIS_TRAINING_SRC`、`AEGIS_QLORA_MODEL_DIR` 即可运行服务。
+- **真实 GLM sanity check**：GLM-4.7-flash 对压力层全部 **25 条**隐喻式自杀意念样本做扩展探针（2026-08-20，`data/eval/glm_probe_25.json`）。受免费档限流影响，14 条命中 429/超时回退 none；**11 条非 fallback 判断中 10 条判 high、1 条判 medium（corp-130）**，显示真实模型的 best-effort 表现接近但不超过 QLoRA 上界。
+- **配置事实**：`Settings` 与 `.env.example` 默认 `RISK_LLM_CHANNEL_ENABLED=true`、`RISK_QLORA_ENABLED=false`；是否开启应由部署的安全策略显式决定。
 
 <details>
 <summary><b>风险双通道机制详解（点击展开）</b></summary>
 
-本系统的风险判定由**两条通道**组成，`RISK_LLM_CHANNEL_ENABLED` 控制是否启用第二条 LLM 通道：
+本系统的风险判定由**规则通道 + 可选模型通道**组成，`RISK_LLM_CHANNEL_ENABLED` 控制通用 LLM 通道，`RISK_QLORA_ENABLED` 控制已验收的 QLoRA 通道：
 
 **规则通道（rules channel，不可关）** — `app/assessment.py` 的 `assess_message()`
 - 纯关键词匹配，零 LLM 调用、零外部依赖、可审计
 - `HIGH_TERMS`（自杀/轻生/一了百了等 18 词）命中 → HIGH
 - `MEDIUM_TERMS`（自残/崩溃/绝望等 7 词）命中 → MEDIUM
 - 第三人称消歧：高危词出现在"新闻/电影/朋友"等语境 → 降级 LOW
-- **固有上限**：只能识别词面，隐喻式表达（"想消失""不配""撑不下去"）常漏判
+- **固有上限**：只能识别词面，隐喻式表达（"想消失"、"从没出生过"、"撑不下去"）常漏判；实际补强由 QLoRA 通道承担
 
-**LLM 通道（llm channel，可开关）** — `app/llm/client.py` + `app/agents/classic.py:78-94`
-- 用 `RISK_ASSESS_SYSTEM_PROMPT`（`client.py:45-53`）让模型理解隐喻
+**LLM 通道（llm channel，可开关）** — `app/llm/client.py` + `app/agents/classic.py`
+- 用 `RISK_ASSESS_SYSTEM_PROMPT`（`app/llm/client.py`，提示词契约 v2）让模型理解隐喻
+- **QLoRA 微调通道（第十四轮）**：`RISK_QLORA_ENABLED=true` 时 RiskGuardian 的 LLM 通道自动切换为 QLoRA 微调模型（`aegis-risk-qwen3.5-2b-v9`），以隔离 Transformers 推理服务（`serve_risk_qlora.py`）代替原始 Ollama 调用；不启用时行为完全不变
 - 并集融合：`order[llm_level] > order[risk_level]` 时升级（只升不降，安全优先）
 - 兜底：LLM 失败/超时/429 返回 None → 回退纯规则结果，保证安全边界
 
 **CHANNEL ON/OFF 的含义**
-- `RISK_LLM_CHANNEL_ENABLED=false`：只跑规则通道，trace 记 `llm: "skipped"`；适合纯规则、可复现 baseline。
-- `RISK_LLM_CHANNEL_ENABLED=true`：规则与 LLM 两条通道取并集，trace 记 `llm: "high/medium/low"`；这是当前代码与 `.env.example` 的默认设置。
+- `RISK_QLORA_ENABLED=false`：不启用微调通道；行为由 `RISK_LLM_CHANNEL_ENABLED` 决定。若后者为 false，只跑规则；若为 true，使用配置的通用 LLM 客户端。
+- `RISK_QLORA_ENABLED=true`：RiskGuardian 自动使用隔离 Transformers 服务中的 v9 QLoRA 模型，规则与 QLoRA 两条通道取并集；`RISK_LLM_CHANNEL_ENABLED` 会被强制视为 true。服务不可达/超时/非法 JSON 自动回退规则。
 
-**双路径评测中的两个"假客户端"**
-- `MockLLMClient`（baseline 路径用）：`assess_risk()` 返回 None，让 LLM 通道形同虚设 → 量**下界**（LLM 通道最差情况 = 不工作）
-- `MetaphorAwareStubClient`（llm_stub 路径用）：继承 MockLLMClient，用 30 个隐喻关键词 + 13 个痛苦关键词**模拟**理想 LLM 的判定逻辑，不调真模型 → 量**上界**（LLM 通道满血情况）
-- 真实 GLM（GLM probe 路径）：小样本 sanity check，量**真实表现**（介于上下界之间）
+**历史双路径评测中的客户端**
+- `MockLLMClient`：用于规则 baseline，`assess_risk()` 返回 None。
+- `MetaphorAwareStubClient`：第十一轮历史测试替身，用关键词模拟理想 LLM；**不是生产模型，也不是 v9 QLoRA 的成绩**。
+- v9 QLoRA：当前生产候选，真实 Transformers 推理服务，验收结果见上方第十四轮记录。
 
-**为什么上界用 stub 不用真模型**：GLM 免费档 ~1 req/s，150 条全量跑会大量 429 污染结果；stub 用关键词确定性地模拟"LLM 完美理解 prompt 会怎么判"，给出可复现的能力天花板。25 条扩展 GLM 探针验证了这一设计——成功调用准确率 0.91，接近 stub 量出的 0.94 上界且不超，说明 stub 是 LLM 的合理代理。
+> 第十一轮 stub/GLM 数字保留作历史可复现记录；生产能力和上线判断以 `risk-qlora-eval-v9.json` 的真实 QLoRA 评测为准。
 
 </details>
 
@@ -265,7 +269,7 @@ python -m app.mcp_tools.server --list
 │   ├── assessment.py             # 规则式风险评估(高危/中危关键词单一来源)
 │   ├── skills.py                 # SkillRegistry:注册式 Skill、标准 Skill 与自动蒸馏
 │   ├── core/                     # 横切原语:auth(认证) privacy(脱敏) runtime(Redis 限流锁) utils
-│   ├── llm/                      # 模型后端:client(Mock/OpenAI/Ollama) prompts(提示词模板)
+│   ├── llm/                      # 模型后端:Mock/OpenAI/Ollama/RiskQloraClient + prompts
 │   ├── agents/                   # 智能体层:classic(六单轮) model_profiles runtime harness orchestrator
 │   ├── autonomous/               # 自治协作:events registry board coordinator agents runtime
 │   ├── rag/                      # 检索与记忆：text/scoring/chunking/facts(L2)/memory(L3)/vector_store
@@ -316,7 +320,10 @@ python -m app.mcp_tools.server --list
 | `VECTOR_BACKEND` | 向量后端，默认 `chroma`；仅在 `VECTOR_ENABLED=true` 时参与向量检索。 |
 | `KNOWLEDGE_FUSION_MODE` | `weighted`（代码默认，线性加权）或 `rrf`（Reciprocal Rank Fusion 排名融合）。 |
 | `KNOWLEDGE_CACHE_ENABLED` | 是否启用进程内 LRU 精确查询缓存；默认 `false`，可配 `KNOWLEDGE_CACHE_TTL_SECONDS`、`KNOWLEDGE_CACHE_MAX_ENTRIES`。Redis 写入目前为预留能力，检索读取仍以进程内缓存为准。 |
-| `RISK_LLM_CHANNEL_ENABLED` | 风险评估双通道开关；代码和 `.env.example` 默认 `true`，规则 ∪ LLM 只升不降。设为 `false` 时保留纯规则 baseline。 |
+| `RISK_LLM_CHANNEL_ENABLED` | 风险评估通用 LLM 通道开关；代码和 `.env.example` 默认 `true`。`RISK_QLORA_ENABLED=true` 时由 QLoRA 通道接管。 |
+| `RISK_QLORA_ENABLED` | QLoRA 风险增强开关；默认 `false`，开启后 RiskGuardian 调用隔离 Transformers 服务。 |
+| `RISK_QLORA_URL` | QLoRA 服务地址；默认 `http://127.0.0.1:8301`，客户端仅允许环回地址。 |
+| `RISK_QLORA_TIMEOUT_SECONDS` | QLoRA 请求超时；默认 `8` 秒，超时回退规则。 |
 | `FUNCTION_CALLING_ENABLED` | 技能选择：模型在规则白名单内自主挑选；默认 `true`，失败时回退规则白名单。 |
 | `SKILL_DISTILL_ENABLED` | 是否记录基础 Skill 重复组合并触发自动蒸馏；默认 `true`。 |
 | `SKILL_DISTILL_MIN_REPEAT` | 同一 `intent|risk|基础 Skill 集合` 触发蒸馏的次数；默认 `3`。 |
@@ -364,8 +371,8 @@ python -m app.mcp_tools.server --list
 > 按「实现难度 × 实现意义」盘点的演进清单;带 ✅ 的已在本仓库落地,详见 [docs/records](docs/records/) 各轮说明文档。
 
 ### 安全与合规(心理场景立身之本)
-- ✅ **风险评估双通道**:规则关键词 ∪ 轻量 LLM 二次评估,任一通道判高危即高危,规则兜底(`RISK_LLM_CHANNEL_ENABLED`)
-- ✅ **双路径验证**:stub-LLM on vs MockLLM OFF,压力层风险准确率 0.67→0.94、高风险召回 0.52→1.00(第十一轮,`data/eval/risk_dual_path.json`)
+- ✅ **风险评估双通道**:规则关键词 ∪ QLoRA/通用 LLM 二次评估,任一通道判高危即高危,规则兜底(`RISK_QLORA_ENABLED` / `RISK_LLM_CHANNEL_ENABLED`)
+- ✅ **真实 QLoRA 验收**:第十四轮 v9 冻结 stress 87 条八门槛全过,FPR 0、medium 召回 0.88、第三人称 0.82
 - 危机转介资源可配置化:学校心理中心/紧急联系方式从硬编码改为按校配置、管理端可编辑(低难度)
 - 对话数据字段级加密存储(中难度)
 - 账号安全补齐:登录失败锁定、密码强度策略、会话撤销列表(低难度)

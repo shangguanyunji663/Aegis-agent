@@ -63,7 +63,7 @@ flowchart TD
 | `app/tools/contracts.py` | 工具契约:角色、风险等级、审批要求、脱敏字段和重试限制 |
 | `app/tools/gateway.py` / `app/tools/mcp_client.py` / `app/mcp_tools/server.py` | internal/FastMCP 工具边界 |
 | `app/services/` | 报告个案、工具执行、工具治理、队列 worker、记录表等服务层 |
-| `app/llm/` | 模型后端:client(Mock/OpenAI/Ollama)+ prompts;含 assess_risk(风险通道)、chat_with_tools(FC)、judge_reply(LLM 评审)三通道 |
+| `app/llm/` | 模型后端:client(Mock/OpenAI/Ollama/RiskQloraClient)+ prompts;含 assess_risk(风险通道)、chat_with_tools(FC)、judge_reply(LLM 评审)三通道;RiskQloraClient 告警规则:URL 仅允许环回地址,含 SSRF 防护 |
 | `app/evaluation/` | 评测:runner(八套指标)、datasets、report_html、runtime_ab(三运行时 A/B)、judge(LLM-as-Judge) |
 | `app/agents/skill_selection.py` | Function Calling 技能选择:规则白名单 + 模型自主挑选 |
 | `app/core/` | 横切原语:auth(认证)、privacy(脱敏)、runtime(Redis 限流/锁)、utils |
@@ -132,21 +132,23 @@ flowchart TD
 
 ## 9. 关键增强特性
 
-### 9.1 风险评估双通道（第五轮、第十一轮）
+### 9.1 风险评估双通道（第五轮、第十一轮、第十四轮）
 
 系统采用**规则 ∪ LLM 双通道**的风险评估策略：
 
 - **规则通道（baseline）**：基于关键词和模式匹配，永远兜底，确保显式高危表达不会漏判
 - **LLM 通道（可选增强）**：通过 `RISK_LLM_CHANNEL_ENABLED` 配置，可调用 LLM 识别隐喻式、改写式高危表达
+- **QLoRA 微调通道（第十四轮）**：由 `RISK_QLORA_ENABLED` 开关控制，开启后 RiskGuardian 的 LLM 通道改用 **v9 QLoRA 微调模型**（`aegis-risk-qwen3.5-2b-v9`），以独立 Transformers 推理服务（`serve_risk_qlora.py`，由 `AEGIS_TRAINING_ROOT` / `AEGIS_QLORA_MODEL_DIR` 配置模型路径）代替原始 Ollama 裸模型调用。`RISK_QLORA_ENABLED=true` 时自动接管 LLM 通道，`RISK_LLM_CHANNEL_ENABLED` 在 QLoRA 模式下始终为 true
 - **降级保障**：LLM 超时/失败/mock 环境自动回退纯规则，规则永远兜底
 
 **生产环境配置建议**：
 
-根据第十一轮双路径验证（`scripts/eval_risk_dual_path.py`）：
-- **关闭 LLM 通道**（`RISK_LLM_CHANNEL_ENABLED=false`）：压力层风险准确率 0.67，主动暴露规则通道在隐喻式高危识别上的固有边界
-- **开启 LLM 通道**：压力层风险准确率提升至 0.94，高风险召回 1.00，但会掩盖"暴露边界"的工程诚实卖点
+根据第十四轮 QLoRA 训练验收（v9，`risk_sft_v9`，提示词契约 v2）：
+- **关闭 QLoRA 通道**（`RISK_QLORA_ENABLED=false`，默认）：行为完全不变，LLM 通道由 `RISK_LLM_CHANNEL_ENABLED` 控制（可选 Generic LLM 或关闭）
+- **开启 QLoRA 通道**（`RISK_QLORA_ENABLED=true`）：冻结 stress 87 条八门槛**全部通过**（FPR 0、隐喻新增 +6、medium 召回 0.88、第三人称准确率 0.82、整体 accuracy 0.782），同时保有格式 100%、P95 延迟 0.95s 的生产级质量
+- 建议 qlora 模型默认 bf16 部署（与验收口径一致），`--load-4bit` 仅显存紧张时使用（4-bit 可能偏移极个别边界预测）
 
-建议生产环境保持 `false`，维持评测体系的"暴露边界"策略，同时在关键场景（如夜间值班、特定关键词触发）局部开启 LLM 补强。
+> **溯源**：训练沿革、七版完整谱系、提示词契约 v1→v2 变更记录见 `D:\AegisTraining\reports\TRAINING-HISTORY-INDEX.md`。
 
 ### 9.2 Function Calling 技能选择（第五轮）
 
@@ -218,7 +220,10 @@ flowchart TD
 
 | 配置项 | 默认值 | 说明 |
 |---|---|---|
-| `RISK_LLM_CHANNEL_ENABLED` | `true` | 风险 LLM 通道开关，生产建议 `false` |
+| `RISK_LLM_CHANNEL_ENABLED` | `true` | 通用风险 LLM 通道开关；`RISK_QLORA_ENABLED=true` 时由 QLoRA 通道接管 |
+| `RISK_QLORA_ENABLED` | `false` | v9 QLoRA 风险增强开关；开启后调用隔离 Transformers 服务，默认关闭保持兼容 |
+| `RISK_QLORA_URL` | `http://127.0.0.1:8301` | QLoRA 服务环回地址，客户端含 SSRF 防护 |
+| `RISK_QLORA_TIMEOUT_SECONDS` | `8.0` | QLoRA 请求超时，超时回退规则 |
 | `FUNCTION_CALLING_ENABLED` | `true` | Function Calling 技能选择开关 |
 | `llm_support_temperature` | `0.6` | 支持回复的温度参数 |
 | `MEMORY_RECENT_MESSAGES` | `15` | 保留最近消息数 |

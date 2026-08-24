@@ -411,7 +411,8 @@ uvicorn app.main:app --host 127.0.0.1 --port 8091
 | 模型  | `OLLAMA_BASE_URL`/`OLLAMA_MODEL`                             | 本地 Ollama                          | 127.0.0.1:11434 / qwen2.5:7b     |
 | 模型  | `LLM_THINKING_ENABLED`                                       | 深度思考（接 GLM 建议关）                    | `false`                          |
 | 模型  | `LLM_SUPPORT_TEMPERATURE`                                    | 支持性回复采样温度（偏高更真人）                   | `0.6`                            |
-| 风险  | `RISK_LLM_CHANNEL_ENABLED`                                   | 规则 ∪ LLM 双通道                       | `true`                           |
+| 风险  | `RISK_LLM_CHANNEL_ENABLED`                                   | 通用 LLM 风险通道；`RISK_QLORA_ENABLED=true` 时由 QLoRA 接管 | `true`                           |
+| 风险  | `RISK_QLORA_ENABLED` / `RISK_QLORA_URL` / `RISK_QLORA_TIMEOUT_SECONDS` | v9 QLoRA 隔离服务开关 / 地址 / 超时 | `false` / `http://127.0.0.1:8301` / `8` |
 | 技能  | `FUNCTION_CALLING_ENABLED`                                   | 模型在白名单内自主选技能                       | `true`                           |
 | 检索  | `EMBEDDING_PROVIDER`                                         | `openai`（代码默认）/ `local`（离线 MiniLM 示例）      | `openai`（`.env.example` 推荐 `local`）                          |
 | 检索  | `VECTOR_ENABLED` / `VECTOR_BACKEND`                          | 是否启用向量 / 后端                        | `false` / `chroma`               |
@@ -767,11 +768,12 @@ ANXIETY_TERMS = ["焦虑", "压力", "考试", "睡不着", "失眠", "panic", "
 
 学习要点
 
-（风险双通道）：`assess_message` 是规则通道；`RiskGuardianAgent` 会再用轻量 LLM 通道（`llm.assess_risk`，严格 JSON、8s 短超时）复核，两通道取并集——任一判 high 即 high，弥补关键词召回不足；LLM 失败/超时/mock 一律回退纯规则，输出 `risk_channels` 溯源。
+（风险双通道）：`assess_message` 是规则通道；`RiskGuardianAgent` 会再用可选模型通道复核——通用 LLM 或开启 `RISK_QLORA_ENABLED` 后的 v9 QLoRA 隔离服务，严格 JSON、8s 短超时；两通道取并集，任一判 high 即 high；模型失败/超时/mock 一律回退纯规则，输出 `risk_channels` 溯源。
 
-- **双路径验证（第十一轮）**：150 条语料双路径对比——baseline（channel OFF，纯规则）压力层 risk_acc=**0.67**、high_recall=**0.52**；stub-LLM on（`MetaphorAwareStubClient` + channel ON）risk_acc=**0.94**、high_recall=**1.00**（corp-106..130 全部 25 条隐喻式自杀意念命中）。`RISK_LLM_CHANNEL_ENABLED` 在代码与 `.env.example` 中默认 `true`；需要纯规则、可复现 baseline 时可显式设置为 `false`。真实 GLM-4.7-flash sanity probe 对 25 条扩展样本的 11 条非 fallback 判断中有 10 条判 high、1 条判 medium，另 14 条受 429/超时回退。数据：`data/eval/risk_dual_path.json`，脚本：`scripts/eval_risk_dual_path.py`。
+- **第十四轮真实 QLoRA 验收**：v9 使用新提示词契约 v2，在冻结 stress 87 条上八门槛全部通过：FPR 0、隐喻新增 +6、medium 召回 0.88、第三人称准确率 0.82、P95 0.95s。推理服务脚本位于 `D:\AegisTraining\training\scripts\serve_risk_qlora.py`，路径可通过 `AEGIS_TRAINING_ROOT` / `AEGIS_QLORA_MODEL_DIR` 覆盖。
+- **第十一轮历史双路径验证**：150 条语料的 baseline/stub/GLM 数字仍保留在 `data/eval/risk_dual_path.json`，只代表历史测试替身，不代表当前 v9 生产模型。
 - `HIGH_TERMS` 是单一事实来源——`autonomous/board.py` 的 `hard_high_risk()` 也引用它，改关键词只改一处。
-- 规则评估可解释（命中了哪个词一目了然）、可单测、零成本零延迟。代价是召回有限——25 条隐喻式自杀意念中仅命中 13 条（corp-106..130），剩余 12 条需 LLM 语义理解才能捕捉，这是关键词路线的固有上限。
+- 规则评估可解释（命中了哪个词一目了然）、可单测、零成本零延迟。代价是召回有限，隐喻式高危由模型通道补强。
 
 ***
 
@@ -867,15 +869,16 @@ class LLMClient(Protocol):
 
 协议从最初的「一问一答」长成了多通道客户端：回复生成（阻塞）、回复直播（流式）、查询改写（RAG）、风险复核（双通道）、技能选择（FC）、质量评审（Judge）。新增通道全部遵守同一条铁律：失败/超时/mock 返回 None，调用方优雅降级——这正是全系统「LLM 永远不是安全关键路径」的落点。
 
-三个实现：
+三个实现（风险通道另有独立 QLoRA 实现）：
 
-- `MockLLMClient`：方法都返回 `None`（None 就代表「请走本地模板兜底」）。这让无 key 环境下整条链路（含高风险处置）照常可测。测试中还派生了 `MetaphorAwareStubClient`（`tests/test_risk_dual_channel.py`），模拟 LLM judge 的隐喻检测行为，用于 corp-106..130 双路径验证。
-- `OpenAICompatibleClient`：`client.py` 用 urllib 裸调 `{base_url}/chat/completions`，支持智谱等 OpenAI 兼容端点的 `thinking:{"type":"disabled"}` 参数（默认关闭深度思考，大幅降低延迟）。第六轮起支持性回复使用独立温度 `LLM_SUPPORT_TEMPERATURE`（默认 `0.6`，偏口语更像真人；风险评估/改写/评审仍固定 `0.0`）。`post_json()` 对 429/5xx/超时做指数退避重试（最多 2 次，间隔 2s/4s）；流式请求在连接建立阶段重试，一旦已开始接收 delta 则不再回退（避免已直播的 token 被丢掉）。当前配置：endpoint=`https://open.bigmodel.cn/api/paas/v4`，model=`glm-4.7-flash`（免费档，200K 上下文，~1 req/s 限流）。
-- `OllamaClient`：调 `/api/chat`，本地模型零成本。
+- `MockLLMClient`：方法都返回 `None`（None 就代表「请走本地模板兜底」）。这让无 key 环境下整条链路（含高风险处置）照常可测。测试中还派生了 `MetaphorAwareStubClient`（`tests/test_risk_dual_channel.py`），模拟 LLM judge 的隐喻检测行为，用于第十一轮历史双路径验证。
+- `OpenAICompatibleClient`：`client.py` 用 urllib 裸调 `{base_url}/chat/completions`，支持智谱等 OpenAI 兼容端点的 `thinking:{"type":"disabled"}` 参数（默认关闭深度思考，大幅降低延迟）。第六轮起支持性回复使用独立温度 `LLM_SUPPORT_TEMPERATURE`（默认 `0.6`，偏口语更像真人；风险评估/改写/评审仍固定 `0.0`）。
+- `OllamaClient`：调 `/api/chat`，本地模型零成本；仅负责通用 Ollama 通道。
+- `RiskQloraClient`：`RISK_QLORA_ENABLED=true` 时由 `PsychOrchestrator` 注入 RiskGuardian，调用隔离 Transformers 服务的 v9 QLoRA 模型；URL 仅允许环回地址，服务失败/超时/非法 JSON 返回 `None`，回退规则。
 
-`build_llm_client(settings)` 按配置三选一。
+`build_llm_client(settings)` 负责通用客户端装配；RiskGuardian 的 QLoRA 替换由编排器配置开关控制。
 
-**风险 judge prompt**（`RISK_ASSESS_SYSTEM_PROMPT`，`client.py:45-53`）：LLM 通道的核心提示词，判定 high/medium/low 三档。显式覆盖隐喻式自杀意念（想消失/活着多余/从没出生过/不配/撑不下去/永远睡过去/离开这个世界/结束这一切/不愿再醒来/要是不在了就好了），并标注第三人称/虚构语境不视为自身 high（"新闻里有人轻生/写论文提到自杀/朋友直播自杀"）。输出严格 JSON（`{"risk_level": "...", "reason": "..."}`），`_parse_risk_json()` 容忍代码块包裹与前后杂文。第十一轮双路径验证确认该 prompt 覆盖 corp-106..130 全部 25 条隐喻。
+**风险 judge prompt**（`RISK_ASSESS_SYSTEM_PROMPT`，`app/llm/client.py`；训练侧同源 `data_contract.py`）：LLM 通道的核心提示词，判定 high/medium/low 三档。当前契约 v2 已移除宽泛的「不配」「活着多余」示例，保留明确指向不存在/停止生存的表达，并标注第三人称/虚构语境不视为自身 high（"新闻里有人轻生/写论文提到自杀/朋友直播自杀"）。输出严格 JSON（`{"risk_level": "...", "reason": "..."}`），`_parse_risk_json()` 容忍代码块包裹与前后杂文。
 
 ### 5.2 llm/prompts.py — 提示词模板
 
@@ -1479,11 +1482,11 @@ async def attach_request_context(request, call_next):
 ：效果不是「看着不错」，而是可重复度量。
 
 - `evaluation/runner.py`：真实指标——路由/风险判定准确率、高风险召回率、误报率、HitRate/Recall@4/Precision@4/MRR/NDCG@4、技能选择、安全泄漏检查、多轮一致性、150 条规模化基准；如实标注样本量、数据来源与验证日期（含 95% 置信区间），不再为满分筛选样本。**150 条规模化基准按 `layer` 字段双层拆分**：`base`（基础层·贴近主流场景）/ `stress`（压力层·边界探测），runner 分别输出两套独立指标（`scaled_benchmark.base` / `scaled_benchmark.stress`），零删改、不凑分——既保住“代表性”卖点，也主动暴露规则通道的边界缺口。
-- `evaluation/datasets.py`：加载 `eval/fixtures/representative_corpus.json`（150 条人工构造、人工标注、贴近校园心理求助语料的代表性金标样本，**每条含 `layer`（base/stress）与 `source`（synthetic-representative/synthetic-boundary）字段**，含隐式高危与第三人称干扰）、`rag_queries.json`（77 条自然语言 RAG 问句）、`multi_turn_corpus.json`（8 组多轮场景）；并提供可复现的随机采样工具。
+- `evaluation/datasets.py`：加载 `eval/fixtures/representative_corpus.json`（150 条人工构造、人工标注、贴近校园心理求助语料的代表性金标样本，**每条含 `layer`（base/stress）与 `source`（synthetic-representative/synthetic-boundary）字段**，含隐式高危与第三人称干扰）、`rag_queries.json`（77 条自然语言 RAG 问句）、`multi_turn_corpus.json`（8 组多轮场景）；并提供基于种子哈希排序的可复现抽样工具。
 - `evaluation/report_html.py`：单文件 HTML 报告（内联 CSS），管理端一键可看。
 - `app/rag_eval/runner.py`：RAG 专项（HitRate/Recall@4/Precision@4/MRR/NDCG@4，独立运行改用一次性 SQLite 评测库、不依赖 MySQL/pymysql），数据集在 `eval/fixtures/rag_queries.json`（77 条自然语言问句，基于当前 24 篇知识文档）。
 - `app/harness/runner.py` + `factory.py`：工程级场景回放——8 套件（risk/routing/skills/rag/api/tool-queue/scaled/runtime-ab）验证端到端行为（如“审批后 5 个工具任务全部 success”“死信被正确创建”），失败退出码 1，可接 CI。`factory.py` 是重构产物：harness 与 `eval/run_eval.py` 共用一个装配工厂，消除两份漂移的样板。
-- `scripts/eval_risk_dual_path.py`（第十一轮新增）：风险 LLM 通道双路径评测——同 150 条语料分别跑 baseline（MockLLM + channel OFF）与 llm_stub（`MetaphorAwareStubClient` + channel ON），直调 `RiskGuardianAgent.assess()` 避免 response 生成/judge 等额外 LLM 调用；另有真实 GLM-4.7-flash 的 25 条扩展 best-effort probe。产出 `data/eval/risk_dual_path.json`。
+- `scripts/eval_risk_dual_path.py`（第十一轮历史实验）：风险 LLM 通道双路径评测——同 150 条语料分别跑 baseline（MockLLM + channel OFF）与 llm_stub（`MetaphorAwareStubClient` + channel ON），直调 `RiskGuardianAgent.assess()` 避免 response 生成/judge 等额外 LLM 调用；另有真实 GLM-4.7-flash 的 25 条扩展 best-effort probe。产出 `data/eval/risk_dual_path.json`。当前生产模型验收以 `D:\AegisTraining\reports\risk-qlora-eval-v9.json` 为准。
 - `scripts/probe_glm.py`（第十一轮新增）：GLM 端点探针——验证 endpoint/model/api_key 可用性，不打印 API key，退出码 0=可用。
 - `eval/fixtures/`：路由/风险/安全/多轮小型金标集 + `representative_corpus.json`（150 条）/ `rag_queries.json`（77 条）/ `multi_turn_corpus.json`（8 组）人工构造、人工标注的代表性数据集。
 
@@ -1551,8 +1554,8 @@ async def attach_request_context(request, call_next):
 2.   看一次安全闭环  ：发「我不想活了」，观察：回复是本地安全模板（mock 下也是）→ 管理端出现待审报告 → 审批 → 工具任务全部 success。
 3.   读一次黑板  ：`tests/test_orchestrator.py` 里的高风险用例断言了 SAFETY\_OVERRIDE 的传播；再对照 `autonomous/runtime.py` 的 `_trace_from_board` 看事件如何变成 trace。
 4.   改一个小东西试试  ：往 `assessment.HIGH_TERMS` 加一个词，跑 `python -m pytest tests -q` 与 `python -m app.harness.runner --suite risk`——体会「单一来源 + 评测护栏」如何让修改变得安全。
-5.   换个模型  ：设 `AI_PROVIDER=ollama` 起服务，其余什么都不用改。
-6.   跑一次双路径验证  ：`python scripts/eval_risk_dual_path.py`——看 baseline（channel OFF）与 stub-LLM on（channel ON）在 150 条语料上的风险准确率对比，体会「纯规则 baseline 与 LLM 通道补齐隐喻缺口」的设计取舍。
+5.   换个模型  ：设 `AI_PROVIDER=ollama` 起服务，其余什么都不用改；风险通道若启用微调模型，另设 `RISK_QLORA_ENABLED=true` 并启动 D 盘隔离服务，路径由 `AEGIS_TRAINING_ROOT` / `AEGIS_QLORA_MODEL_DIR` 配置。
+6.   跑一次历史双路径验证  ：`python scripts/eval_risk_dual_path.py`——看 baseline 与 stub-LLM 的历史对比；当前真实 QLoRA 结果见 `D:\AegisTraining\reports\risk-qlora-eval-v9.json`。
 
 ## 总结四：按引导式路线「从零重建」的检查清单
 

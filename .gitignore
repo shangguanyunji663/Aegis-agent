@@ -44,6 +44,9 @@ dist/
 *.egg-info/
 .eggs/
 
+# Runtime-generated distilled skills; curated skills remain versioned.
+skills/auto/
+
 # Model weights and training artifacts (training lives outside this repo)
 *.safetensors
 *.safetensors.index.json

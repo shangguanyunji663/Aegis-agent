@@ -792,7 +792,7 @@ ANXIETY_TERMS = ["焦虑", "压力", "考试", "睡不着", "失眠", "panic", "
 
 （风险双通道）：`assess_message` 是规则通道；`RiskGuardianAgent` 会再用可选模型通道复核——通用 LLM 或开启 `RISK_QLORA_ENABLED` 后的 v9 QLoRA 隔离服务，严格 JSON、8s 短超时；两通道取并集，任一判 high 即 high；模型失败/超时/mock 一律回退纯规则，输出 `risk_channels` 溯源。
 
-- **第十四轮真实 QLoRA 验收**：v9 使用新提示词契约 v2，在冻结 stress 87 条上八门槛全部通过：FPR 0、隐喻新增 +6、medium 召回 0.88、第三人称准确率 0.82、P95 0.95s。推理服务脚本位于 `D:\AegisTraining\training\scripts\serve_risk_qlora.py`，路径可通过 `AEGIS_TRAINING_ROOT` / `AEGIS_QLORA_MODEL_DIR` 覆盖。
+- **第十四轮真实 QLoRA 验收**：v9 使用新提示词契约 v2，在冻结 stress 87 条上八门槛全部通过：FPR 0、隐喻新增 +6、medium 召回 0.88、第三人称准确率 0.82、P95 1.37s。推理服务脚本位于 `D:\AegisTraining\training\scripts\serve_risk_qlora.py`，路径可通过 `AEGIS_TRAINING_ROOT` / `AEGIS_QLORA_MODEL_DIR` 覆盖。
 - **第十一轮历史双路径验证**：150 条语料的 baseline/stub/GLM 数字仍保留在 `data/eval/risk_dual_path.json`，只代表历史测试替身，不代表当前 v9 生产模型。
 - `HIGH_TERMS` 是单一事实来源——`autonomous/board.py` 的 `hard_high_risk()` 也引用它，改关键词只改一处。
 - 规则评估可解释（命中了哪个词一目了然）、可单测、零成本零延迟。代价是召回有限，隐喻式高危由模型通道补强。

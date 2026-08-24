@@ -145,7 +145,7 @@ flowchart TD
 
 根据第十四轮 QLoRA 训练验收（v9，`risk_sft_v9`，提示词契约 v2）：
 - **关闭 QLoRA 通道**（`RISK_QLORA_ENABLED=false`，默认）：行为完全不变，LLM 通道由 `RISK_LLM_CHANNEL_ENABLED` 控制（可选 Generic LLM 或关闭）
-- **开启 QLoRA 通道**（`RISK_QLORA_ENABLED=true`）：冻结 stress 87 条八门槛**全部通过**（FPR 0、隐喻新增 +6、medium 召回 0.88、第三人称准确率 0.82、整体 accuracy 0.782），同时保有格式 100%、P95 延迟 0.95s 的生产级质量
+- **开启 QLoRA 通道**（`RISK_QLORA_ENABLED=true`）：冻结 stress 87 条八门槛**全部通过**（FPR 0、隐喻新增 +6、medium 召回 0.88、第三人称准确率 0.82、整体 accuracy 0.782），同时保有格式 100%、P95 延迟 1.37s 的生产级质量
 - 建议 qlora 模型默认 bf16 部署（与验收口径一致），`--load-4bit` 仅显存紧张时使用（4-bit 可能偏移极个别边界预测）
 
 > **溯源**：训练沿革、七版完整谱系、提示词契约 v1→v2 变更记录见 `D:\AegisTraining\reports\TRAINING-HISTORY-INDEX.md`。

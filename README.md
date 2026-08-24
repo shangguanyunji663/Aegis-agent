@@ -127,6 +127,39 @@ DATABASE_URL=mysql+pymysql://root:你的密码@localhost:3306/aegis?charset=utf8
 
 首次启动会自动建库建表(utf8mb4);已有 SQLite 数据可用 `python -m scripts.migrate_sqlite_to_mysql` 一键迁移(旧文件保留为备份)。
 
+### 使用已验收的 QLoRA 风险模型（可选）
+
+普通启动默认**不会加载训练模型**：`RISK_QLORA_ENABLED=false`，RiskGuardian 保持现有规则/通用 LLM 行为。要启用第四版验收后的 v9 QLoRA 模型，需要先在独立训练环境启动服务，再启动项目：
+
+```bash
+# Windows 示例；其他机器把这些路径改成自己的训练根目录
+set AEGIS_TRAINING_ROOT=D:\AegisTraining
+set AEGIS_TRAINING_SRC=%AEGIS_TRAINING_ROOT%\training\src
+set AEGIS_QLORA_MODEL_DIR=%AEGIS_TRAINING_ROOT%\exports\aegis-risk-qwen3.5-2b-v9-merged
+
+%AEGIS_TRAINING_ROOT%\envs\qlora-qwen35\python.exe ^
+  %AEGIS_TRAINING_ROOT%\training\scripts\serve_risk_qlora.py ^
+  --model-dir "%AEGIS_QLORA_MODEL_DIR%"
+```
+
+服务默认监听 `http://127.0.0.1:8301`，可先检查：
+
+```bash
+curl http://127.0.0.1:8301/health
+```
+
+然后在项目 `.env` 中配置：
+
+```ini
+RISK_QLORA_ENABLED=true
+RISK_QLORA_URL=http://127.0.0.1:8301
+RISK_QLORA_TIMEOUT_SECONDS=8
+```
+
+最后按普通方式启动 FastAPI。QLoRA 服务必须先启动；服务不可达、超时或返回非法 JSON 时，RiskGuardian 自动回退规则。其他 Agent 仍使用各自原有模型通道。该服务路径不依赖 Ollama，训练文件和模型仍放在外部 `AEGIS_TRAINING_ROOT`，不写入项目仓库。
+
+> 生产部署默认建议使用 bf16（与验收口径一致）；显存不足时可加 `--load-4bit`，但需要重新验证边界样本结果。`RISK_QLORA_ENABLED` 默认关闭。
+
 打开浏览器访问：
 
 - 首页：[http://127.0.0.1:8091](http://127.0.0.1:8091)

@@ -385,6 +385,28 @@ python -m app.init_db
 uvicorn app.main:app --host 127.0.0.1 --port 8091
 ```
 
+如果要使用已经通过八门槛验收的 v9 QLoRA 风险模型，先启动 D 盘隔离推理服务，再启动 FastAPI：
+
+```bat
+set AEGIS_TRAINING_ROOT=D:\AegisTraining
+set AEGIS_TRAINING_SRC=%AEGIS_TRAINING_ROOT%\training\src
+set AEGIS_QLORA_MODEL_DIR=%AEGIS_TRAINING_ROOT%\exports\aegis-risk-qwen3.5-2b-v9-merged
+%AEGIS_TRAINING_ROOT%\envs\qlora-qwen35\python.exe ^
+  %AEGIS_TRAINING_ROOT%\training\scripts\serve_risk_qlora.py ^
+  --model-dir "%AEGIS_QLORA_MODEL_DIR%"
+```
+
+确认 `http://127.0.0.1:8301/health` 返回 `status=ok` 后，在项目 `.env` 写入：
+
+```ini
+RISK_QLORA_ENABLED=true
+RISK_QLORA_URL=http://127.0.0.1:8301
+RISK_QLORA_TIMEOUT_SECONDS=8
+```
+
+再执行上面的 FastAPI 启动命令。不开启时 `RISK_QLORA_ENABLED=false`，行为保持原样；服务超时、不可达或 JSON 非法时自动回退规则。训练根目录、模型路径和服务脚本位置均可按机器改为其他 `AEGIS_*` 配置，不要求使用 `D:\AegisTraining`。
+
+
 打开浏览器：
 
 - 首页：<http://127.0.0.1:8091>

@@ -1,7 +1,7 @@
 # QLoRA 与实时服务生产化改进路线
 
 > 本文记录 Aegis 当前已完成的 QLoRA/SSE 能力、待补齐的生产化能力和后续学习实验。
-> 训练文件、模型和训练报告位于外部 `AEGIS_TRAINING_ROOT`（本机为 `D:\AegisTraining`），不进入项目仓库。
+> 训练文件、模型和训练报告位于独立的 `AegisTraining` 仓库（本机由 `AEGIS_TRAINING_ROOT` 指向 `D:\AegisTraining`），不进入本项目仓库。训练操作命令以 [AegisTraining README](https://github.com/shangguanyunji663/AegisTraining) 为准。
 
 ## 1. 当前状态
 
@@ -48,7 +48,6 @@
 
 ```bat
 set AEGIS_TRAINING_ROOT=D:\AegisTraining
-set AEGIS_TRAINING_SRC=%AEGIS_TRAINING_ROOT%\training\src
 set AEGIS_QLORA_MODEL_DIR=%AEGIS_TRAINING_ROOT%\exports\aegis-risk-qwen3.5-2b-v9-merged
 
 %AEGIS_TRAINING_ROOT%\envs\qlora-qwen35\python.exe ^

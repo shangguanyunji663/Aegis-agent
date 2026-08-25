@@ -222,7 +222,7 @@ flowchart TD
 |---|---|---|
 | `RISK_LLM_CHANNEL_ENABLED` | `true` | 通用风险 LLM 通道开关；`RISK_QLORA_ENABLED=true` 时由 QLoRA 通道接管 |
 | `RISK_QLORA_ENABLED` | `false` | v9 QLoRA 风险增强开关；开启后调用隔离 Transformers 服务，默认关闭保持兼容 |
-| `RISK_QLORA_URL` | `http://127.0.0.1:8301` | QLoRA 服务环回地址，客户端含 SSRF 防护 |
+| `RISK_QLORA_URL` | `https://qlora-endpoint.example.invalid` | 受保护的 QLoRA HTTPS endpoint；拒绝 localhost、环回、私有和保留地址 |
 | `RISK_QLORA_TIMEOUT_SECONDS` | `8.0` | QLoRA 请求超时，超时回退规则 |
 | `FUNCTION_CALLING_ENABLED` | `true` | Function Calling 技能选择开关 |
 | `llm_support_temperature` | `0.6` | 支持回复的温度参数 |

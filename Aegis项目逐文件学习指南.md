@@ -389,7 +389,6 @@ uvicorn app.main:app --host 127.0.0.1 --port 8091
 
 ```bat
 set AEGIS_TRAINING_ROOT=D:\AegisTraining
-set AEGIS_TRAINING_SRC=%AEGIS_TRAINING_ROOT%\training\src
 set AEGIS_QLORA_MODEL_DIR=%AEGIS_TRAINING_ROOT%\exports\aegis-risk-qwen3.5-2b-v9-merged
 %AEGIS_TRAINING_ROOT%\envs\qlora-qwen35\python.exe ^
   %AEGIS_TRAINING_ROOT%\training\scripts\serve_risk_qlora.py ^
@@ -434,7 +433,7 @@ RISK_QLORA_TIMEOUT_SECONDS=8
 | 模型  | `LLM_THINKING_ENABLED`                                       | 深度思考（接 GLM 建议关）                    | `false`                          |
 | 模型  | `LLM_SUPPORT_TEMPERATURE`                                    | 支持性回复采样温度（偏高更真人）                   | `0.6`                            |
 | 风险  | `RISK_LLM_CHANNEL_ENABLED`                                   | 通用 LLM 风险通道；`RISK_QLORA_ENABLED=true` 时由 QLoRA 接管 | `true`                           |
-| 风险  | `RISK_QLORA_ENABLED` / `RISK_QLORA_URL` / `RISK_QLORA_TIMEOUT_SECONDS` | v9 QLoRA 隔离服务开关 / 地址 / 超时 | `false` / `http://127.0.0.1:8301` / `8` |
+| 风险  | `RISK_QLORA_ENABLED` / `RISK_QLORA_URL` / `RISK_QLORA_TIMEOUT_SECONDS` | v9 QLoRA 隔离服务开关 / 地址 / 超时 | `false` / `https://qlora-endpoint.example.invalid` / `8` |
 | 技能  | `FUNCTION_CALLING_ENABLED`                                   | 模型在白名单内自主选技能                       | `true`                           |
 | 检索  | `EMBEDDING_PROVIDER`                                         | `openai`（代码默认）/ `local`（离线 MiniLM 示例）      | `openai`（`.env.example` 推荐 `local`）                          |
 | 检索  | `VECTOR_ENABLED` / `VECTOR_BACKEND`                          | 是否启用向量 / 后端                        | `false` / `chroma`               |

@@ -134,7 +134,6 @@ DATABASE_URL=mysql+pymysql://root:你的密码@localhost:3306/aegis?charset=utf8
 ```bash
 # Windows 示例；其他机器把这些路径改成自己的训练根目录
 set AEGIS_TRAINING_ROOT=D:\AegisTraining
-set AEGIS_TRAINING_SRC=%AEGIS_TRAINING_ROOT%\training\src
 set AEGIS_QLORA_MODEL_DIR=%AEGIS_TRAINING_ROOT%\exports\aegis-risk-qwen3.5-2b-v9-merged
 
 %AEGIS_TRAINING_ROOT%\envs\qlora-qwen35\python.exe ^
@@ -272,7 +271,7 @@ python -m app.mcp_tools.server --list
 **风险 LLM 通道双路径验证（第十一轮，2026-08-19） + QLoRA 微调投产（第十四轮，2026-08-24）：**
 - **规则基线配置**：显式设置 `RISK_LLM_CHANNEL_ENABLED=false` 时只跑规则通道，压力层风险准确率 **0.67**、高风险召回 **0.52**；该设置适合需要纯规则、可复现 baseline 的场景。
 - **QLoRA 微调模型（生产级，第十四轮）**：经过多轮有效版本迭代（第一版至第七版，旧 v2 编号作废；数据 720→2867 条，提示词契约 v2），最终候选 **`aegis-risk-qwen3.5-2b-v9`** 在冻结 stress 87 条验收集上**八门槛全部通过**——**FPR 0（零误升级）、隐喻新增 +6（13→19/25）、medium 召回 0.88、第三人称准确率 0.82、整体 accuracy 0.782**。格式 100%、P95 延迟 1.37s，由隔离 Transformers 服务（`serve_risk_qlora.py`，`RISK_QLORA_ENABLED` 开关控制）提供推理。提示词契约 v2 同步移除「不配」「活着多余」两个与金标细线冲突的高危示例，三处副本（client.py / data_contract.py / 数据管线）已同步更新。
-- **训练隔离约定**：训练脚本、数据、adapter、merged 模型、GGUF 与报告全部位于 `AEGIS_TRAINING_ROOT` 指向的外部目录（本机为 `D:\AegisTraining`），不进入项目仓库；克隆项目只需配置 `AEGIS_TRAINING_ROOT`、`AEGIS_TRAINING_SRC`、`AEGIS_QLORA_MODEL_DIR` 即可运行服务。
+- **训练隔离约定**：训练脚本、数据、adapter、merged 模型、GGUF 与报告全部位于 `AEGIS_TRAINING_ROOT` 指向的独立训练仓库（本机为 `D:\AegisTraining`），不进入项目仓库；训练初始化、数据准备、训练和评测命令统一见 [AegisTraining README](https://github.com/shangguanyunji663/AegisTraining)。本项目只保留 QLoRA 服务接入配置。
 - **真实 GLM sanity check**：GLM-4.7-flash 对压力层全部 **25 条**隐喻式自杀意念样本做扩展探针（2026-08-20，`data/eval/glm_probe_25.json`）。受免费档限流影响，14 条命中 429/超时回退 none；**11 条非 fallback 判断中 10 条判 high、1 条判 medium（corp-130）**，显示真实模型的 best-effort 表现接近但不超过 QLoRA 上界。
 - **配置事实**：`Settings` 与 `.env.example` 默认 `RISK_LLM_CHANNEL_ENABLED=true`、`RISK_QLORA_ENABLED=false`；是否开启应由部署的安全策略显式决定。
 
@@ -375,7 +374,7 @@ python -m app.mcp_tools.server --list
 | `KNOWLEDGE_CACHE_ENABLED` | 是否启用进程内 LRU 精确查询缓存；默认 `false`，可配 `KNOWLEDGE_CACHE_TTL_SECONDS`、`KNOWLEDGE_CACHE_MAX_ENTRIES`。Redis 写入目前为预留能力，检索读取仍以进程内缓存为准。 |
 | `RISK_LLM_CHANNEL_ENABLED` | 风险评估通用 LLM 通道开关；代码和 `.env.example` 默认 `true`。`RISK_QLORA_ENABLED=true` 时由 QLoRA 通道接管。 |
 | `RISK_QLORA_ENABLED` | QLoRA 风险增强开关；默认 `false`，开启后 RiskGuardian 调用隔离 Transformers 服务。 |
-| `RISK_QLORA_URL` | QLoRA 服务地址；默认 `http://127.0.0.1:8301`，客户端仅允许环回地址。 |
+| `RISK_QLORA_URL` | QLoRA 服务地址；默认占位值为 `https://qlora-endpoint.example.invalid`，应用集成拒绝 localhost、环回、私有和保留地址。 |
 | `RISK_QLORA_TIMEOUT_SECONDS` | QLoRA 请求超时；默认 `8` 秒，超时回退规则。 |
 | `FUNCTION_CALLING_ENABLED` | 技能选择：模型在规则白名单内自主挑选；默认 `true`，失败时回退规则白名单。 |
 | `SKILL_DISTILL_ENABLED` | 是否记录基础 Skill 重复组合并触发自动蒸馏；默认 `true`。 |

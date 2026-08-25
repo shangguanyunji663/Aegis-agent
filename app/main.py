@@ -19,7 +19,7 @@ from app.api import admin, auth_routes, chat, pages, system
 from app.api.errors import register_exception_handlers
 from app.api.middleware import attach_request_context
 from app.config import Settings, get_settings
-from app.core.runtime import RuntimeServices
+from app.core.runtime_services import RuntimeServices
 from app.database import build_engine, build_session_factory, create_schema
 from app.llm import build_llm_client
 from app.repository import DatabaseStore

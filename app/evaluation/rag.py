@@ -181,7 +181,7 @@ def run_ablation(store: DatabaseStore, cases: list[dict], top_k: int) -> dict:
                 expected_sources = {source.lower() for source in case.get("expectedSources", [])}
                 expected_terms = [term.lower() for term in case.get("expectedTerms", [])]
                 if any(
-                    is_relevant(item.get("source", ""), item.get("content", "") or item.get("snippet", ""), expected_sources, expected_terms)[0]
+                    is_relevant(item.get("source", ""), item.get("content") or item.get("snippet", ""), expected_sources, expected_terms)[0]
                     for item in retrieved
                 ):
                     hits += 1

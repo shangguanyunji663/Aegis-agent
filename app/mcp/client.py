@@ -73,7 +73,7 @@ class AegisMcpToolClient:
         env["VECTOR_REQUIRED"] = str(self.settings.vector_required).lower()
         server = StdioServerParameters(
             command=sys.executable,
-            args=["-m", "app.mcp_tools.server"],
+            args=["-m", "app.mcp.server"],
             env=env,
             cwd=str(project_root),
         )

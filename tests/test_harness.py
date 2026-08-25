@@ -1,4 +1,4 @@
-from app.harness.runner import run_scenario, run_scenarios
+from app.evaluation.harness.runner import run_scenario, run_scenarios
 from tests.test_orchestrator import build_orchestrator
 
 

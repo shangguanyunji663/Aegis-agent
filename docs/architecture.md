@@ -61,12 +61,12 @@ flowchart TD
 | `app/repository/store.py` | 会话、消息、知识库、报告、个案、工具任务和审计持久化(DatabaseStore) |
 | `app/rag/` | 检索子系统:text(分词)、scoring(BM25/重排/融合)、chunking(切块)、memory(会话摘要)、vector_store(Chroma 向量与本地降级) |
 | `app/tools/contracts.py` | 工具契约:角色、风险等级、审批要求、脱敏字段和重试限制 |
-| `app/tools/gateway.py` / `app/tools/mcp_client.py` / `app/mcp_tools/server.py` | internal/FastMCP 工具边界 |
+| `app/tools/gateway.py` / `app/mcp/server.py` / `app/mcp/client.py` | internal/FastMCP 工具边界 |
 | `app/services/` | 报告个案、工具执行、工具治理、队列 worker、记录表等服务层 |
 | `app/llm/` | 模型后端:client(Mock/OpenAI/Ollama/RiskQloraClient)+ prompts;含 assess_risk(风险通道)、chat_with_tools(FC)、judge_reply(LLM 评审)三通道;RiskQloraClient 告警规则:URL 仅允许环回地址,含 SSRF 防护 |
-| `app/evaluation/` | 评测:runner(八套指标)、datasets、report_html、runtime_ab(三运行时 A/B)、judge(LLM-as-Judge) |
+| `app/evaluation/` | 评测:runner(八套指标)、rag(双口径+消融)、datasets、report_html、runtime_ab(三运行时 A/B)、judge(LLM-as-Judge)、harness/(factory 装配工厂 + runner 场景回放 CLI) |
 | `app/agents/skill_selection.py` | Function Calling 技能选择:规则白名单 + 模型自主挑选 |
-| `app/core/` | 横切原语:auth(认证)、privacy(脱敏)、runtime(Redis 限流/锁)、utils |
+| `app/core/` | 横切原语:auth(认证)、privacy(脱敏)、runtime_services(Redis 限流/锁)、utils |
 | `skills/*/SKILL.md` | 标准化心理支持 Skill 规范 |
 
 ## 4. Agent 协作模型

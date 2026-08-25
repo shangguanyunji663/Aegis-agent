@@ -1,4 +1,4 @@
-"""工具治理层:契约定义、内部/MCP 网关与 MCP 客户端。"""
+"""工具治理层:契约定义与内部/MCP 网关。"""
 from app.tools.contracts import (
     TOOL_CONTRACTS,
     ToolContract,

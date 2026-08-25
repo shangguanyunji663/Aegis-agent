@@ -5,8 +5,8 @@ from typing import Any, Protocol
 import asyncio
 
 from app.config import Settings
-from app.tools.mcp_client import AegisMcpToolClient
-from app.mcp_tools.server import read_resource
+from app.mcp.client import AegisMcpToolClient
+from app.mcp.server import read_resource
 from app.tools.contracts import normalize_tool_kind
 
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from app.evaluation import run_evaluation
-from app.harness.factory import build_harness_orchestrator
+from app.evaluation.harness.factory import build_harness_orchestrator
 
 
 ROOT = Path(__file__).resolve().parents[1]

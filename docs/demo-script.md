@@ -36,7 +36,7 @@
 
 ## 5. 工具治理与 MCP
 
-1. 运行 `python -m app.mcp_tools.server --list` 查看 FastMCP 能力。
+1. 运行 `python -m app.mcp.server --list` 查看 FastMCP 能力。
 2. 展示工具包括 case create、case ack、case note add、alert、ledger、email、handoff、resource lookup。
 3. 说明工具不会从学生端直接执行，而是统一进入 ToolJob。
 4. 在管理端查看 ToolAudit、ExcelRecord、AlertRecord 和 DeadLetter。
@@ -49,10 +49,10 @@
 
 ```bash
 python -m pytest -q
-python -m app.rag_eval.runner
+python -m app.evaluation.rag
 python -m eval.run_eval
-python -m app.harness.runner --suite all --output data/harness/latest.json
-python -m app.harness.runner --suite runtime-ab   # 三运行时 A/B 对比报告
+python -m app.evaluation.harness.runner --suite all --output data/harness/latest.json
+python -m app.evaluation.harness.runner --suite runtime-ab   # 三运行时 A/B 对比报告
 ```
 
 4. 说明评测用于工程回归和能力展示，不等同于临床有效性评估。

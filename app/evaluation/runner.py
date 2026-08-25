@@ -36,7 +36,7 @@ from app.evaluation.datasets import (
 )
 from app.evaluation.judge import evaluate_reply_quality
 from app.evaluation.report_html import render_html
-from app.rag_eval.runner import evaluate as evaluate_rag_eval
+from app.evaluation.rag import evaluate as evaluate_rag_eval
 
 FIXTURES_DIR = Path(__file__).resolve().parents[2] / "eval" / "fixtures"
 

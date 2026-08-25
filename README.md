@@ -206,7 +206,7 @@ Compose 会启动应用、MySQL 8.0、Redis 和 Chroma。默认本地模式使�
 # 初始化数据库
 python -m app.init_db
 
-# 后端测试（只跑 tests/，避免被根目录 test_chat.py 阻塞）
+# 后端测试（只跑 tests/，scripts/ 下的联调脚本不在 pytest 收集范围）
 python -m pytest tests -q
 
 # 前端脚本语法检查
@@ -216,16 +216,16 @@ node --check static/login.js static/student.js static/admin.js
 python -m eval.run_eval
 
 # RAG 独立评测(含双口径 + 消融)
-python -m app.rag_eval.runner
+python -m app.evaluation.rag
 
 # 本地性能 benchmark(并发/延迟/吞吐/缓存/ToolJob)
 python -m scripts.run_benchmark
 
 # 工程 Harness 验证
-python -m app.harness.runner --suite all --output data/harness/latest.json
+python -m app.evaluation.harness.runner --suite all --output data/harness/latest.json
 
 # 查看 MCP 能力
-python -m app.mcp_tools.server --list
+python -m app.mcp.server --list
 ```
 
 ## 评测结果
@@ -320,25 +320,23 @@ python -m app.mcp_tools.server --list
 │   ├── database.py               # 引擎/会话工厂/建表/迁移/就绪检查
 │   ├── assessment.py             # 规则式风险评估(高危/中危关键词单一来源)
 │   ├── skills.py                 # SkillRegistry:注册式 Skill、标准 Skill 与自动蒸馏
-│   ├── core/                     # 横切原语:auth(认证) privacy(脱敏) runtime(Redis 限流锁) utils
+│   ├── core/                     # 横切原语:auth(认证) privacy(脱敏) runtime_services(Redis 限流锁) utils
 │   ├── llm/                      # 模型后端:Mock/OpenAI/Ollama/RiskQloraClient + prompts
 │   ├── agents/                   # 智能体层:classic(六单轮) model_profiles runtime harness orchestrator
 │   ├── autonomous/               # 自治协作:events registry board coordinator agents runtime
 │   ├── rag/                      # 检索与记忆：text/scoring/chunking/facts(L2)/memory(L3)/vector_store
 │   ├── repository/               # 持久化仓储：会话、L2 用户事实、知识库、报告与工具任务
-│   ├── tools/                    # 工具治理:contracts(契约) gateway(网关) mcp_client
+│   ├── tools/                    # 工具治理:contracts(契约) gateway(网关)
 │   ├── services/                 # 业务服务:report_case tool_executor tool_queue tool_records tool_governance
 │   ├── api/                      # HTTP 路由:schemas deps middleware pages system auth_routes chat admin
-│   ├── evaluation/               # 评测:runner datasets report_html
-│   ├── harness/                  # 工程 Harness:factory(装配工厂) runner(场景回放 CLI)
-│   ├── mcp_tools/                # FastMCP 工具服务(可选)
-│   └── rag_eval/                 # RAG 独立评测 runner
+│   ├── evaluation/               # 评测:runner rag(双口径+消融) datasets report_html runtime_ab judge + harness/(factory 装配工厂, runner 场景回放 CLI)
+│   └── mcp/                      # MCP 边界:server(FastMCP 服务) client(stdio 客户端)
 ├── knowledge/                    # 内置心理支持知识库（当前 24 篇 .md）
 ├── eval/                         # 评测 CLI 与 fixtures(路由/风险/安全/多轮/检索/RAG 数据集)
 ├── skills/                       # 人工策展 Skill 规范；运行时可在 skills/auto/ 生成 auto Skill
 ├── static/                       # 学生端和管理员端页面(login/student/admin)
 ├── tests/                        # pytest 测试
-├── scripts/                      # 启动脚本 + 评测脚本(eval_risk_dual_path/probe_glm/run_benchmark)
+├── scripts/                      # 启动/联调/诊断脚本(start-local start-compose smoke_chat probe_glm eval_risk_dual_path run_benchmark analyze_layers)
 ├── docs/                         # 架构、安全和演示文档
 ├── Aegis项目逐文件学习指南.md      # 从零构建式逐模块学习指南
 ├── docs/records/                 # 迭代记录（重构→提速→注册 MySQL→LangGraph→深度增强→回复真人化→记忆增强→对抗测试→语料分层→风险双路径→RAG 增强→记忆分层与 Skill 自动蒸馏）

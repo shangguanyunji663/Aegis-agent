@@ -7,7 +7,7 @@ from typing import Any
 
 from app.agents.orchestrator import PsychOrchestrator
 from app.evaluation import evaluate_scaled_benchmark, evaluate_skills, render_report, run_runtime_ab
-from app.harness.factory import KNOWLEDGE_DIR, ROOT, build_harness_orchestrator
+from app.evaluation.harness.factory import KNOWLEDGE_DIR, ROOT, build_harness_orchestrator
 from app.models import ReportStatus
 
 
@@ -162,7 +162,7 @@ def run_standard_skills_harness(orchestrator: PsychOrchestrator) -> dict[str, An
 
 
 def run_rag_harness(orchestrator: PsychOrchestrator) -> dict[str, Any]:
-    from app.rag_eval.runner import evaluate
+    from app.evaluation.rag import evaluate
 
     result = evaluate(orchestrator.store, orchestrator.store.settings)
     # 数据完整性校验（非指标门限）：数据集规模应足以支撑统计结论。
@@ -263,7 +263,6 @@ def run_runtime_ab_harness(orchestrator: PsychOrchestrator) -> dict[str, Any]:
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(report, encoding="utf-8")
     return {"summary": summary, "report": str(report_path), "all_consistent": all_consistent}
-
 
 
 def load_scenarios(path: Path) -> list[dict[str, Any]]:

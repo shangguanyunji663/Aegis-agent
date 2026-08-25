@@ -5,9 +5,15 @@ HTTP 层统一走 _post_json(校验 http(s) 环回基址;基址经 AEGIS_BASE_UR
 """
 import os
 import re
+import sys
 import json
 import urllib.parse
 import urllib.request
+from pathlib import Path
+
+_ROOT = Path(__file__).resolve().parents[1]
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
 
 
 _ALLOWED_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})

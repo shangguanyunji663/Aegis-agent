@@ -1,6 +1,6 @@
 """评测/Harness 共享装配工厂:构造一个使用独立 SQLite 与真实知识库的编排器。
 
-harness.runner 与 eval.run_eval 共用此工厂,避免两处维护
+evaluation.harness.runner 与 eval.run_eval 共用此工厂,避免两处维护
 近乎相同的 build_harness_orchestrator / build_local_orchestrator。
 """
 from __future__ import annotations
@@ -18,7 +18,7 @@ from app.repository import DatabaseStore
 from app.skills import SkillRegistry
 
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 KNOWLEDGE_DIR = ROOT / "knowledge"
 
 

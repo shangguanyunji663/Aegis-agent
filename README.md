@@ -401,6 +401,7 @@ python -m app.mcp.server --list
 
 - [架构说明](docs/architecture.md)
 - [安全设计](docs/safety-design.md)
+- [QLoRA 微调参数与操作手册](docs/qlora-finetuning.md)
 - [演示脚本](docs/demo-script.md)
 - [逐文件学习指南](Aegis项目逐文件学习指南.md)
 - [第一次重构方案](docs/records/REFACTORING.md)

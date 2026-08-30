@@ -5,26 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Aegis 登录</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="/static/styles.css?v=0.3.0" />
+    <link rel="stylesheet" href="/static/styles.css?v=0.8.0" />
   </head>
   <body class="portal-page">
     <header class="role-topbar">
       <div class="role-brand">
         <div class="role-logo">A</div>
         <div>
-          <p class="eyebrow">AEGIS PSYCH AGENT</p>
+          <p class="eyebrow">校园心理支持平台</p>
           <h1>Aegis 校园心理智能体</h1>
         </div>
       </div>
       <div class="top-actions">
-        <span id="health" class="status-pill">checking</span>
-        <span id="agent-status" class="status-pill secondary">agent</span>
+        <span id="health" class="status-pill">检测中</span>
+        <span id="agent-status" class="status-pill secondary">就绪</span>
       </div>
     </header>
 
     <main class="portal-shell">
       <section class="portal-login panel-card">
-        <p class="eyebrow">ACCOUNT GATE</p>
+          <p class="eyebrow">账号登录</p>
         <h2>选择账号进入对应工作台</h2>
         <form id="login-form" class="auth-form">
           <label for="login-username">用户名</label>
@@ -61,18 +61,18 @@
 
       <section class="entry-grid">
         <article class="entry-card student-entry">
-          <span>STUDENT</span>
+          <span>学生入口</span>
           <h3>学生端</h3>
           <p>心理陪伴对话、快捷表达、会话历史和即时支持。</p>
         </article>
         <article class="entry-card admin-entry">
-          <span>COUNSELOR ADMIN</span>
-          <h3>管理员端</h3>
-          <p>风险报告、个案闭环、Agent trace、知识库和工具审计。</p>
+          <span>教师 / 管理员入口</span>
+          <h3>管理后台</h3>
+          <p>风险报告、个案闭环、对话回放、知识库和工具审计。</p>
         </article>
       </section>
     </main>
 
-    <script src="/static/login.js?v=0.3.0"></script>
+    <script src="/static/login.js?v=0.8.0"></script>
   </body>
 </html>

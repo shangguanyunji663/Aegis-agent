@@ -33,9 +33,9 @@ async function refreshHealth() {
   try {
     const response = await fetch("/api/health");
     const data = await response.json();
-    health.textContent = data.status || "UP";
+    health.textContent = data.status === "UP" ? "运行正常" : (data.status || "检测中");
   } catch {
-    health.textContent = "DOWN";
+    health.textContent = "服务异常";
   }
 }
 
@@ -93,4 +93,4 @@ toggleAuth.addEventListener("keydown", (event) => {
   if (event.key === "Enter" || event.key === " ") toggleAuth.click();
 });
 refreshHealth();
-agentStatus.textContent = "ready";
+agentStatus.textContent = "就绪";

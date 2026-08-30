@@ -5,20 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Aegis 管理员端</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="/static/styles.css?v=0.3.0" />
+    <link rel="stylesheet" href="/static/styles.css?v=0.8.0" />
   </head>
   <body class="admin-page">
     <header class="role-topbar">
       <div class="role-brand">
         <div class="role-logo admin-logo">A</div>
         <div>
-          <p class="eyebrow">COUNSELOR ADMIN</p>
+          <p class="eyebrow">咨询后台 · 校园心理支持平台</p>
           <h1>Aegis 咨询后台</h1>
         </div>
       </div>
       <div class="top-actions">
-        <span id="health" class="status-pill">checking</span>
-        <span id="model-state" class="status-pill secondary">model</span>
+        <span id="health" class="status-pill">检测中</span>
+        <span id="model-state" class="status-pill secondary">模型状态</span>
         <div class="user-summary compact"><strong id="active-account">管理员</strong><span>管理员端</span></div>
         <button id="refresh-admin" class="ghost-btn" type="button">刷新</button>
         <button id="logout-btn" class="ghost-btn" type="button">退出</button>
@@ -37,87 +37,107 @@
 
       <section class="admin-columns">
         <div class="admin-stack">
-          <section class="panel-card" data-panel="runtime">
-            <div class="section-title"><div><p class="eyebrow">AGENT RUNTIME</p><h2>自治协作状态</h2></div><button class="collapse-btn" type="button" aria-label="展开或收起">▾</button></div>
-            <div class="card-body">
-<div id="agent-status-box" class="stack empty">正在读取</div>
-            </div>
-          </section>
-          <section class="panel-card" data-panel="cases">
-            <div class="section-title"><div><p class="eyebrow">CASES</p><h2>风险个案闭环</h2></div><button class="collapse-btn" type="button" aria-label="展开或收起">▾</button></div>
-            <div class="card-body">
-<div id="cases-list" class="stack empty">暂无个案</div>
-            </div>
-          </section>
-          <section class="panel-card" data-panel="knowledge">
-            <div class="section-title"><div><p class="eyebrow">KNOWLEDGE</p><h2>RAG 知识库维护</h2></div><button class="collapse-btn" type="button" aria-label="展开或收起">▾</button></div>
-            <div class="card-body">
-            <div class="knowledge-tools">
-              <div class="tool-line">
-                <input id="knowledge-query" type="text" placeholder="检索知识库" />
-                <button id="search-knowledge" class="mini-btn" type="button">Search</button>
-              </div>
-              <div id="knowledge-search-results" class="stack empty">暂无检索</div>
-              <div class="tool-line">
-                <input id="knowledge-filename" type="text" placeholder="source.md" />
-                <button id="upload-knowledge" class="mini-btn approve" type="button">Upload</button>
-              </div>
-              <textarea id="knowledge-content" rows="4" placeholder="粘贴 Markdown 或文本知识"></textarea>
-              <div class="row-actions compact">
-                <button id="rebuild-knowledge" class="ghost-btn" type="button">Rebuild</button>
-                <button id="backup-knowledge" class="ghost-btn" type="button">Backup</button>
+          <section class="panel-card" data-tabs="support">
+            <div class="section-title">
+              <div class="seg-tabs">
+                <button class="seg-tab active" type="button" data-seg-tab="cases" aria-pressed="true">个案</button>
+                <button class="seg-tab" type="button" data-seg-tab="knowledge" aria-pressed="false">知识库</button>
+                <button class="seg-tab" type="button" data-seg-tab="runtime" aria-pressed="false">协作状态</button>
               </div>
             </div>
-            <div id="knowledge-status" class="stack empty">正在加载</div>
+            <div class="card-body">
+              <div class="seg-panel active" data-seg-panel="cases">
+                <div id="cases-list" class="stack empty">暂无个案</div>
+              </div>
+              <div class="seg-panel" data-seg-panel="knowledge">
+                <div class="knowledge-tools">
+                  <div class="tool-line">
+                    <input id="knowledge-query" type="text" placeholder="输入关键词检索知识库" />
+                    <button id="search-knowledge" class="mini-btn" type="button">搜索</button>
+                  </div>
+                  <div id="knowledge-search-results" class="stack empty">暂无检索</div>
+                  <div class="tool-line">
+                    <input id="knowledge-filename" type="text" placeholder="文件名,如:睡眠知识.md" />
+                    <button id="upload-knowledge" class="mini-btn approve" type="button">上传知识</button>
+                  </div>
+                  <textarea id="knowledge-content" rows="4" placeholder="粘贴文章内容(Markdown 或纯文本)"></textarea>
+                  <div class="row-actions compact">
+                    <button id="rebuild-knowledge" class="ghost-btn" type="button">重建索引</button>
+                    <button id="backup-knowledge" class="ghost-btn" type="button">备份知识库</button>
+                  </div>
+                </div>
+                <div id="knowledge-status" class="stack empty">正在加载</div>
+              </div>
+              <div class="seg-panel" data-seg-panel="runtime">
+                <div id="agent-status-box" class="stack empty">正在读取</div>
+              </div>
             </div>
           </section>
         </div>
 
         <div class="admin-stack">
-          <section class="panel-card" data-panel="reports">
-            <div class="section-title"><div><p class="eyebrow">REPORTS</p><h2>心理风险与咨询报告</h2></div><button class="collapse-btn" type="button" aria-label="展开或收起">▾</button></div>
-            <div class="card-body">
-<div id="reports-list" class="stack empty">暂无报告</div>
+          <section class="panel-card" data-tabs="review">
+            <div class="section-title">
+              <div class="seg-tabs">
+                <button class="seg-tab active" type="button" data-seg-tab="reports" aria-pressed="true">风险报告</button>
+                <button class="seg-tab" type="button" data-seg-tab="traces" aria-pressed="false">对话回放</button>
+              </div>
             </div>
-          </section>
-          <section class="panel-card" data-panel="traces">
-            <div class="section-title"><div><p class="eyebrow">TRACES</p><h2>Agent Trace</h2></div><button class="collapse-btn" type="button" aria-label="展开或收起">▾</button></div>
             <div class="card-body">
-<div id="trace-list" class="stack empty">暂无 trace</div>
+              <div class="seg-panel active" data-seg-panel="reports">
+                <div id="reports-list" class="stack empty">暂无报告</div>
+              </div>
+              <div class="seg-panel" data-seg-panel="traces">
+                <div id="trace-list" class="stack empty">暂无 trace</div>
+              </div>
             </div>
           </section>
         </div>
 
         <aside class="admin-detail">
-          <section class="panel-card" data-panel="detail">
-            <div class="section-title"><h2>详情</h2><span id="detail-title">未选择</span><button class="collapse-btn" type="button" aria-label="展开或收起">▾</button></div>
+          <section class="panel-card detail-card">
+            <div class="section-title"><h2>详情</h2><span id="detail-title">未选择</span></div>
             <div class="card-body">
-<pre id="detail-json" class="detail-json">选择报告、个案、trace、工具任务或审计查看详情。</pre>
+<pre id="detail-json" class="detail-json">点击任意列表中的行，这里会显示它的完整信息。</pre>
             </div>
           </section>
-          <section class="panel-card" data-panel="tool-jobs">
-            <div class="section-title"><h2>Tool Jobs</h2><button id="run-tool-worker" class="ghost-btn" type="button">Dispatch</button><button class="collapse-btn" type="button" aria-label="展开或收起">▾</button></div>
-            <div class="card-body">
-<div id="tool-jobs-list" class="stack empty">暂无任务</div>
+          <section class="panel-card workspace-card" data-tabs="workspace">
+            <div class="section-title workspace-title">
+              <h2>工作台</h2>
+              <div class="seg-tabs">
+                <button class="seg-tab active" type="button" data-seg-tab="jobs" aria-pressed="true">工具任务</button>
+                <button class="seg-tab" type="button" data-seg-tab="records" aria-pressed="false">执行记录</button>
+                <button class="seg-tab" type="button" data-seg-tab="eval" aria-pressed="false">评测</button>
+                <button class="seg-tab" type="button" data-seg-tab="audit" aria-pressed="false">审计</button>
+              </div>
             </div>
-          </section>
-          <section class="panel-card" data-panel="tool-records">
-            <div class="section-title"><h2>Tool Records</h2><span id="tool-worker-state">worker</span><button class="collapse-btn" type="button" aria-label="展开或收起">▾</button></div>
             <div class="card-body">
-<div id="tool-records-list" class="stack empty">暂无记录</div>
-            </div>
-          </section>
-          <section class="panel-card" data-panel="eval-audit">
-            <div class="section-title"><h2>Eval / Audit</h2><button id="run-eval" class="ghost-btn" type="button">Run Eval</button><button class="collapse-btn" type="button" aria-label="展开或收起">▾</button></div>
-            <div class="card-body">
-<div id="eval-results" class="stack empty">暂无评测</div>
-              <div id="audit-list" class="stack empty">暂无审计</div>
+              <div class="seg-panel active" data-seg-panel="jobs">
+                <div class="seg-panel-head">
+                  <span id="tool-worker-state" class="status-pill secondary">执行器</span>
+                  <button id="run-tool-worker" class="ghost-btn" type="button">立即派发</button>
+                </div>
+                <div id="tool-jobs-list" class="stack empty">暂无任务</div>
+              </div>
+              <div class="seg-panel" data-seg-panel="records">
+                <div id="tool-records-list" class="stack empty">暂无记录</div>
+              </div>
+              <div class="seg-panel" data-seg-panel="eval">
+                <div class="seg-panel-head">
+                  <span class="knowledge-line">内置测试题,不使用真实学生数据</span>
+                  <button id="run-eval" class="ghost-btn" type="button">运行评测</button>
+                </div>
+                <div id="eval-results" class="stack empty">暂无评测</div>
+              </div>
+              <div class="seg-panel" data-seg-panel="audit">
+                <div id="audit-list" class="stack empty">暂无审计</div>
+              </div>
             </div>
           </section>
         </aside>
       </section>
     </main>
 
-    <script src="/static/admin.js?v=0.3.0"></script>
+    <script src="/static/admin.js?v=0.8.0"></script>
   </body>
 </html>

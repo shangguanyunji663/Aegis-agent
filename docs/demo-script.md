@@ -8,7 +8,7 @@
 2. 使用 `student / student123!` 登录，进入学生端。
 3. 展示学生端只有会话、聊天和历史记录，不出现管理功能。
 4. 退出后使用 `admin / admin123!` 登录，进入管理员端。
-5. 展示 Reports、Cases、Traces、Knowledge、Tool Jobs、Eval、Audit 等管理模块。
+5. 展示「风险报告」「个案」「知识库」「对话回放」与「工作台」（工具任务/执行记录/评测/审计页签）等管理模块。
 
 ## 2. 普通心理支持对话
 
@@ -32,7 +32,7 @@
 3. 切换到管理员端，在 Reports 中查看 pending report。
 4. 管理员审批报告后，系统创建 case 和相关 ToolJob。
 5. 在 Cases 中确认个案，添加辅导员备注。
-6. 在 Tool Jobs 中查看 alert、ledger、email、handoff 等任务状态。
+6. 在工作台的「工具任务」页签查看预警、台账、邮件、交接摘要等任务状态（界面显示为中文动作名）。
 
 ## 5. 工具治理与 MCP
 

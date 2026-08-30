@@ -65,6 +65,7 @@ flowchart LR
 
 ### 管理端
 
+- 三列页签工作台（桌面端固定一屏、界面全中文）：左列「个案 | 知识库 | 协作状态」、中列「风险报告 | 对话回放」、右列「详情检查器 + 工作台」；操作详见《[咨询后台使用手册(教师版)](docs/admin-teacher-guide.md)》。
 - 风险报告列表、状态流转和报告 trace 查看。
 - 个案创建、辅导员确认、备注追加和状态更新。
 - 知识库检索、文件上传、重建索引、向量索引重建和备份。
@@ -320,7 +321,7 @@ python -m app.mcp.server --list
 │   ├── database.py               # 引擎/会话工厂/建表/迁移/就绪检查
 │   ├── assessment.py             # 规则式风险评估(高危/中危关键词单一来源)
 │   ├── skills.py                 # SkillRegistry:注册式 Skill、标准 Skill 与自动蒸馏
-│   ├── core/                     # 横切原语:auth(认证) privacy(脱敏) runtime_services(Redis 限流锁) utils
+│   ├── core/                     # 横切原语:auth(认证) privacy(脱敏) runtime_services(Redis 限流锁) network(出站 URL 校验/SSRF 防护) utils
 │   ├── llm/                      # 模型后端:Mock/OpenAI/Ollama/RiskQloraClient + prompts
 │   ├── agents/                   # 智能体层:classic(六单轮) model_profiles runtime harness orchestrator
 │   ├── autonomous/               # 自治协作:events registry board coordinator agents runtime
@@ -336,10 +337,10 @@ python -m app.mcp.server --list
 ├── skills/                       # 人工策展 Skill 规范；运行时可在 skills/auto/ 生成 auto Skill
 ├── static/                       # 学生端和管理员端页面(login/student/admin)
 ├── tests/                        # pytest 测试
-├── scripts/                      # 启动/联调/诊断脚本(start-local start-compose smoke_chat probe_glm eval_risk_dual_path run_benchmark analyze_layers)
-├── docs/                         # 架构、安全和演示文档
+├── scripts/                      # 启动/联调/诊断脚本(start-local start-compose smoke_chat probe_glm migrate_sqlite_to_mysql eval_risk_dual_path run_benchmark analyze_layers)
+├── docs/                         # 架构、安全、演示、教师手册与前端学习文档
 ├── Aegis项目逐文件学习指南.md      # 从零构建式逐模块学习指南
-├── docs/records/                 # 迭代记录（重构→提速→注册 MySQL→LangGraph→深度增强→回复真人化→记忆增强→对抗测试→语料分层→风险双路径→RAG 增强→记忆分层与 Skill 自动蒸馏）
+├── docs/records/                 # 迭代记录（重构→提速→注册 MySQL→LangGraph→深度增强→回复真人化→记忆增强→对抗测试→文档整合→语料分层→风险双路径→RAG 增强→记忆分层与 Skill 自动蒸馏→前端整体改造:主题/页签化/全中文化/学习指南）
 ├── Dockerfile
 └── docker-compose.yml
 ```
@@ -349,7 +350,7 @@ python -m app.mcp.server --list
 | 类型 | 接口 |
 | --- | --- |
 | 认证 | `POST /api/auth/register`(注册), `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` |
-| 学生会话 | `GET /api/sessions`, `POST /api/sessions`, `GET /api/sessions/{id}`, `PATCH /api/sessions/{id}` |
+| 学生会话 | `GET /api/sessions`, `POST /api/sessions`, `GET /api/sessions/{id}`, `PATCH /api/sessions/{id}`, `DELETE /api/sessions/{id}` |
 | 聊天 | `POST /api/chat`, `POST /api/chat/stream` |
 | 管理端报告 | `GET /api/admin/reports`, `PATCH /api/admin/reports/{report_id}` |
 | 个案 | `GET /api/admin/cases`, `POST /api/admin/cases/{case_id}/notes`, `PATCH /api/admin/cases/{case_id}` |
@@ -401,6 +402,8 @@ python -m app.mcp.server --list
 
 - [架构说明](docs/architecture.md)
 - [安全设计](docs/safety-design.md)
+- [咨询后台使用手册(教师版)](docs/admin-teacher-guide.md)
+- [前端学习指南](docs/frontend-learning-guide.md)
 - [QLoRA 微调参数与操作手册](docs/qlora-finetuning.md)
 - [演示脚本](docs/demo-script.md)
 - [逐文件学习指南](Aegis项目逐文件学习指南.md)
@@ -412,10 +415,14 @@ python -m app.mcp.server --list
 - [第六次回复真人化改造(提示词/兜底模板/429重试)](docs/records/LLM-RESPONSE-HUMANIZATION.md)
 - [第七次记忆系统增强(消息数/摘要容量提升)](docs/records/MEMORY-ENHANCEMENT.md)
 - [第八次对抗型对话测试(10轮配合+10轮对抗)](docs/records/CONFRONTATIONAL-DIALOGUE-TESTING.md)
+- [第九轮项目文档整合与规范化](docs/records/ROUND-9-CONSOLIDATION.md)
 - [第十轮代表性语料双层拆分(基础层/压力层)](docs/records/CORPUS-LAYER-SPLIT.md)
 - [第十一轮风险LLM通道双路径验证(stub-LLM on vs MockLLM OFF)](docs/records/ROUND-11-RISK-LLM-DUAL-CHANNEL.md)
 - [第十二轮RAG增强与性能基准(知识库24篇/RRF/缓存/双口径消融/benchmark)](docs/records/ROUND-12-RAG-ENHANCEMENT-BENCHMARK.md)
 - [第十三轮记忆分层与 Skill 自动蒸馏(L2/L3/L4/SCD-2/自动 Skill)](docs/records/ROUND-13-MEMORY-SKILL-DISTILLATION.md)
+- [第十五轮前端疗愈主题升级(暖米白+鼠尾草绿/风险分级色条/无障碍)](docs/records/ROUND-15-FRONTEND-CALM-THEME.md)
+- [第十六轮咨询后台教师使用手册(全板块按钮逐一覆盖)](docs/records/ROUND-16-ADMIN-TEACHER-GUIDE.md)
+- [第十七轮前端整体改造(后台页签化布局/固定一屏/全中文界面/前端学习指南)](docs/records/ROUND-17-FRONTEND-OVERHAUL.md)
 
 ## 待改进与优化(Roadmap)
 
@@ -456,4 +463,4 @@ python -m app.mcp.server --list
 
 ## License
 
-当前仓库未声明开源许可证。未经作者许可，请不要将代码用于商业分发或生产心理咨询服务。
+本项目基于 [MIT License](LICENSE) 开源发布。同时请继续遵守上文的安全声明：本项目用于心理支持工程学习与展示，不提供医学诊断，不能替代专业心理咨询或危机干预服务，未经专业评估不建议直接用于真实生产心理咨询服务。

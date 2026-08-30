@@ -56,8 +56,10 @@ flowchart LR
 
 ### 学生端
 
-- 注册与登录:学生自由注册;教师凭邀请码注册(默认 `aegis-teacher`,经 `AUTH_TEACHER_INVITE_CODE` 配置)后进入咨询后台。
+- 注册与登录:学生自由注册;教师凭邀请码注册(默认 `aegis-teacher`,经 `AUTH_TEACHER_INVITE_CODE` 配置)后进入咨询工作台。
 - 登录、退出、会话创建、会话重命名和会话删除。
+- 对话助手「小暖」:消息头像、入场动画与欢迎屏话题 chips;顶栏时段问候、服务状态圆点(60 秒自动刷新)。
+- 左栏实用卡片:「心情速选」2×2 图标卡一键填入表达、「紧急求助」卡(心理援助热线)与「60 秒放松练习」。
 - SSE 流式心理支持回复，兼容非流式 `/api/chat`。低风险对话在生成的同时逐字直播(真流式),中/高风险回复经安全复核通过后再输出。
 - 低风险陪伴、心理咨询建议、高风险安全回应三类回复路径。
 - L2/L3/L4 分层记忆：跨会话当前有效用户事实、会话滚动摘要与最近原话窗口共同注入回复；当前有效事实优先于可能过期的摘要，避免旧状态干扰当前回应。
@@ -65,7 +67,7 @@ flowchart LR
 
 ### 管理端
 
-- 三列页签工作台（桌面端固定一屏、界面全中文）：左列「个案 | 知识库 | 协作状态」、中列「风险报告 | 对话回放」、右列「详情检查器 + 工作台」；操作详见《[咨询后台使用手册(教师版)](docs/admin-teacher-guide.md)》。
+- 三列页签工作台（桌面端固定一屏、界面全中文）：左列「个案 | 知识库 | 协作状态」、中列「风险报告 | 对话回放」、右列「详情检查器 + 工作台」；操作详见《[咨询工作台使用手册(教师版)](docs/admin-teacher-guide.md)》。
 - 风险报告列表、状态流转和报告 trace 查看。
 - 个案创建、辅导员确认、备注追加和状态更新。
 - 知识库检索、文件上传、重建索引、向量索引重建和备份。
@@ -402,7 +404,7 @@ python -m app.mcp.server --list
 
 - [架构说明](docs/architecture.md)
 - [安全设计](docs/safety-design.md)
-- [咨询后台使用手册(教师版)](docs/admin-teacher-guide.md)
+- [咨询工作台使用手册(教师版)](docs/admin-teacher-guide.md)
 - [前端学习指南](docs/frontend-learning-guide.md)
 - [QLoRA 微调参数与操作手册](docs/qlora-finetuning.md)
 - [演示脚本](docs/demo-script.md)
@@ -421,7 +423,7 @@ python -m app.mcp.server --list
 - [第十二轮RAG增强与性能基准(知识库24篇/RRF/缓存/双口径消融/benchmark)](docs/records/ROUND-12-RAG-ENHANCEMENT-BENCHMARK.md)
 - [第十三轮记忆分层与 Skill 自动蒸馏(L2/L3/L4/SCD-2/自动 Skill)](docs/records/ROUND-13-MEMORY-SKILL-DISTILLATION.md)
 - [第十五轮前端疗愈主题升级(暖米白+鼠尾草绿/风险分级色条/无障碍)](docs/records/ROUND-15-FRONTEND-CALM-THEME.md)
-- [第十六轮咨询后台教师使用手册(全板块按钮逐一覆盖)](docs/records/ROUND-16-ADMIN-TEACHER-GUIDE.md)
+- [第十六轮咨询工作台教师使用手册(全板块按钮逐一覆盖)](docs/records/ROUND-16-ADMIN-TEACHER-GUIDE.md)
 - [第十七轮前端整体改造(后台页签化布局/固定一屏/全中文界面/前端学习指南)](docs/records/ROUND-17-FRONTEND-OVERHAUL.md)
 
 ## 待改进与优化(Roadmap)

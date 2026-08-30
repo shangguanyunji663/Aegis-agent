@@ -14,6 +14,8 @@ const els = {
   sendButton: $("#send-btn"),
   sessionBadge: $("#session-badge"),
   streamStatus: $("#stream-status"),
+  greet: $("#greet"),
+  greetDate: $("#greet-date"),
 };
 
 function escapeHtml(value) {
@@ -34,6 +36,22 @@ function setPill(el, text, tone = "secondary") {
   el.className = `status-pill ${tone}`;
 }
 
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 5) return "夜深了";
+  if (h < 11) return "早上好";
+  if (h < 13) return "中午好";
+  if (h < 18) return "下午好";
+  return "晚上好";
+}
+
+function setGreeting() {
+  const now = new Date();
+  const week = ["日", "一", "二", "三", "四", "五", "六"][now.getDay()];
+  els.greet.textContent = greeting();
+  els.greetDate.textContent = `${now.getMonth() + 1} 月 ${now.getDate()} 日 周${week}`;
+}
+
 async function loadMe() {
   const data = await (await api("/api/auth/me")).json();
   if (data.user.role === "admin" || data.user.role === "teacher") {
@@ -47,11 +65,12 @@ async function loadMe() {
 async function loadHealth() {
   try {
     const health = await (await fetch("/api/health")).json();
-    setPill(els.health, health.status || "UP");
+    const up = health.status === "UP";
+    setPill(els.health, up ? "服务正常" : (health.status || "检测中"), up ? "ok" : "bad");
     const status = await (await api("/api/agent/status")).json();
-    setPill(els.modelState, status.models.base_provider === "mock" ? "mock 演示" : status.models.base_model);
+    setPill(els.modelState, status.models.base_provider === "mock" ? "演示模式" : `模型 · ${status.models.base_model}`);
   } catch {
-    setPill(els.health, "DOWN");
+    setPill(els.health, "服务异常", "bad");
   }
 }
 
@@ -90,7 +109,8 @@ function addMessage(role, content = "") {
   clearWelcome();
   const row = document.createElement("article");
   row.className = `split-message ${role}`;
-  row.innerHTML = `<div class="message-role">${role === "user" ? "我" : "Aegis"}</div><div class="message-bubble">${escapeHtml(content)}</div>`;
+  const avatar = `<div class="msg-avatar" aria-hidden="true">${role === "user" ? "我" : "暖"}</div>`;
+  row.innerHTML = `${role === "user" ? "" : avatar}<div class="message-content"><div class="message-role">${role === "user" ? "我" : "小暖"}</div><div class="message-bubble">${escapeHtml(content)}</div></div>${role === "user" ? avatar : ""}`;
   els.messages.append(row);
   els.messages.scrollTop = els.messages.scrollHeight;
   return row.querySelector(".message-bubble");
@@ -121,7 +141,7 @@ async function sendMessage(event) {
   assistant.innerHTML = '<span class="typing-dots"><span></span><span></span><span></span></span>';
   const meta = document.createElement("div");
   meta.className = "stream-meta";
-  assistant.parentElement.append(meta);
+  assistant.closest(".message-content").append(meta);
   let answer = "";
   try {
     const response = await api("/api/chat/stream", {
@@ -188,15 +208,16 @@ async function logout() {
 
 function resetSession() {
   state.sessionId = null;
-  els.messages.innerHTML = `<div class="intro"><div class="intro-title">新会话已开始</div><p>你可以继续输入新的问题。</p></div>`;
+  els.messages.innerHTML = `<div class="intro"><div class="intro-avatar" aria-hidden="true">暖</div><div class="intro-title">新会话已开始</div><p>想到什么就说什么，我一直都在。</p></div>`;
   setPill(els.sessionBadge, "READY");
 }
 
-document.querySelectorAll("[data-quick]").forEach((button) => {
-  button.addEventListener("click", () => {
-    els.messageInput.value = button.dataset.quick;
-    els.messageInput.focus();
-  });
+/* 事件委托:快捷表达按钮与欢迎屏话题 chips(含重绘后的)统一在此处理 */
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-quick]");
+  if (!button) return;
+  els.messageInput.value = button.dataset.quick;
+  els.messageInput.focus();
 });
 els.chatForm.addEventListener("submit", sendMessage);
 els.logout.addEventListener("click", logout);
@@ -208,4 +229,6 @@ els.messageInput.addEventListener("keydown", (event) => {
   }
 });
 
+setGreeting();
+setInterval(loadHealth, 60000);
 loadMe().then(() => Promise.all([loadHealth(), loadSessions()])).catch(() => window.location.replace("/"));

@@ -3,22 +3,23 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Aegis 学生端</title>
+    <title>心屿 · 学生端</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="/static/styles.css?v=0.7.2" />
+    <link rel="stylesheet" href="/static/styles.css?v=0.13.0" />
   </head>
   <body class="student-page">
     <header class="role-topbar">
       <div class="role-brand">
         <div class="role-logo student-logo">A</div>
         <div>
-          <p class="eyebrow">STUDENT COMPANION</p>
-          <h1>Aegis 学生心理陪伴</h1>
+          <p class="eyebrow">倾诉小站</p>
+          <h1>心屿 · 你的倾诉伙伴</h1>
         </div>
       </div>
       <div class="top-actions">
-        <span id="health" class="status-pill">checking</span>
-        <span id="model-state" class="status-pill secondary">model</span>
+        <div class="topbar-greet"><strong id="greet"></strong><span id="greet-date"></span></div>
+        <span id="health" class="status-pill">检测中</span>
+        <span id="model-state" class="status-pill secondary">模型状态</span>
         <div class="user-summary compact"><strong id="active-account">学生</strong><span>学生端</span></div>
         <button id="logout-btn" class="ghost-btn" type="button">退出</button>
       </div>
@@ -27,46 +28,78 @@
     <main class="student-layout">
       <aside class="student-rail">
         <section class="panel-card">
-          <p class="eyebrow">QUICK SIGNAL</p>
-          <button class="signal-btn" type="button" data-quick="我最近考试压力很大，晚上总是睡不着。">压力失眠</button>
-          <button class="signal-btn" type="button" data-quick="我感觉很焦虑，考试前完全静不下来。">焦虑倾诉</button>
-          <button class="signal-btn" type="button" data-quick="我最近情绪很低落，不太想和别人说话。">低落求助</button>
-          <button class="signal-btn" type="button" data-quick="我想聊聊最近和家人的矛盾。">关系困扰</button>
+          <p class="eyebrow">心情速选</p>
+          <div class="quick-grid">
+            <button class="quick-card" type="button" data-quick="我最近考试压力很大，晚上总是睡不着。">
+              <span class="quick-ico" aria-hidden="true">🌙</span>
+              <strong>压力失眠</strong>
+            </button>
+            <button class="quick-card" type="button" data-quick="我感觉很焦虑，考试前完全静不下来。">
+              <span class="quick-ico" aria-hidden="true">🌧️</span>
+              <strong>焦虑不安</strong>
+            </button>
+            <button class="quick-card" type="button" data-quick="我最近情绪很低落，不太想和别人说话。">
+              <span class="quick-ico" aria-hidden="true">🍂</span>
+              <strong>情绪低落</strong>
+            </button>
+            <button class="quick-card" type="button" data-quick="我想聊聊最近和家人的矛盾。">
+              <span class="quick-ico" aria-hidden="true">💬</span>
+              <strong>关系困扰</strong>
+            </button>
+          </div>
+          <p class="quick-hint">点一下，帮你把话补完整</p>
+        </section>
+
+        <section class="panel-card help-card">
+          <p class="eyebrow">需要立即帮助？</p>
+          <ul class="help-list">
+            <li>心理援助热线：<strong>12356</strong></li>
+            <li>紧急情况请拨打 <strong>120</strong></li>
+            <li>联系辅导员或学校心理中心</li>
+          </ul>
+          <p class="help-note">你不是一个人在面对，求助是勇敢的表现。</p>
+        </section>
+
+        <section class="panel-card calm-card">
+          <p class="eyebrow">60 秒放松练习</p>
+          <ol class="help-list">
+            <li>把双脚放稳，慢慢呼气，确认此刻是安全的。</li>
+            <li>说出你看到的 5 个物体、听到的 3 种声音。</li>
+            <li>给现在的情绪打 0-10 分，只需观察，不急着解决。</li>
+          </ol>
         </section>
 
         <section class="panel-card">
           <div class="section-title"><h2>会话历史</h2><button id="new-session" class="ghost-btn" type="button">新会话</button></div>
           <div id="history-list" class="history-list split"></div>
         </section>
-
-        <section class="panel-card">
-          <p class="eyebrow">CARE LOOP</p>
-          <ol class="loop-list">
-            <li>理解表达</li>
-            <li>安全分流</li>
-            <li>必要时检索支持知识</li>
-            <li>生成陪伴回应</li>
-          </ol>
-        </section>
       </aside>
 
       <section class="student-chat panel-card">
         <div class="section-title">
           <div>
-            <p class="eyebrow">STUDENT CHAT</p>
-            <h2>心理陪伴对话</h2>
+            <p class="eyebrow">倾诉小站</p>
+            <h2>和小暖聊聊</h2>
           </div>
           <span id="session-badge" class="status-pill secondary">READY</span>
         </div>
         <div id="messages" class="messages">
           <div class="intro">
-            <div class="intro-title">从一段真实表达开始</div>
-            <p>你可以说压力、睡眠、关系、考试，也可以只写下现在最卡住的一句话。</p>
+            <div class="intro-avatar" aria-hidden="true">暖</div>
+            <div class="intro-title">你好，我是小暖 🌿</div>
+            <p>说说压力、睡眠、关系，或任何让你卡住的事。先挑一个话题，或直接打字给我：</p>
+            <div class="intro-chips">
+              <button type="button" class="intro-chip" data-quick="我最近考试压力很大，晚上总是睡不着。">最近的压力</button>
+              <button type="button" class="intro-chip" data-quick="我最近情绪很低落，不太想和别人说话。">有点低落</button>
+              <button type="button" class="intro-chip" data-quick="我最近总是睡不着，白天也没什么精神。">睡不好</button>
+              <button type="button" class="intro-chip" data-quick="随便聊聊吧，我今天有点烦。">随便聊聊</button>
+            </div>
           </div>
         </div>
         <form id="chat-form" class="composer split-composer">
           <textarea id="message-input" rows="3" placeholder="写下你现在想说的话..."></textarea>
           <div class="composer-actions">
+            <span class="composer-hint">Enter 发送 · Shift+Enter 换行</span>
             <span id="stream-status" class="status-pill secondary">idle</span>
             <button id="send-btn" class="send-text-btn" type="submit">发送</button>
           </div>
@@ -74,6 +107,6 @@
       </section>
     </main>
 
-    <script src="/static/student.js?v=0.7.2"></script>
+    <script src="/static/student.js?v=0.13.0"></script>
   </body>
 </html>

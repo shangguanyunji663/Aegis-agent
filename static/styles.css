@@ -163,6 +163,46 @@ input:focus, textarea:focus, select:focus {
   color: var(--muted);
 }
 
+/* 服务状态:彩色圆点 + 文案(ok/bad 由 JS 按健康检查结果设置) */
+.status-pill.ok {
+  background: var(--calm-soft);
+  color: var(--calm-strong);
+}
+
+.status-pill.ok::before,
+.status-pill.bad::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: 1px;
+}
+
+.status-pill.ok::before { background: var(--calm); }
+.status-pill.bad {
+  background: var(--risk-high-soft);
+  color: var(--risk-high);
+}
+.status-pill.bad::before { background: var(--risk-high); }
+
+.topbar-greet {
+  display: grid;
+  margin-right: 2px;
+  text-align: right;
+  line-height: 1.35;
+}
+
+.topbar-greet strong {
+  font-size: 14px;
+}
+
+.topbar-greet span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .primary-btn, .ghost-btn {
   border-radius: 12px;
   transition: background-color .18s ease, border-color .18s ease,
@@ -489,11 +529,108 @@ body.admin-page {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(320px, 460px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 460px);
+  grid-template-areas:
+    "hero login"
+    "entries entries"
+    "strip strip";
   gap: 18px;
   padding: 0 16px 24px;
   align-items: start;
 }
+
+.portal-hero { grid-area: hero; padding-top: 12px; }
+.portal-login { grid-area: login; }
+.entry-grid { grid-area: entries; }
+.portal-strip { grid-area: strip; }
+
+.portal-deco {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 200px;
+  pointer-events: none;
+  z-index: 0;
+  opacity: .9;
+}
+
+.hero-slogan {
+  margin: 0 0 14px;
+  font: 700 clamp(30px, 4vw, 46px) var(--serif);
+  color: var(--calm-strong);
+  letter-spacing: .02em;
+}
+
+.hero-sub {
+  margin: 0 0 26px;
+  max-width: 46ch;
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1.85;
+}
+
+.hero-features {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hero-features li {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.hero-ico {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border-radius: 12px;
+  background: var(--calm-soft);
+  font-size: 19px;
+}
+
+.hero-features strong {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.hero-features span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.hero-note {
+  margin: 26px 0 0;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
+  color: var(--muted);
+  font-size: 12px;
+  max-width: 52ch;
+}
+
+.portal-strip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 10px 18px;
+  padding: 14px 18px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.portal-strip strong { color: var(--calm-strong); }
+.portal-strip i { width: 1px; height: 14px; background: var(--border-strong); }
 
 .portal-login {
   padding: 24px;
@@ -516,7 +653,7 @@ body.admin-page {
 }
 
 .entry-card {
-  min-height: 230px;
+  min-height: 170px;
   padding: 24px;
   border: 1px solid var(--border);
   border-radius: 22px;
@@ -580,25 +717,42 @@ body.admin-page {
   min-height: 0;
 }
 
-.signal-btn {
-  width: 100%;
-  min-height: 44px;
-  margin-top: 8px;
-  padding: 10px 14px;
+.quick-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.quick-card {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  padding: 12px 8px;
   border: 1px solid var(--border);
   border-radius: 14px;
   background: var(--surface-2);
   color: var(--text);
-  text-align: left;
   transition: border-color .18s ease, background-color .18s ease,
-    color .18s ease, transform .18s ease;
+    color .18s ease, transform .18s ease, box-shadow .18s ease;
 }
 
-.signal-btn:hover {
+.quick-card .quick-ico { font-size: 20px; }
+.quick-card strong { font-size: 13px; }
+
+.quick-card:hover {
   border-color: var(--calm);
   background: var(--calm-soft);
   color: var(--calm-strong);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.quick-hint {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
 }
 
 .history-list {
@@ -648,11 +802,28 @@ body.admin-page {
   color: var(--muted);
 }
 
-.loop-list {
+.help-list {
   margin: 8px 0 0;
-  padding-left: 20px;
-  color: var(--muted);
+  padding-left: 18px;
   line-height: 1.8;
+}
+
+.help-list strong { color: var(--risk-high); }
+
+.help-note {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.help-card {
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  background: linear-gradient(180deg, var(--accent-soft), var(--surface));
+}
+
+.calm-card {
+  border-color: color-mix(in srgb, var(--calm) 35%, transparent);
+  background: linear-gradient(180deg, var(--calm-soft), var(--surface));
 }
 
 .messages {
@@ -662,12 +833,29 @@ body.admin-page {
   align-content: start;
   gap: 16px;
   padding: 18px 4px 18px 0;
+  background-image: radial-gradient(color-mix(in srgb, var(--calm) 7%, transparent) 1.5px, transparent 1.5px);
+  background-size: 22px 22px;
+  border-radius: 12px;
 }
 
 .intro {
-  padding: 44px 16px;
+  padding: 40px 16px;
   text-align: center;
   color: var(--muted);
+}
+
+.intro-avatar {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--calm-grad);
+  color: #fff;
+  font: 800 22px var(--serif);
+  box-shadow: var(--shadow-md);
+  animation: breathe 7s ease-in-out infinite;
 }
 
 .intro-title {
@@ -676,12 +864,83 @@ body.admin-page {
   font: 500 22px var(--serif);
 }
 
+.intro-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.intro-chip {
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  transition: border-color .18s ease, background-color .18s ease,
+    color .18s ease, transform .18s ease;
+}
+
+.intro-chip:hover {
+  border-color: var(--calm);
+  background: var(--calm-soft);
+  color: var(--calm-strong);
+  transform: translateY(-1px);
+}
+
+.composer-hint {
+  margin-right: auto;
+  color: color-mix(in srgb, var(--muted) 75%, transparent);
+  font-size: 12px;
+}
+
 .split-message {
   max-width: min(760px, 92%);
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  animation: msg-in .28s ease both;
 }
 
 .split-message.user {
   justify-self: end;
+  flex-direction: row-reverse;
+}
+
+.msg-avatar {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.split-message:not(.user) .msg-avatar {
+  background: var(--calm-grad);
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.split-message.user .msg-avatar {
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.message-content {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+@keyframes msg-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .message-role {
@@ -733,8 +992,7 @@ body.admin-page {
 .composer-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
 }
 
 .send-text-btn {
@@ -953,6 +1211,11 @@ body.admin-page {
   }
   .portal-shell {
     grid-template-columns: 1fr;
+    grid-template-areas:
+      "hero"
+      "login"
+      "entries"
+      "strip";
   }
   [data-tabs] {
     height: auto;

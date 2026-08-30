@@ -11,6 +11,8 @@ const toggleAuth = document.querySelector("#toggle-auth");
 const authError = document.querySelector("#auth-error");
 const health = document.querySelector("#health");
 const agentStatus = document.querySelector("#agent-status");
+const greet = document.querySelector("#greet");
+const greetDate = document.querySelector("#greet-date");
 
 function showError(message) {
   authError.textContent = message;
@@ -29,13 +31,32 @@ function switchMode(mode) {
   showError("");
 }
 
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 5) return "夜深了";
+  if (h < 11) return "早上好";
+  if (h < 13) return "中午好";
+  if (h < 18) return "下午好";
+  return "晚上好";
+}
+
+function setGreeting() {
+  const now = new Date();
+  const week = ["日", "一", "二", "三", "四", "五", "六"][now.getDay()];
+  greet.textContent = `${greeting()}，欢迎回来`;
+  greetDate.textContent = `${now.getMonth() + 1} 月 ${now.getDate()} 日 周${week}`;
+}
+
 async function refreshHealth() {
   try {
     const response = await fetch("/api/health");
     const data = await response.json();
-    health.textContent = data.status === "UP" ? "运行正常" : (data.status || "检测中");
+    const up = data.status === "UP";
+    health.textContent = up ? "服务正常" : (data.status || "检测中");
+    health.className = `status-pill ${up ? "ok" : "bad"}`;
   } catch {
     health.textContent = "服务异常";
+    health.className = "status-pill bad";
   }
 }
 
@@ -93,4 +114,6 @@ toggleAuth.addEventListener("keydown", (event) => {
   if (event.key === "Enter" || event.key === " ") toggleAuth.click();
 });
 refreshHealth();
+setGreeting();
+setInterval(refreshHealth, 60000);
 agentStatus.textContent = "就绪";

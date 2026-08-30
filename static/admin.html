@@ -3,20 +3,21 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Aegis 管理员端</title>
+    <title>咨询工作台</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="/static/styles.css?v=0.8.0" />
+    <link rel="stylesheet" href="/static/styles.css?v=0.13.0" />
   </head>
   <body class="admin-page">
     <header class="role-topbar">
       <div class="role-brand">
         <div class="role-logo admin-logo">A</div>
         <div>
-          <p class="eyebrow">咨询后台 · 校园心理支持平台</p>
-          <h1>Aegis 咨询后台</h1>
+          <p class="eyebrow">校园心理支持平台 · 教师工作区</p>
+          <h1>咨询工作台</h1>
         </div>
       </div>
       <div class="top-actions">
+        <div class="topbar-greet"><strong id="greet"></strong><span id="greet-date"></span></div>
         <span id="health" class="status-pill">检测中</span>
         <span id="model-state" class="status-pill secondary">模型状态</span>
         <div class="user-summary compact"><strong id="active-account">管理员</strong><span>管理员端</span></div>
@@ -138,6 +139,6 @@
       </section>
     </main>
 
-    <script src="/static/admin.js?v=0.8.0"></script>
+    <script src="/static/admin.js?v=0.13.0"></script>
   </body>
 </html>

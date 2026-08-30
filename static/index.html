@@ -3,9 +3,9 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Aegis 登录</title>
+    <title>心屿 · 校园心理支持</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="/static/styles.css?v=0.8.0" />
+    <link rel="stylesheet" href="/static/styles.css?v=0.13.0" />
   </head>
   <body class="portal-page">
     <header class="role-topbar">
@@ -13,18 +13,41 @@
         <div class="role-logo">A</div>
         <div>
           <p class="eyebrow">校园心理支持平台</p>
-          <h1>Aegis 校园心理智能体</h1>
+          <h1>心屿 · 校园心理支持</h1>
         </div>
       </div>
       <div class="top-actions">
+        <div class="topbar-greet"><strong id="greet"></strong><span id="greet-date"></span></div>
         <span id="health" class="status-pill">检测中</span>
         <span id="agent-status" class="status-pill secondary">就绪</span>
       </div>
     </header>
 
     <main class="portal-shell">
+      <section class="portal-hero">
+        <h2 class="hero-slogan">有人愿意听你说</h2>
+        <p class="hero-sub">
+          每一句倾诉，都有人认真对待。说说压力、睡眠、关系，或者任何让你卡住的事——你不必一个人扛。
+        </p>
+        <ul class="hero-features">
+          <li>
+            <span class="hero-ico" aria-hidden="true">🛡️</span>
+            <div><strong>安全守护</strong><span>三级风险分流，高风险自动转交人工跟进</span></div>
+          </li>
+          <li>
+            <span class="hero-ico" aria-hidden="true">📚</span>
+            <div><strong>知识陪伴</strong><span>回答基于心理知识库，给出可执行的小建议</span></div>
+          </li>
+          <li>
+            <span class="hero-ico" aria-hidden="true">🔒</span>
+            <div><strong>隐私保护</strong><span>敏感信息脱敏存储，每一次处理全程留痕</span></div>
+          </li>
+        </ul>
+        <p class="hero-note">心屿 用于支持与陪伴，不提供医学诊断，不能替代专业心理咨询或危机干预。</p>
+      </section>
+
       <section class="portal-login panel-card">
-          <p class="eyebrow">账号登录</p>
+        <p class="eyebrow">账号登录</p>
         <h2>选择账号进入对应工作台</h2>
         <form id="login-form" class="auth-form">
           <label for="login-username">用户名</label>
@@ -37,7 +60,7 @@
           <label for="reg-username">用户名</label>
           <input id="reg-username" type="text" autocomplete="username" placeholder="2-32 位字母、数字、下划线或中文" />
           <label for="reg-password">密码</label>
-          <input id="reg-password" type="password" autocomplete="new-password" placeholder="至少 6 位" />
+          <input id="reg-password" type="password" value="" autocomplete="new-password" placeholder="至少 6 位" />
           <label for="reg-role">注册身份</label>
           <select id="reg-role">
             <option value="student" selected>学生</option>
@@ -71,8 +94,28 @@
           <p>风险报告、个案闭环、对话回放、知识库和工具审计。</p>
         </article>
       </section>
+
+      <section class="portal-strip">
+        <span><strong>24</strong> 篇心理知识文档</span>
+        <i></i>
+        <span><strong>三级</strong> 风险分流</span>
+        <i></i>
+        <span><strong>双通道</strong> 风险守护</span>
+        <i></i>
+        <span><strong>全程</strong> 留痕可审计</span>
+      </section>
     </main>
 
-    <script src="/static/login.js?v=0.8.0"></script>
+    <svg class="portal-deco" viewBox="0 0 1440 320" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+      <path d="M0,220 C240,140 420,260 720,210 C1020,160 1200,250 1440,190 L1440,320 L0,320 Z"
+            fill="currentColor" style="color:color-mix(in srgb, var(--calm) 16%, transparent)"></path>
+      <path d="M0,270 C300,210 560,300 880,260 C1160,225 1300,290 1440,255 L1440,320 L0,320 Z"
+            fill="currentColor" style="color:color-mix(in srgb, var(--calm) 24%, transparent)"></path>
+      <circle cx="1180" cy="120" r="7" fill="currentColor" style="color:color-mix(in srgb, var(--accent) 45%, transparent)"></circle>
+      <circle cx="1240" cy="78" r="5" fill="currentColor" style="color:color-mix(in srgb, var(--calm) 45%, transparent)"></circle>
+      <circle cx="1210" cy="52" r="3.5" fill="currentColor" style="color:color-mix(in srgb, var(--accent) 35%, transparent)"></circle>
+    </svg>
+
+    <script src="/static/login.js?v=0.13.0"></script>
   </body>
 </html>

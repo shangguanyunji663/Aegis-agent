@@ -22,6 +22,8 @@ const els = {
   workerState: $("#tool-worker-state"),
   evals: $("#eval-results"),
   audits: $("#audit-list"),
+  greet: $("#greet"),
+  greetDate: $("#greet-date"),
   knowledgeStatus: $("#knowledge-status"),
   knowledgeQuery: $("#knowledge-query"),
   knowledgeResults: $("#knowledge-search-results"),
@@ -59,13 +61,27 @@ const AGENT_LABEL = {
 const TOOL_BACKEND_LABEL = { internal: "内置队列", mcp: "MCP 后端" };
 const QUEUE_LABEL = { "background-worker": "后台队列", inline: "同步执行" };
 const PROVIDER_LABEL = { mock: "演示模型", openai: "在线模型", ollama: "本地模型" };
-const runtimeLabel = (value) => {
-  const v = String(value || "");
-  if (v.includes("langgraph")) return "状态图编排";
-  if (v === "autonomous") return "自治协作";
-  if (v === "ordered") return "顺序流水线";
-  return v;
-};
+
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 5) return "夜深了";
+  if (h < 11) return "早上好";
+  if (h < 13) return "中午好";
+  if (h < 18) return "下午好";
+  return "晚上好";
+}
+
+function setGreeting() {
+  const now = new Date();
+  const week = ["日", "一", "二", "三", "四", "五", "六"][now.getDay()];
+  els.greet.textContent = greeting();
+  els.greetDate.textContent = `${now.getMonth() + 1} 月 ${now.getDate()} 日 周${week}`;
+}
+
+function healthPill(status) {
+  const up = status === "UP";
+  setPill(els.health, up ? "服务正常" : (status || "检测中"), up ? "ok" : "bad");
+}
 
 async function api(path, options = {}) {
   const response = await fetch(path, { credentials: "same-origin", ...options });
@@ -114,13 +130,14 @@ async function loadMe() {
     return;
   }
   els.activeAccount.textContent = data.user.username;
+  setGreeting();
 }
 
 async function loadHealthAndAgent() {
   const health = await (await fetch("/api/health")).json();
-  setPill(els.health, health.status === "UP" ? "运行正常" : (health.status || "检测中"));
+  healthPill(health.status);
   const status = await (await api("/api/agent/status")).json();
-  setPill(els.modelState, `${PROVIDER_LABEL[status.models.base_provider] || status.models.base_provider} / ${runtimeLabel(status.agentFramework.active)}`, "secondary");
+  setPill(els.modelState, `${PROVIDER_LABEL[status.models.base_provider] || status.models.base_provider} · ${status.models.base_model}`, "secondary");
   els.agentStatus.className = "stack";
   els.agentStatus.innerHTML = `
     <div class="knowledge-line">编排引擎:${escapeHtml(status.runtimeHarness.name)} · 调度:${escapeHtml(status.agentFramework.scheduler)}</div>
@@ -329,3 +346,10 @@ Object.keys(localStorage)
   .forEach((key) => localStorage.removeItem(key));
 
 loadMe().then(refreshAll).catch(() => window.location.replace("/"));
+setGreeting();
+setInterval(async () => {
+  try {
+    const health = await (await fetch("/api/health")).json();
+    healthPill(health.status);
+  } catch { /* 保持当前状态,下个周期再试 */ }
+}, 60000);

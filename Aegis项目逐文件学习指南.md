@@ -2160,7 +2160,7 @@ python -m app.evaluation.harness.runner --suite risk
 
 ## 第 14 站 收尾 — static/ + tests/
 
-- `static/`：原生 JS 三端界面（零构建）：登录页（index/login.js）、学生端（student，会话列表 + SSE 流式对话）、管理端（admin，三列页签工作台——左列「个案|知识库|协作状态」、中列「风险报告|对话回放」、右列「详情检查器 + 工作台」，界面全中文，桌面端固定一屏）。前端实现详解见《[前端学习指南](docs/frontend-learning-guide.md)》。
+- `static/`：原生 JS 三端界面（零构建）：登录页（index/login.js，Hero 标语与数据条）、学生端（student，助手「小暖」——SSE 流式对话、消息头像、心情速选与紧急求助卡）、管理端（admin，三列页签工作台——左列「个案|知识库|协作状态」、中列「风险报告|对话回放」、右列「详情检查器 + 工作台」，界面全中文，桌面端固定一屏）。前端实现详解见《[前端学习指南](docs/frontend-learning-guide.md)》。
 - `tests/` 当前包含多个模块化测试文件：orchestrator（提供 `build_orchestrator` 给其他测试复用）、api（TestClient 全链）、agent\_runtime、retrieval\_eval、mcp\_tools、harness、assessment、risk\_dual\_channel（双通道，覆盖 corp-106..130 隐喻双路径并含 `MetaphorAwareStubClient`）、risk\_qlora\_channel（QLoRA 风险通道：升级/不降级/回退/非法 JSON/URL 防护/默认关闭）、function\_calling（FC）、runtime\_ab（A/B）、judge（LLM 评审）、langgraph\_runtime、langgraph\_checkpoint（跨进程恢复）、reply\_style（真人化提示词与模板标签守护）。历史“约 71 项通过”应附带日期与环境，执行时统一使用 `python -m pytest tests -q`（历史上位于根目录的联调脚本 `test_chat.py` 已迁至 `scripts/smoke_chat.py`，不再参与 pytest 收集）。
 - 第十三轮新增的 L2/L4 与 auto Skill 已做烟雾验证，但尚缺少专门 pytest 回归：SCD-2 冲突截断、匿名命名空间隔离、三运行时 L4 去重、仅 L2/L4 时 LangGraph `memory_used`、第 3 次自动蒸馏及 auto Skill 防递归等都应补成独立用例。
 

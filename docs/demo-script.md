@@ -13,7 +13,7 @@
 ## 2. 普通心理支持对话
 
 1. 在学生端用「心情速选」卡片或直接输入，发送一条低风险考试压力消息。
-2. 观察 SSE 流式返回，包括 route、agent、skill、token、summary 等事件。
+2. 观察 SSE 流式返回，包括 route、skill、report、token、done 等事件。
 3. 刷新页面后重新打开同一会话，确认历史消息仍在。
 4. 继续追问上一轮提到的问题，展示 MemoryAgent 对上下文的连续性支持。
 5. 在管理端 trace 中查看 MemoryAgent load/update 和回复生成过程。

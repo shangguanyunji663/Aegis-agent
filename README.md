@@ -57,9 +57,9 @@ flowchart LR
 ### 学生端
 
 - 注册与登录:学生自由注册;教师凭邀请码注册(默认 `aegis-teacher`,经 `AUTH_TEACHER_INVITE_CODE` 配置)后进入咨询工作台。
-- 登录、退出、会话创建、会话重命名和会话删除。
+- 登录、退出、会话创建与新会话切换;会话重命名/删除目前仅提供 API 接口(`PATCH` / `DELETE /api/sessions/{id}`),界面暂无对应按钮。
 - 对话助手「小暖」:消息头像、入场动画与欢迎屏话题 chips;顶栏时段问候、服务状态圆点(60 秒自动刷新)。
-- 左栏实用卡片:「心情速选」2×2 图标卡一键填入表达、「紧急求助」卡(心理援助热线)与「60 秒放松练习」。
+- 左栏实用卡片:「心情速选」2×2 图标卡一键填入表达、「需要立即帮助」卡(心理援助热线 12356 / 120)与「60 秒放松练习」。
 - SSE 流式心理支持回复，兼容非流式 `/api/chat`。低风险对话在生成的同时逐字直播(真流式),中/高风险回复经安全复核通过后再输出。
 - 低风险陪伴、心理咨询建议、高风险安全回应三类回复路径。
 - L2/L3/L4 分层记忆：跨会话当前有效用户事实、会话滚动摘要与最近原话窗口共同注入回复；当前有效事实优先于可能过期的摘要，避免旧状态干扰当前回应。
@@ -68,12 +68,12 @@ flowchart LR
 ### 管理端
 
 - 三列页签工作台（桌面端固定一屏、界面全中文）：左列「个案 | 知识库 | 协作状态」、中列「风险报告 | 对话回放」、右列「详情检查器 + 工作台」；操作详见《[咨询工作台使用手册(教师版)](docs/admin-teacher-guide.md)》。
-- 风险报告列表、状态流转和报告 trace 查看。
+- 风险报告列表、状态流转和报告 trace 查看(「对话回放」页签)。
 - 个案创建、辅导员确认、备注追加和状态更新。
-- 知识库检索、文件上传、重建索引、向量索引重建和备份。
-- ToolJob、ToolAudit、ExcelRecord、AlertRecord、DeadLetter 的独立查看。
-- Agent 模型配置状态、Agent 私有记忆和 Runtime 状态查看。
-- 一键触发综合评测和 Harness 验证。
+- 知识库检索、内容上传(.md/.txt/.pdf)、重建索引和备份;向量索引重建另提供 `/api/admin/knowledge/rebuild-vector` 接口。
+- 工具任务(ToolJob)与执行记录(ExcelRecord/AlertRecord)在界面查看;操作审计在「审计」页签查看;ToolAudit 与 DeadLetter 提供独立 API 查询(`tool-audits` / `dead-letters`)。
+- Runtime 协作状态查看(编排引擎/调度/存储/队列与智能体名单),模型状态在顶栏胶囊展示;Agent 模型配置与 Agent 私有记忆另提供 API 查询(`agent-models` / `agent-memories`)。
+- 一键触发综合评测(Harness 验证经命令行 `python -m app.evaluation.harness.runner` 执行)。
 
 ### Agent 协作
 
@@ -351,14 +351,15 @@ python -m app.mcp.server --list
 
 | 类型 | 接口 |
 | --- | --- |
+| 系统状态 | `GET /api/health`, `GET /api/readiness`, `GET /api/agent/status`(需登录), `GET /api/skills` |
 | 认证 | `POST /api/auth/register`(注册), `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` |
 | 学生会话 | `GET /api/sessions`, `POST /api/sessions`, `GET /api/sessions/{id}`, `PATCH /api/sessions/{id}`, `DELETE /api/sessions/{id}` |
 | 聊天 | `POST /api/chat`, `POST /api/chat/stream` |
-| 管理端报告 | `GET /api/admin/reports`, `PATCH /api/admin/reports/{report_id}` |
+| 管理端报告 | `GET /api/admin/reports`, `PATCH /api/admin/reports/{report_id}`, `GET /api/admin/traces`(对话回放) |
 | 个案 | `GET /api/admin/cases`, `POST /api/admin/cases/{case_id}/notes`, `PATCH /api/admin/cases/{case_id}` |
-| 工具队列 | `GET /api/admin/tool-jobs`, `POST /api/admin/tool-jobs/run`, `GET /api/admin/tool-worker/status` |
-| 工具审计 | `GET /api/admin/tool-audits`, `GET /api/admin/excel-records`, `GET /api/admin/alert-records`, `GET /api/admin/dead-letters` |
-| 知识库 | `GET /api/admin/knowledge/search`, `POST /api/admin/knowledge`, `POST /api/admin/knowledge/rebuild-vector` |
+| 工具队列 | `GET /api/admin/tool-jobs`, `POST /api/admin/tool-jobs/run`, `POST /api/admin/tool-jobs/{job_id}/retry`, `GET /api/admin/tool-worker/status`, `POST /api/admin/tool-worker/run-once` |
+| 工具审计 | `GET /api/admin/tool-audits`, `GET /api/admin/excel-records`, `GET /api/admin/alert-records`, `GET /api/admin/dead-letters`, `GET /api/admin/audit-logs` |
+| 知识库 | `GET /api/admin/knowledge/status`, `GET /api/admin/knowledge/search`, `POST /api/admin/knowledge`(文本入库), `POST /api/admin/knowledge/upload`, `POST /api/admin/knowledge/rebuild`, `POST /api/admin/knowledge/rebuild-vector`, `POST /api/admin/knowledge/backup` |
 | 评测 | `GET /api/admin/eval-results`, `POST /api/admin/eval-results/run` |
 
 ## 环境变量

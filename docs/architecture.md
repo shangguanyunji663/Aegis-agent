@@ -185,7 +185,7 @@ flowchart TD
 - Trace 复杂度
 - 最终回复一致性
 
-结果输出：`data/eval/runtime-ab-report.json`
+结果输出：`data/harness/runtime-ab-report.md`（由 `python -m app.evaluation.harness.runner --suite runtime-ab` 生成）
 
 ### 9.5 双层评测体系（第十轮）
 

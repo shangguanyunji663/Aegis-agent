@@ -6,7 +6,7 @@
 
 1. 打开应用首页。
 2. 使用 `student / student123!` 登录，进入学生端。
-3. 展示学生端只有「心情速选」「紧急求助」「放松练习」「会话历史」和聊天区，不出现管理功能。
+3. 展示学生端只有「心情速选」「需要立即帮助」「60 秒放松练习」「会话历史」和聊天区，不出现管理功能。
 4. 退出后使用 `admin / admin123!` 登录，进入管理员端。
 5. 展示「风险报告」「个案」「知识库」「对话回放」与「工作台」（工具任务/执行记录/评测/审计页签）等管理模块。
 
@@ -16,22 +16,22 @@
 2. 观察 SSE 流式返回，包括 route、skill、report、token、done 等事件。
 3. 刷新页面后重新打开同一会话，确认历史消息仍在。
 4. 继续追问上一轮提到的问题，展示 MemoryAgent 对上下文的连续性支持。
-5. 在管理端 trace 中查看 MemoryAgent load/update 和回复生成过程。
+5. 在管理端「对话回放」页签查看 MemoryAgent load/update 和回复生成过程。
 
 ## 3. 咨询与知识库检索
 
 1. 输入睡眠、焦虑、关系冲突或适应问题等咨询类问题。
 2. 展示系统只在咨询/风险类场景触发知识库检索。
-3. 在管理端查看 trace 中的 KnowledgeAgent、选中的知识片段和 Skill。
-4. 打开 Knowledge 页面，使用 topic、risk_level、audience 等过滤条件检索知识。
+3. 在管理端「对话回放」页签查看 trace 中的 KnowledgeAgent、选中的知识片段和 Skill。
+4. 打开管理端「知识库」页签，用关键词检索知识（API 另支持 topic、risk_level、audience 过滤参数，界面当前仅提供关键词检索）。
 
 ## 4. 高风险处置闭环
 
 1. 在学生端发送一条高风险表达。
 2. 展示学生端回复不会暴露风险分数、报告 id 或工具信息。
-3. 切换到管理员端，在 Reports 中查看 pending report。
+3. 切换到管理端，在「风险报告」页签查看待审批报告。
 4. 管理员审批报告后，系统创建 case 和相关 ToolJob。
-5. 在 Cases 中确认个案，添加辅导员备注。
+5. 在「个案」页签确认接案，添加辅导员备注。
 6. 在工作台的「工具任务」页签查看预警、台账、邮件、交接摘要等任务状态（界面显示为中文动作名）。
 
 ## 5. 工具治理与 MCP
@@ -39,11 +39,11 @@
 1. 运行 `python -m app.mcp.server --list` 查看 FastMCP 能力。
 2. 展示工具包括 case create、case ack、case note add、alert、ledger、email、handoff、resource lookup。
 3. 说明工具不会从学生端直接执行，而是统一进入 ToolJob。
-4. 在管理端查看 ToolAudit、ExcelRecord、AlertRecord 和 DeadLetter。
+4. 在管理端「执行记录」页签查看台账（ExcelRecord）、预警（AlertRecord）回执；ToolAudit 与 DeadLetter 经 API 查询（`/api/admin/tool-audits`、`/api/admin/dead-letters`）。
 
 ## 6. 工程评测
 
-1. 在管理端 Eval 页面触发综合评测。
+1. 在管理端「工作台 · 评测」页签触发综合评测。
 2. 展示 routing、risk、retrieval、skills、safety、multi-turn 等指标。
 3. 运行命令行评测：
 

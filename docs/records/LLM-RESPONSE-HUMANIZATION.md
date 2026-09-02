@@ -1,9 +1,10 @@
-# Aegis 第六轮：回复"真人化"改造（第六次提交说明）
+# Aegis 第六轮：回复「真人化」改造
 
 > 分支:`fix/source-labels` · 时间:2026-08 · 系列:[REFACTORING](REFACTORING.md) → [OPTIMIZATION](OPTIMIZATION.md) → [AUTH-MYSQL](AUTH-MYSQL.md) → [LANGGRAPH-DOCKER](LANGGRAPH-DOCKER.md) → [DEEP-ENHANCEMENTS](DEEP-ENHANCEMENTS.md) → 本篇
+> 性质:**回复「真人化」改造——提示词重写 + 兜底模板防泄漏修复 + 429 指数退避重试**
 > 验证:`pytest 65/65` · 界面实测（GLM 可用时自然口语化，429 限流时兜底模板不露馅）· 新增 429 指数退避重试
 
----
+***
 
 ## 1. 背景
 
@@ -83,17 +84,16 @@
   - 没有内部元数据泄漏。
 - 429 重试逻辑已加，限流恢复后 LLM 可正常调用。
 
----
+## 5. 本轮文件清单
 
-## 5. 涉及文件
-- `app/llm/prompts.py`（提示词重写）
-- `app/agents/classic.py`（兜底模板修复 + 降级日志）
-- `app/config.py`（支持温度配置）
-- `app/llm/client.py`（429 指数退避重试）
-- `tests/test_orchestrator.py`（测试断言更新）
-- `tests/test_reply_style.py`（新增守护测试）
-
----
+| 文件 | 变更 |
+| --- | --- |
+| `app/llm/prompts.py` | 提示词重写（自然口语化、防内部标签泄漏） |
+| `app/agents/classic.py` | 兜底模板修复 + 降级日志 |
+| `app/config.py` | 支持温度配置 |
+| `app/llm/client.py` | 429 指数退避重试 |
+| `tests/test_orchestrator.py` | 测试断言更新 |
+| `tests/test_reply_style.py` | 新增守护测试 |
 
 ## 6. 遗留与建议
 - GLM 免费 API 429 限流仍会影响体验，后续可考虑：

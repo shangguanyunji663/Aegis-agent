@@ -1,9 +1,10 @@
-# Aegis 第三轮功能:注册登录 + MySQL 持久化 + 全局异常处理(第三次提交说明)
+# Aegis 第三轮：注册登录 + MySQL 持久化 + 全局异常处理
 
-> 分支:`improve-code` · 时间:2026-08 · 系列:[REFACTORING.md](REFACTORING.md)(第一次·模块化重构)→ [OPTIMIZATION.md](OPTIMIZATION.md)(第二次·提速与流式)→ 本篇
+> 分支:`improve-code` · 时间:2026-08 · 系列:[REFACTORING](REFACTORING.md)(第一轮·模块化重构) → [OPTIMIZATION](OPTIMIZATION.md)(第二轮·提速与流式) → 本篇
+> 性质:**注册登录 + MySQL 持久化 + 全局异常处理,认证与存储体系升级轮次**
 > 验证:`pytest 43/43` · 端到端注册/登录/对话全过 · 数据落 MySQL 直查确认 · 浏览器 UI 实测
 
----
+***
 
 ## 1. 目标
 
@@ -78,7 +79,7 @@
 
 浏览器缓存旧版静态 JS 导致界面更新不生效(本次实测时注册切换无反应,服务端已发新文件)。修复:三个页面(index/student/admin)的 CSS/JS 引用统一加版本号 `?v=0.3.0`(cache-busting)。
 
-## 6. 涉及文件
+## 6. 本轮文件清单
 
 | 文件 | 变更 |
 | --- | --- |

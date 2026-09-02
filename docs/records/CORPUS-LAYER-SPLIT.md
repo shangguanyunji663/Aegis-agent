@@ -3,7 +3,7 @@
 > 分支:`main` · 时间:2026-08-19 · 系列:[REFACTORING](REFACTORING.md) → [OPTIMIZATION](OPTIMIZATION.md) → [AUTH-MYSQL](AUTH-MYSQL.md) → [LANGGRAPH-DOCKER](LANGGRAPH-DOCKER.md) → [DEEP-ENHANCEMENTS](DEEP-ENHANCEMENTS.md) → [LLM-RESPONSE-HUMANIZATION](LLM-RESPONSE-HUMANIZATION.md) → [MEMORY-ENHANCEMENT](MEMORY-ENHANCEMENT.md) → [CONFRONTATIONAL-DIALOGUE-TESTING](CONFRONTATIONAL-DIALOGUE-TESTING.md) → [ROUND-9-CONSOLIDATION](ROUND-9-CONSOLIDATION.md) → 本篇
 > 性质:**评测语料与指标体系的双层拆分,代码改动小、文档同步**
 
----
+***
 
 ## 1. 背景
 
@@ -55,7 +55,7 @@
 
 `python -m pytest tests/test_retrieval_eval.py -q` → **5 passed**（含 `test_scaled_benchmark_supports_layer_split`）。
 
-## 6. 文件变更清单
+## 6. 本轮文件清单
 
 - `eval/fixtures/representative_corpus.json`（新增 `layer`/`source` 字段，150 条全保留）
 - `app/evaluation/runner.py`

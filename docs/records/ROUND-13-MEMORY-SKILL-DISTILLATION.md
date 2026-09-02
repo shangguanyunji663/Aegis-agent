@@ -3,7 +3,7 @@
 > 分支:`main` · 时间:2026-08-21 · 系列:[ROUND-12-RAG-ENHANCEMENT-BENCHMARK](ROUND-12-RAG-ENHANCEMENT-BENCHMARK.md) → 本篇
 > 性质:**L2/L3/L4 记忆分层实战落地 + Skill 自动蒸馏观察器 + 全项目文档一致性审计**
 
----
+***
 
 ## 1. 背景与问题定位
 
@@ -27,7 +27,7 @@
 - **根因**：`response_skill_names()` 为静态规则，`select_response_skills()` 选择后未记录使用模式，SkillRegistry 无观察器与蒸馏器。
 - **后果**：人工策展 Skill 数量固定，无法从真实对话中自动发现高频组合并沉淀为新 Skill；扩展性受限。
 
----
+***
 
 ## 2. 实施方案与技术细节
 
@@ -155,7 +155,7 @@ def _distill_skill(self, pattern_key, data) -> str | None:
     slug = f"auto_{intent}_{risk}_{uuid4().hex[:6]}"
     skill_dir = auto_dir / slug
     # 确定性模板生成 SKILL.md (frontmatter 含 origin=auto)
-    frontmatter = f"---\nname: {slug}\ntrigger_intent: {intent}\ntrigger_risk: {risk}\nincludes: {','.join(names)}\norigin: auto\n---\n"
+    frontmatter = f"***\nname: {slug}\ntrigger_intent: {intent}\ntrigger_risk: {risk}\nincludes: {','.join(names)}\norigin: auto\n***\n"
     (skill_dir / "SKILL.md").write_text(frontmatter + body)
     self._standard_skills = self._load_standard_skills()  # 重载
 ```
@@ -179,7 +179,7 @@ skill_distill_min_repeat: int = 3
 skill_distill_dir: str = "skills/auto"
 ```
 
----
+***
 
 ## 3. 验证与测试
 
@@ -209,7 +209,7 @@ extract_user_facts('这周睡眠已经恢复了，情绪好多了')
 
 测试中产生 12 个自动 Skill 文件（`skills/auto/auto_counseling_low_*/SKILL.md` 等）与 `data/skill-usage.json`，已在提交前清理，避免污染仓库。生产环境下自动 Skill 会持久化并自动加载，需定期人工审核启用。
 
----
+***
 
 ## 4. 全项目文档一致性审计
 
@@ -235,9 +235,9 @@ extract_user_facts('这周睡眠已经恢复了，情绪好多了')
 | `ROUND-11-RISK-LLM-DUAL-CHANNEL.md` | "`OLLAMA_MODEL` ... ⚠️ 不存在" | 正确名为 `qwen2.5:3b` | 移除警告或更新配置 |
 | 多处 | "6→15 条消息""900→3000 字符" | 配置已改但未生效，本轮才真正接线 | 标注"配置第七轮完成，实际接线第十三轮" |
 
----
+***
 
-## 5. 文件变更清单
+## 5. 本轮文件清单
 
 ### 5.1 核心实现（15 个文件，+409 行）
 
@@ -268,7 +268,7 @@ extract_user_facts('这周睡眠已经恢复了，情绪好多了')
 | `docs/architecture.md` | 补充记忆分层架构图（L2/L3/L4） |
 | `.env.example` | 新增 `SKILL_DISTILL_*` 配置项 |
 
----
+***
 
 ## 6. 后续工作
 
@@ -290,7 +290,7 @@ extract_user_facts('这周睡眠已经恢复了，情绪好多了')
 - [ ] Skill 蒸馏加入"用户反馈信号"（点赞/点踩影响蒸馏阈值）
 - [ ] 跨会话事实聚合与趋势分析（"本周睡眠改善用户占比"）
 
----
+***
 
 ## 7. 关键设计决策记录
 
@@ -303,7 +303,7 @@ extract_user_facts('这周睡眠已经恢复了，情绪好多了')
 | **事实抽取是规则还是 LLM** | 当前规则，LLM 可选增强 | 规则确定性高、成本低；LLM 增强可后续迭代 |
 | **Skill 蒸馏是否自动启用** | 否，生成后需人工审核 | 心理建议场景要求高，自动启用风险大 |
 
----
+***
 
 ## 8. 提交信息
 
@@ -320,7 +320,7 @@ feat(memory): 实现 L2/L3/L4 记忆分层与 Skill 自动蒸馏闭环
 验证：71 项测试通过，事实抽取与蒸馏器烟雾测试正常
 ```
 
----
+***
 
 ## 9. 参考资料
 

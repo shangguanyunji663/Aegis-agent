@@ -1,9 +1,10 @@
 # Aegis 第十一轮：风险 LLM 通道双路径验证（stub-LLM on vs MockLLM OFF）
 
 > 分支:`main` · 时间:2026-08-19 · 系列:[REFACTORING](REFACTORING.md) → [OPTIMIZATION](OPTIMIZATION.md) → [AUTH-MYSQL](AUTH-MYSQL.md) → [LANGGRAPH-DOCKER](LANGGRAPH-DOCKER.md) → [DEEP-ENHANCEMENTS](DEEP-ENHANCEMENTS.md) → [LLM-RESPONSE-HUMANIZATION](LLM-RESPONSE-HUMANIZATION.md) → [MEMORY-ENHANCEMENT](MEMORY-ENHANCEMENT.md) → [CONFRONTATIONAL-DIALOGUE-TESTING](CONFRONTATIONAL-DIALOGUE-TESTING.md) → [ROUND-9-CONSOLIDATION](ROUND-9-CONSOLIDATION.md) → [CORPUS-LAYER-SPLIT](CORPUS-LAYER-SPLIT.md) → 本篇
+> 性质:**风险 LLM 通道双路径验证——stub-LLM on vs MockLLM OFF 的对照评测与真实 GLM sanity check**
 > **历史快照说明（2026-08-24）**：本文记录第十一轮的 stub/GLM 能力上界实验，`RISK_LLM_CHANNEL_ENABLED=false` 的生产建议、旧 prompt-vs-corpus 张力和 stub 数字均不代表当前生产状态。当前实现已由 v9 QLoRA（提示词契约 v2、`RISK_QLORA_ENABLED`、隔离 Transformers 服务）接管；最新真实验收见 `D:\AegisTraining\reports\risk-qlora-eval-v9.json`，八门槛全部通过。本文原始数字保留用于历史复现，不回写修改。
 
----
+***
 
 ## 1. 背景
 
@@ -113,7 +114,7 @@ python -m pytest tests/test_risk_dual_channel.py -v
 # 9 passed in 1.03s
 ```
 
-## 7. 文件变更清单
+## 7. 本轮文件清单
 
 | 文件 | 变更 | 说明 |
 | --- | --- | --- |

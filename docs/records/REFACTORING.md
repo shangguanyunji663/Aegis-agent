@@ -1,6 +1,7 @@
-# Aegis 第一轮模块化重构方案与变更记录
+# Aegis 第一轮：模块化重构方案与变更记录
 
-> 分支:`improve-code` · 时间:2026-08 · 性质:**纯结构性重构,业务逻辑零改动**(唯一功能增量:补齐 X-Request-ID / X-Trace-ID 中间件)
+> 分支:`improve-code` · 时间:2026-08 · 系列:起始轮,无前置
+> 性质:**纯结构性重构,业务逻辑零改动**（唯一功能增量:补齐 X-Request-ID / X-Trace-ID 中间件）
 > 验证:`pytest 43/43 通过` · `harness 7/7 套件通过` · `pyflakes 干净` · `uvicorn 冒烟 + 登录 + SSE 正常`
 
 ***
@@ -132,11 +133,17 @@ app/
 ## 5. 删除清单(均经全仓 grep 验证无引用)
 
 - `app/store.py` 整文件(JsonStore,零引用)
+
 - `repository.py`:`execute_tool_job`、`append_tool_output`、`_report_dict`、`_ensure_case`、`_ensure_case_tool_jobs`、`_case_dict`、`_handoff_summary`、`_follow_up_suggestion`(被 `ReportCaseService` 取代)、`session_belongs_to_user`、`recent_messages`
+
 - `agents.py`:`CounselorAgent.compose`(无调用方)
+
 - `agent_harness.py`:`AegisToolPlan`/`tool_plan`(计算后从未被消费)、`stream` 中 outcome 恒为 None 的死分支
+
 - `mcp_client.py`:`extract_job_id`(与 gateway 内实现重复)、`queue_case_tools`
+
 - `database.py`:模块级 `engine`/`SessionLocal`/`get_db`/`session_scope` 单例(零引用,`create_schema`/`readiness_check` 的默认引擎改为按需 `build_engine()`)
+
 - 各文件未用导入(main.py 的 time/uuid4/Request、repository 的 RiskLevel、evaluation 的 asdict、autonomous\_agents 的 CompanionAgent、tests 的 ReportStatus 等约 10 处)
 
 ## 6. 去重明细(保留各调用点原语义)
@@ -160,14 +167,19 @@ app/
 `tests/test_api.py::test_readiness_and_auth_flow` 断言响应包含 `X-Request-ID`/`X-Trace-ID` 头,但原代码没有实现(重构前该测试失败)。新增 `app/api/middleware.py`:
 
 - 每个请求生成 `req-*`/`trace-*` ID 并写入响应头;请求方自带同名头时沿用,便于链路串联。
+
 - 属纯增量,不修改任何既有路径行为。重构后 43/43 测试全部通过。
 
 ## 8. 环境与配置变更
 
 - `requirements.txt`:`mcp` 钉版为 `mcp>=1.0,<2`(mcp 2.x 移除了 `mcp.server.fastmcp`,与本项目代码不兼容,曾导致 2 个 MCP 测试失败)
+
 - `config.py`:`knowledge_dir` 默认值 `app/knowledge` → `knowledge`;`rag_eval_dataset` → `eval/fixtures/aegis-rag-eval.json`
+
 - `.env.example` / `.env`:`KNOWLEDGE_DIR=knowledge`
+
 - `.gitignore`:补充 `.conda/`
+
 - Dockerfile 无需改动(`COPY . /app` 已覆盖新目录)
 
 ## 9. 验证记录
@@ -182,9 +194,11 @@ app/
 | `python -m app.harness.runner --suite all` | **7/7 套件通过**(risk/routing/skills/rag/api/tool-queue/scaled) |
 | 变更规模                                       | 87 个文件,+1734 / −1552 行                                      |
 
-## 10. 遗留说明
+## 10. 遗留与建议
 
 - `database.migrate_legacy_schema` 仍与 `entities.py` 存在两份 schema 真相(手写 DDL 迁移),建议后续引入 Alembic 统一。
+
 - `agents/classic.py` 中路由关键词表、`skills.py` 中技能触发词表仍为硬编码,可后续外置为配置。
+
 - `McpToolGateway` 在同步方法内使用 `asyncio.run`,如需高并发可改造为原生异步。
 

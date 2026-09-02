@@ -1,9 +1,10 @@
-# Aegis 第五轮深度增强:风险双通道 + Function Calling + 三运行时 A/B + LLM-as-Judge + Checkpoint(第五次提交说明)
+# Aegis 第五轮：深度增强 — 风险双通道 + Function Calling + 三运行时 A/B + LLM-as-Judge + Checkpoint
 
 > 分支:`improve-code` · 时间:2026-08 · 系列:[REFACTORING](REFACTORING.md) → [OPTIMIZATION](OPTIMIZATION.md) → [AUTH-MYSQL](AUTH-MYSQL.md) → [LANGGRAPH-DOCKER](LANGGRAPH-DOCKER.md) → 本篇
+> 性质:**风险双通道 + Function Calling + 三运行时 A/B + LLM-as-Judge + Checkpoint 深度增强轮次**
 > **历史快照说明（2026-08-24）**：本文件记录第五轮的通用 LLM/GLM 风险通道实现与验证，原始配置、指标和 `improve-code` 分支信息按历史保留。当前生产实现已增加 v9 QLoRA 隔离服务（`RISK_QLORA_ENABLED`）；最新验收和启动方式以根目录 `README.md`、`docs/architecture.md` 与 `D:\AegisTraining\reports\TRAINING-HISTORY-INDEX.md` 为准。
 
----
+***
 
 ## 1. 背景
 
@@ -51,7 +52,7 @@
 - SqliteSaver 用法经探查契约后一次写对(`sqlite3.Connection` 构造 + `setup()`,而非 `from_conn_string` 上下文管理器)
 - FC 守卫改为能力探测,消除"stub 覆盖 provider"这类实现耦合的补丁
 
-## 8. 涉及文件
+## 8. 本轮文件清单
 
 | 文件 | 变更 |
 | --- | --- |

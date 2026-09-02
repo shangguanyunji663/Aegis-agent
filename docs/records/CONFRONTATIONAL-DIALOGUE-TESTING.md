@@ -1,9 +1,10 @@
-﻿# Aegis 第八轮：对抗型对话测试（10轮）与AI响应优化分析（第八次提交说明）
+# Aegis 第八轮：对抗型对话测试与 AI 响应优化分析
 
 > 分支:`fix/confrontational-dialogue-testing` · 时间:2026-08 · 系列:[REFACTORING](REFACTORING.md) → [OPTIMIZATION](OPTIMIZATION.md) → [AUTH-MYSQL](AUTH-MYSQL.md) → [LANGGRAPH-DOCKER](LANGGRAPH-DOCKER.md) → [DEEP-ENHANCEMENTS](DEEP-ENHANCEMENTS.md) → [LLM-RESPONSE-HUMANIZATION](LLM-RESPONSE-HUMANIZATION.md) → [MEMORY-ENHANCEMENT](MEMORY-ENHANCEMENT.md) → 本篇
+> 性质:**对抗型对话压力测试——10 轮配合 + 10 轮对抗对话验证记忆系统与 AI 响应质量**
 > 验证:10轮配合型对话 + 10轮对抗型对话 · 记忆系统验证 · AI响应质量分析
 
----
+***
 
 ## 1. 背景
 
@@ -112,7 +113,7 @@ def login(username, password):
 - 在对抗型对话第4-6轮，AI的回复稍显"过度包容"，可以更早地识别到用户需要空间
 - 建议后续增加"沉默响应"策略：当用户连续3轮表达抵触时，AI可以简短回应后主动留白
 
-## 6. 文件变更
+## 6. 本轮文件清单
 
 | 文件 | 变更类型 | 说明 |
 |------|---------|------|

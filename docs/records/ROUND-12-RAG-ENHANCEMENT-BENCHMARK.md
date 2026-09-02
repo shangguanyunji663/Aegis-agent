@@ -3,7 +3,7 @@
 > 分支:`main` · 时间:2026-08-21 · 系列:[REFACTORING](REFACTORING.md) → [OPTIMIZATION](OPTIMIZATION.md) → [AUTH-MYSQL](AUTH-MYSQL.md) → [LANGGRAPH-DOCKER](LANGGRAPH-DOCKER.md) → [DEEP-ENHANCEMENTS](DEEP-ENHANCEMENTS.md) → [LLM-RESPONSE-HUMANIZATION](LLM-RESPONSE-HUMANIZATION.md) → [MEMORY-ENHANCEMENT](MEMORY-ENHANCEMENT.md) → [CONFRONTATIONAL-DIALOGUE-TESTING](CONFRONTATIONAL-DIALOGUE-TESTING.md) → [ROUND-9-CONSOLIDATION](ROUND-9-CONSOLIDATION.md) → [CORPUS-LAYER-SPLIT](CORPUS-LAYER-SPLIT.md) → [ROUND-11-RISK-LLM-DUAL-CHANNEL](ROUND-11-RISK-LLM-DUAL-CHANNEL.md) → 本篇
 > 性质:**RAG 检索链路增强 + 知识库规模化扩充 + 本地系统性能基准,对标企业级 RAG 与工程化能力**
 
----
+***
 
 ## 1. 背景
 
@@ -125,7 +125,7 @@
 - `python -m app.rag_eval.runner` → 输出双口径 + 消融对比，写 `data/eval/rag-eval-report.json`。
 - `python -m scripts.run_benchmark` → 输出完整性能报告，写 `data/eval/benchmark.json`。
 
-## 7. 文件变更清单
+## 7. 本轮文件清单
 
 - `knowledge/`：12 篇深化 + 12 篇新增（共 24 篇）
 - `eval/fixtures/rag_queries.json`（50 → 77 条）

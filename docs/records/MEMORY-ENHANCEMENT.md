@@ -1,9 +1,10 @@
-﻿# Aegis 第七轮：记忆系统增强（第七次提交说明）
+# Aegis 第七轮：记忆系统增强
 
 > 分支:`fix/memory-enhancement` · 时间:2026-08 · 系列:[REFACTORING](REFACTORING.md) → [OPTIMIZATION](OPTIMIZATION.md) → [AUTH-MYSQL](AUTH-MYSQL.md) → [LANGGRAPH-DOCKER](LANGGRAPH-DOCKER.md) → [DEEP-ENHANCEMENTS](DEEP-ENHANCEMENTS.md) → [LLM-RESPONSE-HUMANIZATION](LLM-RESPONSE-HUMANIZATION.md) → 本篇
+> 性质:**记忆系统容量增强——最近消息数 6→15、摘要上限 900→3000（配置级变更，实际接线在第十三轮）**
 > 验证:配置变更生效 · 记忆容量提升(6→15条消息, 900→3000字符摘要)
 
----
+***
 
 ## 1. 修改背景和目的
 

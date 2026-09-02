@@ -52,6 +52,7 @@
 | [第五部分](#part-5) | 从零动手 · 14 站实现地图 | 「每一站具体怎么写？」 |
 | [第六部分](#faq) | 常见问题解答（FAQ） | 「卡住了 / 想不通，看哪里？」 |
 | [第七部分](#part-7) | 总结与自检清单 | 「怎么确认自己学会了？」 |
+| [附录 A](#appendix-a) | 后端 API 契约总表（48 端点） | 「复现后端时怎么逐端点验收？」 |
 
 快速跳转：[第〇章 学习路线总览](#station-0) · [第 1 站](#station-1) · [第 2 站](#station-2) · [第 3 站](#station-3) · [第 4 站](#station-4) · [第 5 站](#station-5) · [第 6 站](#station-6) · [第 7 站](#station-7) · [第 8 站](#station-8) · [第 9 站](#station-9) · [第 10 站](#station-10) · [第 11 站](#station-11) · [第 12 站](#station-12) · [第 13 站](#station-13) · [第 14 站](#station-14) · [术语表](#glossary) · [FAQ](#faq)
 
@@ -291,7 +292,7 @@ flowchart LR
 | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------ |
 | `app/config.py`                                          | 全局配置（env / .env 映射，全部带安全默认值）                                                                         | `Settings`、`get_settings()`                                                                      | pydantic-settings  |
 | `app/models.py`                                          | 领域模型（Intent/RiskLevel/ChatResponse 等纯数据词汇表）                                                          | 枚举、`dataclass`、SSE 映射                                                                            | 仅标准库               |
-| `app/entities.py`                                        | ORM 实体（19 张表，含第十三轮新增的 L2 事实表）                                                                                        | `Base` 下的实体类                                                                                     | SQLAlchemy         |
+| `app/entities.py`                                        | ORM 实体（20 张表，含第十三轮新增的 L2 事实表与第十八轮新增的 `UserPreference` 主题偏好表）                                                                                        | `Base` 下的实体类                                                                                     | SQLAlchemy         |
 | `app/database.py`                                        | 引擎/会话工厂/建表/迁移/就绪检查                                                                                   | `build_engine`、`build_session_factory`、`create_schema`                                           | SQLAlchemy         |
 | `app/assessment.py`                                      | 确定性风险评估（规则通道单一事实来源）                                                                                  | `assess_message()`                                                                               | 无（纯函数）             |
 | `app/skills.py`                                          | 注册式执行 Skill、人工策展 Skill、使用观察器与自动蒸馏/重载                                                                                 | `SkillRegistry`、`response_skill_names()`                                                         | store 回调注入         |
@@ -303,10 +304,10 @@ flowchart LR
 | `app/agents/langgraph_runtime.py`                        | LangGraph StateGraph 运行时 + 检查点                                                                       | `LangGraphRuntime`                                                                               | langgraph          |
 | `app/autonomous/`                                        | 自治协作：events（协议）、registry（能力/决策）、board（共享读）、coordinator（认领循环）、agents（六自治 Agent）、runtime（黑板→响应）        | `AutonomousAgentRuntime`                                                                         | llm、rag、store      |
 | `app/rag/`                                               | 检索与记忆子系统：text（分词）、scoring（BM25/rerank/融合）、chunking（切块/元数据）、facts（L2 事实抽取与渲染）、memory（L3 摘要）、vector\_store（Chroma/本地降级） | `DatabaseStore.search_knowledge`（组装检索流水线）                                                        | chromadb（可选）       |
-| `app/repository/store.py`                                | 持久化总闸（约 1146 行，第十三轮新增 L4/L2 方法后更新）                                                                               | `DatabaseStore`                                                                                  | entities、rag       |
+| `app/repository/store.py`                                | 持久化总闸（约 1173 行，第十三轮新增 L4/L2、第十八轮新增主题偏好方法后更新）                                                                           | `DatabaseStore`                                                                                  | entities、rag       |
 | `app/tools/`                                             | 工具治理：contracts（契约）、gateway（internal/MCP 网关）、mcp\_client                                              | `governed_payload()`、`build_tool_gateway()`                                                      | store              |
 | `app/services/`                                          | 业务服务：report\_case（审批后编排）、tool\_executor（真实副作用）、tool\_queue（队列/worker）、tool\_records、tool\_governance | `ReportCaseService`、`ToolQueueWorker`                                                            | store、tools        |
-| `app/api/`                                               | HTTP 路由：schemas/deps/middleware/pages/system/auth\_routes/chat/admin                                 | RESTful + SSE 接口                                                                                 | FastAPI、harness    |
+| `app/api/`                                               | HTTP 路由：schemas/deps/middleware/errors（全局异常处理，见 12.3b）/pages/system/auth\_routes/chat/admin                                 | RESTful + SSE 接口                                                                                 | FastAPI、harness    |
 | `app/mcp/`                                               | MCP 边界：server（FastMCP 工具服务）/ client（stdio 客户端）（可选后端）                                       | `@mcp.tool` 暴露的工具                                                                                | store、contracts    |
 | `app/evaluation/`（含 `harness/`）、`eval/`              | 评测闭环：runner / rag（双口径+消融）/ datasets / report\_html / runtime\_ab / judge / harness（factory 装配工厂 + runner 场景回放） | `eval.run_eval`、`app.evaluation.harness.runner`                                                 | store、llm          |
 | `static/`、`tests/`                                       | 双端原生前端 + pytest 单测（历史验证结果应以运行日期和环境为准）                                                                                 | HTML/JS 页面、测试                                                                                    | —                  |
@@ -455,7 +456,7 @@ settings → engine/会话工厂 → create_schema
 ### 自研 append-only Blackboard + 认领制（核心运行时）
 
 - **选了**：不依赖任何框架的黑板模式 + claim-based 协调器。
-- **为什么**：多 Agent「协作」需要真实语义——谁认领、凭什么（能力+置信度）、产出什么、如何验收。`append_artifact` 每次克隆出新黑板（不可变快照），协作过程天然可回放、无共享状态竞争；`SAFETY_OVERRIDE` 事件实现安全「一票否决」；`REVISION_REQUESTED` 实现「提案→复核→修订」循环。
+- **为什么**：多 Agent「协作」需要真实语义——谁认领、凭什么（能力+置信度）、产出什么、如何验收。`add_artifact` 每次经 `dataclasses.replace` 克隆出新黑板（不可变快照），协作过程天然可回放、无共享状态竞争；`SAFETY_OVERRIDE` 事件实现安全「一票否决」；`REVISION_REQUESTED` 实现「提案→复核→修订」循环。
 - **替代**：单 Lead 串行分派（伪协作、无中间产物）、纯 LangGraph（也支持，但自研版更易做教学演示与对照评测）。
 - **代价/取舍**：自研调度逻辑需要自己保证终止（轮次/每轮认领/单 Agent 认领三道预算护栏）；`force_response` 保证学生端永远有答案。
 
@@ -478,6 +479,13 @@ settings → engine/会话工厂 → create_schema
 - **为什么**：限流窗口与「防止两个管理员同时触发批处理」的锁是运维增强，不是功能必需。
 - **替代**：纯进程内字典（单机够用，但多实例无效）。
 - **代价/取舍**：`check_rate_limit`/`lock` 必须写「Redis 实现 + 本地退化实现」两份，语义一致——这是可选依赖的代价，也是本地零依赖可跑的前提。
+
+### 自研 DB 任务队列（ToolJob 表 + 轮询 Worker）
+
+- **选了**：用数据库表 `ToolJob` 做持久队列，`ToolQueueWorker` 线程池轮询领取执行（第 11 站），不引入 Celery / RQ / 消息中间件。
+- **为什么**：任务量级是「审批一个高风险个案 → 派发 5 个 ToolJob」，低频、小体积。DB 队列有三个正中治理需求的特性：**任务即数据**（能 SQL 查询、能审计、能手工 retry，管理端死信页直接读表）；**与业务事务同库**（入队与审批在同一会话内完成，无分布式一致性问题）；**零新增基础设施**（延续「本地零依赖可跑」哲学）。
+- **替代**：Celery / RQ 需要 broker（Redis/RabbitMQ）+ worker 进程与队列运维；对日几十~几百任务的规模是过度工程。
+- **代价/取舍**：无延迟语义，只能轮询（`tool_queue_poll_interval_seconds` 默认 2s）；失败状态机（`run_after` 退避、死信）要自己实现（11.3 走读）；轮询有空转开销。规模大到「任务本身成为瓶颈」时再迁 broker——此时 `ToolJob` 状态机与工具契约可作为迁移边界，业务代码不改。
 
 ### SSE（Server-Sent Events）
 
@@ -807,11 +815,11 @@ def from_dict(cls, data: dict[str, Any]) -> "PendingReport":
 
 **学习要点**：领域模型层要保持「零依赖」（只依赖标准库），它决定了整个系统的公共语言；`str+Enum` 是做配置类枚举的惯用法。
 
-### 1.3 app/entities.py — ORM 实体（19 张表）
+### 1.3 app/entities.py — ORM 实体（20 张表）
 
 SQLAlchemy 2.0 声明式实体，和 `models.py` 的关系是：models 是「怎么说」，entities 是「怎么存」。
 
-代表表：`ChatSession`（会话，含 `owner_user_public_id` 归属）、`ChatMessage`、`SessionMemory`（滚动记忆摘要）、`AuthUser`/`AuthSession`（口令与令牌）、`PsychologicalReport`（风险报告）、`RiskCase`+`CaseNote`（个案）、`KnowledgeChunk`（知识切块）、`ToolJob`/`ToolAuditRecord`/`DeadLetterRecord`（工具任务/审计/死信）、`ExcelRecord`/`AlertRecord`（副作用记录）、`AgentPrivateMemory`（Agent 私有记忆）、`AgentModelProfile`（每 Agent 模型档案）、`UserMemoryFact`（L2 用户事实，SCD-2 有效期版本，见 9.5）、`AdminAuditLog`（管理端审计）。
+代表表：`ChatSession`（会话，含 `owner_user_public_id` 归属）、`ChatMessage`、`SessionMemory`（滚动记忆摘要）、`AuthUser`/`AuthSession`（口令与令牌）、`PsychologicalReport`（风险报告）、`RiskCase`+`CaseNote`（个案）、`KnowledgeChunk`（知识切块）、`ToolJob`/`ToolAuditRecord`/`DeadLetterRecord`（工具任务/审计/死信）、`ExcelRecord`/`AlertRecord`（副作用记录）、`AgentPrivateMemory`（Agent 私有记忆）、`AgentModelProfile`（每 Agent 模型档案）、`UserMemoryFact`（L2 用户事实，SCD-2 有效期版本，见 9.5）、`UserPreference`（界面主题偏好，一用户一行，第十八轮新增，见 12.5b）、`AdminAuditLog`（管理端审计）。
 
 注意两个细节：
 
@@ -879,7 +887,7 @@ True
 #### 练习
 
 1. 给 `Settings` 加一个字段 `demo_greeting: str = "hello"`，在 `.env` 写 `DEMO_GREETING=hi` 验证覆盖生效。（验证：`python -c "from app.config import get_settings; print(get_settings().demo_greeting)"`）
-2. 打开 `data/aegis.sqlite`（任意 SQLite 工具），数一数有多少张表，与 `entities.py` 里 19 个 `Base` 子类一一对应。
+2. 打开 `data/aegis.sqlite`（任意 SQLite 工具），数一数有多少张表，与 `entities.py` 里 20 个 `Base` 子类一一对应（含第十八轮新增的 `user_preferences`）。
 3. 思考题：如果 `models.py` import 了 SQLAlchemy，「测试可以单独 import 它」会失去什么？（写下答案，与 1.2 的学习要点对照）
 
 ***
@@ -1151,7 +1159,37 @@ _distill_skill() 写入 skills/auto/<slug>/SKILL.md
 
 
 
-**学习要点**：`side_effect` 标记让「哪些技能会改变世界」一眼可见，后续审计/评测都依赖它；把 LLM 工具描述（`openai_schema`）作为技能的一等公民——第五轮已接真 function calling（`agents/skill_selection.py`）：规则先定白名单（安全边界不变），模型在白名单内自主挑选技能与顺序，失败/幻觉名回退整个白名单。
+### 4.2 select_response_skills — 模型自选技能（Function Calling，第五轮）
+
+注册表只是「能力库存」，**这条消息到底注入哪些策展技能**由 `app/agents/skill_selection.py` 的 `select_response_skills()` 决定。规则与模型各有分工：**规则**先用 `response_skill_names` 定白名单（安全边界不变——高风险必选安全计划、陪伴闲聊不选技能），**模型**（可用时）只在白名单内挑真正值得用的技能与顺序。这就是「模型点菜、代码下厨」在技能层的落点：
+
+```python
+def select_response_skills(llm_client, registry, intent, risk_level, message,
+                           enabled: bool = True) -> tuple[list[str], str]:
+    whitelist = registry.response_skill_names(intent, risk_level, message)   # ① 规则白名单
+    if not _supports_function_calling(llm_client, enabled):                  # ② 能力探测
+        registry.record_skill_usage(intent, risk_level, whitelist)
+        return whitelist, "rules"                                            #    不可用 → 整单兜底
+    tools = [func_call 工具描述 for name in whitelist]                       # ③ 把白名单描述给模型
+    chosen = llm_client.chat_with_tools(SKILL_SELECTION_SYSTEM_PROMPT, message, tools)
+    if chosen is None:
+        return whitelist, "rules"                                            # None=失败/mock → 兜底
+    if not chosen:
+        return [], "fc"                                                      # 空列表≠失败:模型判断都不需要
+    allowed = [name for name in chosen if name in whitelist]
+    if not allowed:
+        return whitelist, "rules"                                            # ④ 幻觉守卫:全不在白名单 → 兜底
+    return allowed, "fc"
+```
+
+四个关键点，按执行顺序读：
+
+1. **能力探测不看 provider 字符串**：`_supports_function_calling` 只判「开关打开且客户端存在」；客户端是否真支持 FC 由 `chat_with_tools` 的**返回值**决定（mock 返回 `None` → 走 rules）。任何覆写了该方法返回结果的真实客户端/stub 都会自然放行，不与实现细节耦合。
+2. **返回二元组 `(技能列表, "fc"|"rules")`**：下游 trace 里能一眼看出这轮是模型选的（`fc`）还是规则兜底的（`rules`）——8.1 的 `skill_mode` trace 记的就是它。
+3. **空列表 ≠ 失败**：`chat_with_tools` 返回 `[]` 表示模型明确判断「这条消息不需要任何技能」，与「失败（`None`）」是两种语义，只有后者才回退整张白名单。
+4. **幻觉守卫**：模型挑出的技能逐个核对白名单，**全部**不在白名单才回退整单（部分在则只留合法的）——模型永远没有把白名单外的技能塞进提示词的机会。
+
+**学习要点**：FC 不是给模型更大权力，而是给规则白名单加一个「排序与裁剪」的后端——安全边界仍然由 `response_skill_names` 那一层负责，`side_effect` 标记让「哪些技能会改变世界」一眼可见，后续审计/评测都依赖它。
 
 #### 动手试一试：注册、白名单与 Function Calling 描述
 
@@ -1181,18 +1219,45 @@ print(reg.response_skill_names(Intent.COUNSELING, RiskLevel.LOW, "我最近睡�
 # ['supportive_response_baseline', 'sleep_routine_support']
 ```
 
+Function Calling：让模型在规则白名单内选技能（接上面的 `reg`，未传 settings 所以不会触发自动蒸馏写入）：
+
+```python
+from app.agents.skill_selection import select_response_skills
+from app.llm.client import MockLLMClient
+
+class FakeFCClient:
+    """最小 stub:只实现 FC 所需的 chat_with_tools(模拟模型"挑中"的技能)。"""
+    def chat_with_tools(self, system, user, tools):
+        return ["sleep_routine_support"]
+
+class FakeFCClientHallucinated:
+    def chat_with_tools(self, system, user, tools):
+        return ["garbage_made_up_skill"]      # 模型幻觉:白名单外
+
+print(select_response_skills(FakeFCClient(), reg, Intent.COUNSELING, RiskLevel.LOW, "我最近睡不着"))
+# (['sleep_routine_support'], 'fc')           ← 挑得对,照单全收
+
+print(select_response_skills(FakeFCClientHallucinated(), reg, Intent.COUNSELING, RiskLevel.LOW, "我最近睡不着"))
+# (['supportive_response_baseline', 'sleep_routine_support'], 'rules')  ← 幻觉名被过滤 → 回退整白名单
+
+print(select_response_skills(MockLLMClient(), reg, Intent.COUNSELING, RiskLevel.LOW, "我最近睡不着"))
+# (['supportive_response_baseline', 'sleep_routine_support'], 'rules')  ← mock 不会 FC → 规则模式
+```
+
 #### 常见易错点
 
 - **传字符串而不是枚举**：`response_skill_names("risk", "high", ...)` 不报错，但白名单永远只剩 `['supportive_response_baseline']`——函数内部用 `is` 比较枚举，字符串与枚举恒不相等。务必传 `Intent.RISK` / `RiskLevel.HIGH`。
 - **在技能里 import 仓储**：技能层只认回调（`report_sink` / `knowledge_search`），一旦 import 就失去了可单测性——这是本项目的纪律，不是巧合。
 - **把 `side_effect=True` 的技能当纯查询用**：`create_pending_report` 会真的改变世界（建报告）；编排层与审计都依赖这个标记区分「读」与「写」。
 - **开着自动蒸馏做基线评测**：`SKILL_DISTILL_ENABLED=true` 时重复模式会写 `skills/auto/` 与 `data/skill-usage.json`，污染下一次基线（4.9 第 5 条）。做可复现评测先关掉或隔离输出目录。
+- **以为 FC 是「模型随便挑」**：模型只能在 `response_skill_names` 的规则白名单内挑（4.2 的 `select_response_skills`），白名单外一律被幻觉守卫过滤；`None`/异常/未开启时整单回退 `mode="rules"`，行为与旧版完全一致——FC 只是「排序与裁剪」的后端。
 
 #### 练习
 
 1. 注册一个自定义技能 `suggest_music`（无副作用），导出并完整打印它的 OpenAI schema。
 2. 用 `Intent.COMPANION / RISK` × `RiskLevel.LOW / HIGH` 四种组合调用 `response_skill_names`，归纳出白名单矩阵（哪个意图 + 哪个风险 → 哪些技能）。
 3. 对比 `skills/` 下人工策展 SKILL.md 与 `skills/auto/` 的 frontmatter 差异（`origin` 字段），解释为什么要防止 auto Skill 触发下一层蒸馏。
+4. 用 FakeFCClient 分别返回「一个白名单内技能」和「一个白名单外技能」，验证 `('...', 'fc')` 与 `rules` 回退两路输出，并解释 `[]` 与 `None` 两种返回值为什么是不同的语义（对照 4.2 第 3 点）。
 
 ***
 
@@ -1370,21 +1435,29 @@ companion | LeadAgent route | intent=companion, risk=low
 
 先定义「协作的语言」：
 
-- `AgentEventType`：TURN\_STARTED / TASK\_CREATED / TASK\_CLAIMED / ARTIFACT\_PUBLISHED / SAFETY\_OVERRIDE / REVISION\_REQUESTED / FINAL\_ACCEPTED / BUDGET\_EXHAUSTED …
-- `AgentTask`：带 `required_capabilities`（能力要求）、`priority`、`metadata`。
-- `AgentArtifact`：`(owner, kind, payload, confidence, task_id, metadata)`——一切中间产物，kind 取值：`memory`/`intent`/`risk`/`context`/`response_proposal`/`safety_review`/`pending_report`。
-- `CollaborationBlackboard`：核心结构，`turn_id/session_id/user_input` + `tasks/artifacts/messages/events` 四个列表。
+- `AgentEventType`：TURN\_STARTED / ROUND\_STARTED / TASK\_CREATED / TASK\_CLAIMED / TASK\_CLOSED / TASK\_REOPENED / MESSAGE\_SENT / ARTIFACT\_PUBLISHED / CRITIQUE\_PUBLISHED / SAFETY\_OVERRIDE / REVISION\_REQUESTED / FINAL\_ACCEPTED / BUDGET\_EXHAUSTED（events.py 的真实枚举全集，共 13 个；MESSAGE\_SENT 由 `send_message()` 在 Agent 间互发消息时发出）
+- `AgentTask`：带 `required_capabilities`（能力要求）、`priority`、`status`、`metadata`。
+- `AgentArtifact`：`(owner, kind, payload, confidence, task_id, metadata)`——一切中间产物，kind 取值：`memory`/`intent`/`risk`/`context`/`response_proposal`/`safety_review`/`critique`/`pending_report`。
+- `CollaborationBlackboard`：核心结构，`turn_id/session_id/user_input` + `tasks/artifacts/messages/events` 四个列表 + `final_artifact_id`（验收通过后落下总工件 id）。
+
+`CollaborationBlackboard` 是 `frozen dataclass`——所有「修改」方法都不改自己，而是**复制一份改完返回新对象**。看真实的 `add_artifact`（events.py 第 152~163 行）：
 
 ```python
-def append_artifact(self, artifact: AgentArtifact) -> "CollaborationBlackboard":
-    clone = self._clone()          # ① 深拷贝自己
-    clone._artifacts = [*self._artifacts, artifact]   # ② 追加新列表
-    return clone                   # ③ 返回新板,旧板不动
+def add_artifact(self, artifact: AgentArtifact) -> "CollaborationBlackboard":
+    event_type = (AgentEventType.CRITIQUE_PUBLISHED if artifact.kind == "critique"
+                  else AgentEventType.ARTIFACT_PUBLISHED)
+    return replace(self, artifacts=(*self.artifacts, artifact)).append_event(
+        AgentEvent(type=event_type, actor=artifact.owner, task_id=artifact.task_id,
+                   artifact_id=artifact.id, message=artifact.kind,
+                   metadata={"confidence": artifact.confidence}))
 ```
 
+两个关键实现点：
 
+- **`dataclasses.replace` 是「复制再改」的标准写法**：字段中不可变结构用 `(*old, new)` 重建（tuple 追加），无需手写 `_clone()`。`add_task` / `append_event` / `send_message` / `accept_final` 全是同一模式。
+- **「发布产物」和「留痕」在同一个方法里绑定**：`add_artifact` 不但追加工件，还顺手发一条 `ARTIFACT_PUBLISHED`（critique 用 `CRITIQUE_PUBLISHED`）事件——管理端 trace 的「谁在何时发布了什么」数据来源就在这。
 
-**不可变（immutable）设计**：每个 append/append\_event 都克隆出新黑板。为什么？——同一轮里任何时刻截取的 board 都是一致快照，协作过程天然可回放、可 debug，不存在「谁偷偷改了共享状态」。
+**不可变（immutable）设计**：每改一次就换新板，为什么？——同一轮里任何时刻截取的 board 都是一致快照，协作过程天然可回放、可 debug，不存在「谁偷偷改了共享状态」。代价是新板频繁构造，但黑板的生命周期只有一轮 `run()`（run 结束即可整体回收，见 7.6），不会内存爆炸。
 
 ### 7.2 autonomous/registry.py — 能力与决策
 
@@ -1423,6 +1496,8 @@ def intent_from_board(board, *, use_board_risk=True, use_hard_terms=True) -> Int
   4. 逐个执行:agent.act(task, board) → board.apply_turn_result(...)
   5. 回到 1
 ```
+
+进入循环前，协调器先 `_ensure_root_task` 建一个根任务（`task:root`）——输入命中硬高危词时根任务直接标 CRITICAL（`hard_high_risk`，第 3 站的词表仍是单一来源）。
 
 预算护栏体现在三处：轮次上限（超了发 `BUDGET_EXHAUSTED`）、每轮认领上限、单 Agent 认领上限。`force_response=True` 分支保证即使前置缺失也会被逼着产出一个回复——学生端永远有答案——。
 
@@ -1510,7 +1585,7 @@ if getattr(self.settings, "agent_runtime", "autonomous") == "autonomous":
 
 有序路径（`agent_runtime="ordered"`）同样值得读一遍：load memory → assess risk → route →（companion 跳过检索！）→ search\_knowledge → grounding → HIGH 则 create\_report → 选标准 Skill → compose\_plan → finalize\_plan → 存消息/更新记忆/落 trace。每步都经 `runtime_runner.run_step()` 包裹（记录 AGENT\_STARTED/RUN\_FAILED 事件）。
 
-两条路径最终都汇成 `ChatResponse`。`_run_autonomous` 额外把黑板事件流翻译成 RuntimeEvent 发给 `emit`——这就是 SSE 流式输出的来源。低风险对话支持真流式：回复生成的 token 经回调链（services.on\_reply\_token → finalize\_plan → stream\_support\_reply）实时推给 SSE，首字延迟≈模型首 token 延迟；中/高风险不直播，必须等 RiskGuardian 安全复核通过后输出。直播过真实 token 后，结尾的模拟切块 `_token_chunks()` 会自动跳过，避免重复。
+两条路径最终都汇成 `ChatResponse`。`_run_autonomous` 额外把黑板事件流翻译成 RuntimeEvent 发给 `emit`——这就是 SSE 流式输出的来源（HTTP 层怎么把 StreamEvent 编码成 SSE 帧、线程如何推进、异常怎么兜底，见 12.4）。低风险对话支持真流式：回复生成的 token 经回调链（services.on\_reply\_token → finalize\_plan → stream\_support\_reply）实时推给 SSE，首字延迟≈模型首 token 延迟；中/高风险不直播，必须等 RiskGuardian 安全复核通过后输出。直播过真实 token 后，结尾的模拟切块 `_token_chunks()` 会自动跳过，避免重复。
 
 ### 8.2 harness.py — AegisAgentHarness
 
@@ -1533,6 +1608,48 @@ def _prepare(self, message, session_id, owner_user_public_id):
 ### 8.4 langgraph\_runtime.py — LangGraph StateGraph（三档运行时之一）
 
 `LangGraphRuntime` 用 LangGraph 的声明式状态图编排同一批单轮 Agent：`START → load_memory → assess_risk → route_intent →（条件边：companion+low 直接跳 compose，否则）→ context → report（仅 HIGH）→ compose → finalize → END`。状态 `GraphState` 是 TypedDict，`trace/skills` 字段用 `Annotated[list, operator.add]` 让节点返回增量自动合并；图只编译一次，每次对话 invoke 新状态，天然线程安全；finalize 仅低风险传 `on_token` 直播回调，安全门控与另两个运行时一致。`AGENT_RUNTIME=langgraph|autonomous|ordered` 三档切换（默认 **autonomous**），是「同一业务、三种编排」的活教材。图还挂了 SqliteSaver 检查点（thread\_id=会话 ID，`LANGGRAPH_CHECKPOINT_ENABLED`），`get_state(session_id)` 可读取最近终态——长对话跨进程断点可恢复。
+
+这段话落到源码上是三块，值得对照 langgraph\_runtime.py 逐行读：
+
+```python
+class GraphState(TypedDict, total=False):        # ① 状态形状:total=False 允许节点只返回"增量字段"
+    session_id: str; message: str
+    memory_summary: str; recent_messages: list[dict[str, str]]; user_facts: list[str]
+    risk: SkillResult; risk_level: RiskLevel; intent: Intent
+    knowledge: SkillResult | None; grounding: SkillResult | None
+    pending_report: PendingReport | None; response_plan: ResponsePlan | None
+    answer: str
+    # 增量合并字段:节点只管 append,LangGraph 用 operator.add 自动拼接 —— 不需要全局可变对象
+    skills: Annotated[list[SkillResult], operator.add]
+    trace: Annotated[list[AgentTrace], operator.add]
+
+def _skip_context(state: GraphState) -> str:     # ② 条件边:陪伴类低风险闲聊跳过 RAG(与 ordered 的短路一致)
+    if state["intent"] is Intent.COMPANION and state["risk_level"] is RiskLevel.LOW:
+        return "compose"
+    return "context"
+
+def _build_graph(self):                          # ③ 声明式装配:节点=单轮 Agent 的方法,边=固定顺序+一条条件边
+    builder = StateGraph(GraphState)
+    builder.add_node("load_memory", self._node_load_memory)      # 记忆加载(exclude_current 剔除本轮,9.5)
+    builder.add_node("assess_risk", self._node_assess_risk)      # 风险双通道(第 3/5 站)
+    builder.add_node("route_intent", self._node_route_intent)    # 意图路由
+    builder.add_node("context", self._node_gather_context)       # 检索 + 稳定练习
+    builder.add_node("report", self._node_maybe_report)          # 仅 HIGH 建待审报告
+    builder.add_node("compose", self._node_compose)              # 选技能 + 组 ResponsePlan
+    builder.add_node("finalize", self._node_finalize)            # 终稿(仅 LOW 传 on_token 直播)
+    builder.add_edge(START, "load_memory")
+    builder.add_conditional_edges("route_intent", _skip_context, {"context": "context", "compose": "compose"})
+    ...
+    if self.checkpointer is not None:            # SqliteSaver 仅在开关打开时挂载;缺依赖返回 None 零开销
+        graph = builder.compile(checkpointer=self.checkpointer)  # thread_id=会话 ID,跨进程可恢复
+    return graph
+```
+
+三个与黑板运行时的对照点（也是面试可讲的设计差异）：
+
+- **增量合并 vs 克隆追加**：黑板每改一次 `dataclasses.replace` 换新板（7.1）；LangGraph 用 `Annotated[list, operator.add]` reducer 让节点只返回增量、框架负责拼接——两种机制达成同一个「过程可回放」目标。
+- **条件边 vs 认领制**：`_skip_context` 是声明式的意图分流；autonomous 里同一决策由 Knowledge/Counselor 的 `decide()` 置信度竞争产生（7.4）。
+- **终态同构**：`run()` 把图终态收敛为 `AutonomousRunOutcome(board=None)`——orchestrator 无需感知背后是哪个运行时，这就是三档可 A/B 的结构性前提。
 
 ### 8.5 runtime.py — AgentRegistry / AgentRuntimeRunner
 
@@ -1591,7 +1708,7 @@ high True 我很在意你刚才提到的危险信号。此刻请
 
 #### 练习
 
-1. 把 `settings.agent_runtime` 依次改为 `ordered` / `langgraph` 重跑脚本，对比两次 `resp.trace` 的形态差异（条数、粒度、事件类型）。
+1. 把 `settings.agent_runtime` 依次改为 `ordered` / `langgraph` 重跑脚本，对比两次 `resp.trace` 的形态差异（条数、粒度、事件类型）。预期形态：ordered 的 trace 是固定步骤序列、每步一条、条数最少；langgraph 的节点序列与 ordered 相近，但 trace 由各节点增量合并（能见到技能选择模式痕迹）；autonomous 的 trace 从黑板事件翻译而来、含任务认领/验收语义、同一消息条数最多（`try_station8` 里约 42 条）。判定（intent/risk/回复）应三者一致——不一致才是 bug。
 2. 第二次 `handle` 之后，检查 `resp2.pending_report` 的 `risk_level` 与 `status` 字段——它此刻在等谁做什么？（答案在第 11 站）
 3. 用 `store.list_traces()` 取回 trace，与管理端 `/admin` 的 trace 页面对照，找出同一次对话在两边的对应关系。
 
@@ -1623,7 +1740,7 @@ def tokenize(text: str) -> list[str]:
 
 ### 9.3 chunking.py — 知识文档处理
 
-`parse_knowledge_document` 解析 frontmatter（topic/audience/risk\_level/source\_type/last\_reviewed）；`metadata_matches` 做元数据过滤；`chunk_text` 是滑窗切块（size-overlap 步进）。
+`parse_knowledge_document` 解析 frontmatter（topic/audience/risk\_level/source\_type/last\_reviewed）；`metadata_matches` 做元数据过滤；`chunk_text` 是滑窗切块（size-overlap 步进）。这里还有一个容易与 Agent 层混淆的函数——`rewrite_query`（chunking.py:74，**规则归一化**：压缩空白 + 超长截断为前 60 字，无任何模型调用）。它与第 6 站 `KnowledgeAgent.rewrite_query`（**LLM 语义改写**，失败回退原文前 60 字）名字相同、职责不同：9.8 检索流水线入口用的是前者，Agent 检索前的查询改写用的是后者。
 
 ### 9.4 memory.py — 会话记忆摘要
 
@@ -1688,7 +1805,7 @@ superseded_by  替代它的新事实 public_id
   - `openai`（`Settings` 代码默认）：OpenAI 兼容 `/embeddings` API（需向量模型额度）。
 - `LocalVectorBackend`：哈希 bigram 伪向量 + 本地余弦；当向量已启用但 Chroma 不可用、或显式选择 local 回退时使用，不是 `VECTOR_ENABLED=false` 时的默认替代。
 
-`store.search_knowledge`（第 10 站）把 9.1–9.6 串成完整流水线：改写查询 → 向量候选（可选）→ 元数据过滤 → BM25 → 双路融合 → **weighted 模式才执行本地 rerank** → 邻块扩展 → 截 top\_k。RRF 模式走“排名融合 + 邻块扩展”，当前不会继续叠加 `rerank_score()`。
+`store.search_knowledge` 把 9.1–9.6 串成完整流水线（逐段源码走读见 9.8）：规则归一化查询 → 向量候选（可选，异常时降级）→ 元数据过滤 → BM25 → 双路融合 → **weighted 模式才执行本地 rerank** → 邻块扩展 → 截 top\_k。RRF 模式走“排名融合 + 邻块扩展”，当前不会继续叠加 `rerank_score()`。再次提醒：流水线第一步的「改写查询」是 chunking.py 的规则版 `rewrite_query`（见 9.3），不是 LLM 改写。
 
 
 
@@ -1832,6 +1949,74 @@ self._knowledge_cache: OrderedDict[str, tuple[datetime, list[dict]]] = ...
 - 严格口径 HitRateStrict：**0.8831**（68/77）
 - MRR / NDCG@4：0.8203 / 0.8323
 
+### 9.8 search_knowledge 总装走读（store.py:803-905）
+
+前面九小节讲的是「每一环的算法」，本节走读「把这些环串起来的那段代码」——`store.search_knowledge`（store.py:803-905，约 110 行）。这也是 RAG 子系统从「知识」变成「服务」的装配点：
+
+```python
+def search_knowledge(self, query, top_k=3, topic=None, risk_level=None, audience=None) -> list[dict]:
+    rewritten_query = rewrite_query(query)                # ① 规则归一化(chunking.py:74):压缩空白+截60字
+    cache_key = f"{rewritten_query}|{top_k}|{topic}|{risk_level}|{audience}"
+    if self.settings.knowledge_cache_enabled:             # ② 进程内 LRU 查询缓存命中即返回(9.7.6)
+        cached = self._check_cache(cache_key)
+        if cached is not None:
+            return cached
+
+    vector_results: list[dict] = []
+    if self.vector_backend.enabled():                     # ③ 向量路:仅 VECTOR_ENABLED=true 时参与
+        try:
+            candidate_k = ...                             #    召回候选数取 candidate_k 与 vector_top_k 的较小值
+            vector_results = self.vector_backend.search(rewritten_query, candidate_k)
+        except Exception as exc:
+            self.vector_error = str(exc)                  #    挂了先记原因(管理端可查)
+            if self.settings.vector_required:
+                raise                                     #    严格模式(vector_required=true):宁可失败不降级
+            vector_results = []                           #    默认(vector_required=false):向量路静默退出,BM25 兜住
+
+    with self.db_factory() as db:
+        chunks = [chunk for chunk in db.query(KnowledgeChunk).all()
+                  if metadata_matches(loads_or(chunk.metadata_json, {}), topic=topic, ...)]  # ④ 元数据过滤
+        scores = bm25_scores(rewritten_query, chunks)     # ⑤ BM25 路:对过滤后的全量块打分
+
+        # ⑥ 向量候选按双 key 建两张映射:Chroma 真向量带 db_id;LocalVectorBackend 伪向量只有 source:source_index
+        vector_by_db_id = {int(i["db_id"]): float(i["score"]) for i in vector_results if i.get("db_id") is not None}
+        vector_by_source_key = {f"{i.get('source')}:{i.get('source_index')}": float(i["score"]) ...}
+
+        for chunk in chunks:
+            if fusion_mode == "rrf":                      # ⑦ RRF:只看两路排名,rrf_fused_score(k=60)(9.7.2)
+                score = rrf_fused_score(vector_rank_map.get(chunk_id), bm25_rank_map.get(chunk_id))
+            else:                                         # ⑧ weighted:两路分数各自归一后线性加权(9.7.2)
+                score = fused_score(base_vector, base_bm25, w_vector, w_bm25)
+                if fusion_mode != "rrf" and self.settings.knowledge_rerank_enabled:
+                    score = rerank_score(rewritten_query, chunk.content, score)  # 仅 weighted 叠加四路词法 rerank
+            ranked.append((chunk, score))
+        ranked.sort(key=lambda item: item[1], reverse=True)
+        ranked = expand_best_hit(ranked, chunks)          # ⑨ 邻块扩展:冠军块拼回同源相邻块(9.7.4)
+        results = [组装 chunk_id/source/content/snippet/metadata/score
+                   for chunk, score in ranked[: max(1, min(top_k, self.settings.knowledge_top_k))]]  # ⑩ 截 top_k
+        if self.settings.knowledge_cache_enabled:
+            self._set_cache(cache_key, results)           # ⑪ 写缓存(只写 Redis 键预留,命中全靠进程内 LRU,见 9.7.6)
+        return results
+```
+
+四个值得停下来想的工程决策：
+
+1. **向量异常的两档处置**（③）：`vector_required=false`（代码默认）时向量挂了只记原因、BM25 继续服务——检索是「可用性优先」的组件；`vector_required=true` 才让向量故障升级为请求失败。这是「可选依赖语义一致降级」哲学在 RAG 内部的再现。
+2. **双 key 匹配**（⑥）：向量后端可插拔（Chroma / local-hash），两种后端返回的候选标识不同，所以两种映射都要建——改向量后端不改这段融合代码。
+3. **融合与重排的耦合边界**（⑦⑧）：`rerank_score` 只在 weighted 分支叠加，RRF 分支直接邻块扩展——对应 9.7.5 消融里「hybrid_rerank 与 rrf 是两条独立链路，不应假设同构」。
+4. **缓存读写点不对称**（②⑪）：读只走进程内 LRU，Redis 只写不读（预留跨进程能力）——多进程部署不要指望 Redis 命中（9.7.6 的边界声明）。
+
+顺手跑一次：同一查询在两种融合模式下的对比（接 `try_station8.py` 的 `store`，或按同法重建；改 settings 属性仅为演示，正式切换用 `KNOWLEDGE_FUSION_MODE` 环境变量）：
+
+```python
+q = "考试压力"
+print(store.search_knowledge(q, top_k=2)[0]["source"], store.search_knowledge(q, top_k=2)[0]["score"])
+# weighted+rerank(默认)的冠军块;score 是融合+四路词法信号加权后的分
+store.settings.knowledge_fusion_mode = "rrf"
+print(store.search_knowledge(q, top_k=2)[0]["source"], store.search_knowledge(q, top_k=2)[0]["score"])
+# RRF 模式:score 变成 [0,1] 的排名融合分(语义完全不同!),冠军块也可能不同——9.7.5 的消融差异就是这么产生的
+```
+
 #### 动手试一试：分词、打分与滚动摘要
 
 ```python
@@ -1877,12 +2062,12 @@ print(extract_user_facts("我最近晚上睡不着，考试压力很大"))
 
 ## 第 10 站 repository/store.py — 持久化仓储
 
-`DatabaseStore` 是所有表的读写总闸（约 1146 行，第十三轮新增 L4/L2 方法后更新，按区块组织）：
+`DatabaseStore` 是所有表的读写总闸（约 1173 行，第十三轮新增 L4/L2、第十八轮新增主题偏好方法后更新，按区块组织）：
 
 -   会话/消息  ：`ensure_session`（不存在则建，支持归属回填）、`list/get/delete/rename_session`、`append_message`（首条用户消息自动成为标题）、**`recent_messages`**（L4 滑动窗口，第十三轮新增，支持 `exclude_current` 排除当前消息）。
 -   认证  ：`ensure_default_users`（演示账号）、`authenticate_user`（验密 + 发会话令牌）、`get/revoke_auth_session`（过期即删）。
 -   记忆  ：`get_memory`（Redis 缓存 → SQLite）、`update_memory`（调 `rag/memory.build_memory_summary` 后双写）。Agent 私有记忆同理（`append/load_agent_private_memory`，Redis list 缓存最近 50 条）。**L2 用户事实（第十三轮新增）**：`upsert_user_fact`（只增不删 + 有效期截断 + 重复丢弃，SCD-2 模式）、`active_user_facts`（只读 `effective_until IS NULL` 的当前有效行）、`user_facts_history`（完整历史版本）。
--   知识库  ：`seed/rebuild_knowledge_dir`（目录全量重建）、`ingest_knowledge`（内容未变则跳过重嵌）、`search_knowledge`（第 9 站流水线）、`rebuild_vector_index`、`backup_knowledge_dir`。
+-   知识库  ：`seed/rebuild_knowledge_dir`（目录全量重建）、`ingest_knowledge`（内容未变则跳过重嵌）、`search_knowledge`（RAG 流水线在此总装——源码逐段走读见 9.8）、`rebuild_vector_index`、`backup_knowledge_dir`。
 -   报告/个案  ：自身只剩薄委托——`list_reports` 等一行转给 `ReportCaseService`（第 11 站），服务持有同一个 Session。
 -   工具任务  ：`create_tool_job`（先过契约校验，被拒也写审计！）、`run_pending_tool_jobs`、`retry_tool_job`、死信列表。
 -   模型档案/审计/追踪  ：`ensure/get/list_agent_model_profiles`、`add/list_audit_logs`（写前脱敏）、`add_trace/list_traces`。
@@ -1981,6 +2166,66 @@ def governed_payload(kind, payload, role, approved) -> dict:
 - `RateLimiter`：邮件每分钟限 N 封，超了不算失败，只延迟。
 - `ToolQueueWorker`：线程池 + 轮询的后台常驻进程，FastAPI lifespan 里启停；`run_once()` 供手动触发（加分布式锁防并发）。
 
+这些条目合起来是一个**状态机**，值得读 `run_job`（tool\_queue.py:69-115）的源码看清它：
+
+```python
+def run_job(self, db, row, email_limiter=None) -> None:
+    ready, wait_reason = self._dependency_ready(db, row)   # ① 依赖门:send_email 要等同 case 的
+    if not ready:                                          #    write_ledger/create_alert 先 SUCCESS
+        row.run_after = now_utc() + timedelta(seconds=retry_delay)  # 未就绪 → 延后重试,不算失败
+        governance.audit(row, "execute", "deferred", wait_reason, payload)
+        return
+    if kind == "send_email" and not email_limiter.allow(...):   # ② 邮件限流:超限只延迟
+        row.run_after = now_utc() + timedelta(seconds=retry_after)  #    (RateLimiter 不记失败)
+        governance.audit(row, "execute", "deferred", reason, payload)
+        return
+    row.status = RUNNING; row.attempts += 1                 # ③ 先置 RUNNING + attempts+1,再执行
+    try:
+        governance.require_allowed(row, payload)            # ④ 执行前再查一次授权(防越权)
+        result = self.executor.execute(row.kind, payload, row.attempts)  # 真实副作用
+        row.status = SUCCESS                                # ⑤ 成功:置 SUCCESS
+    except Exception as exc:
+        self._record_failure(db, row, payload, reason)      # ⑥ 失败:attempts 已在③+1
+        row.status = DEAD if row.attempts >= row.max_attempts else PENDING
+        if row.status == PENDING:                           #    未超限 → 回 PENDING + 退避
+            row.run_after = now_utc() + timedelta(seconds=retry_delay * max(1, row.attempts))
+        if row.status == DEAD:                              #    超限 → DEAD + 写死信
+            self._record_dead_letter(db, row, reason, payload)   # job_public_id 去重,重复执行不重复记
+        governance.audit(row, "execute", decision, reason, payload)  # ⑦ 失败也全量审计
+```
+
+三个「刻意为之」：**attempts 在进 try 之前就 +1**（进程中途崩溃也不丢这次尝试）；**退避随 attempts 线性放大**（`retry_delay * attempts`，第 1 次等 5s、第 2 次 10s…防止抖动任务打爆队列）；**死信按 `job_public_id` 去重**（同一条任务反复重试只留一条死信，见 `_record_dead_letter`）。worker 侧再注意两阶段领取（`_claim_pending_jobs` 先把一批 PENDING 原子置 RUNNING 再提交执行）与 `_recover_running_jobs`（进程重启把遗留 RUNNING 打回 PENDING）——「至少一次执行」语义靠这两段兜底。
+
+动手看一次完整状态机（接 `try_station8.py` 的 `store/settings`；把退避设 0 秒便于一次跑完，仅演示用）：
+
+```python
+from app.services.tool_queue import ToolQueueService
+
+store.settings.tool_queue_retry_delay_seconds = 0        # 退避立即到期,一轮内看完状态
+job = store.create_tool_job(
+    "send_email",
+    {"to": "guardian@example.com", "message": "测试", "always_fail": True},  # executor 必抛的钩子(11.4)
+    role="admin", approved=True,                          # 合法入队:admin + 已审批
+)
+job_id = job["id"]
+svc = ToolQueueService(store.settings)
+for i in range(1, 4):
+    store.run_pending_tool_jobs()                         # 领取并执行到期 PENDING(内部即 svc.run_pending)
+    head = next(j for j in store.run_pending_tool_jobs()["jobs"] if j["id"] == job_id)
+    print(f"第{i}轮", head["status"], "attempts =", head["attempts"])
+letters = store.list_dead_letters()
+print("死信条数:", len(letters), "| 原因:", letters[0]["dead_letter"]["reason"][:40])
+```
+
+预期输出（字段名以实际返回为准，形状固定）：
+
+```text
+第1轮 pending attempts = 1    ← attempts(1) < max_attempts(3):回 PENDING
+第2轮 pending attempts = 2
+第3轮 dead attempts = 3       ← attempts ≥ max_attempts:DEAD + 写死信
+死信条数: 1 | 原因: RuntimeError: send_email forced failure
+```
+
 ### 11.4 services/tool\_executor.py — 真实副作用
 
 `execute(kind, payload, attempts)` 分发到：`write_ledger`（openpyxl 追加 Excel 行）、`create_alert`（建 AlertRecord + 可选 webhook）、`send_email`（SMTP 真发或 log 模式）、`create_handoff_summary`（写 Markdown 文件）、`append_jsonl`（通用 JSONL 追加）。`always_fail` 载荷是故意留的测试钩子——harness 用它验证重试与死信路径。
@@ -1991,7 +2236,20 @@ def governed_payload(kind, payload, role, approved) -> dict:
 
 ### 11.6 tools/gateway.py + app/mcp/server.py + app/mcp/client.py — MCP 边界
 
-`ToolGateway` 协议两个实现：`InternalToolGateway`（直接 store.create\_tool\_job）与 `McpToolGateway`（通过 stdio 拉起 FastMCP server 子进程调用同一套受治理工具）。`build_tool_gateway` 按 `TOOL_BACKEND` 选择——换后端不改业务代码——。MCP server 的每个 `@mcp.tool` 内部走的仍是 DatabaseStore + 契约校验：协议变，治理不变。
+`ToolGateway` 协议两个实现：`InternalToolGateway`（直接 store.create\_tool\_job）与 `McpToolGateway`（通过 stdio 拉起 FastMCP server 子进程调用同一套受治理工具）。`build_tool_gateway` 按 `TOOL_BACKEND` 选择——换后端不改业务代码——。MCP server 的每个 `@mcp.tool` 内部走的仍是 DatabaseStore + 契约校验：协议变，治理不变。看一个真实工具（mcp/server.py）就明白"MCP 工具 = 把 store 的一次调用暴露成签名化函数"：
+
+```python
+@mcp.tool()
+def aegis_case_create(report_id: str) -> str:
+    """Create or return the active Aegis risk case for one psychological report."""
+    store = build_store()                          # MCP 跑在独立子进程:自建 store(读写总闸不变)
+    case = store.ensure_case_for_report(report_id)
+    if case is None:
+        return f"report {report_id} not found"
+    return f"success: caseId={case['id']}, reportId={case['report_id']}, status={case['status']}"
+```
+
+函数签名 + docstring 即工具契约，返回纯字符串（MCP 工具协议要求可 JSON 序列化）。本地查看全部 MCP 能力：`python -m app.mcp.server --list` 输出 `{server, mode, resources, tools}` 的 JSON——其中 `tools` 就是 `list_tool_contracts()` 与新增 case 工具清单的并集，管理端页面可直接消费同一份契约数据。
 
 
 
@@ -2068,10 +2326,94 @@ async def attach_request_context(request, call_next):
 
 请求方带头则沿用（链路串联），否则生成。配合落库的 Agent trace，一次请求从 HTTP 到 Agent 每一步都可追。
 
-### 12.4 其余路由模块
+### 12.3b api/errors.py — 全局异常处理（分层异常约定）
 
-- `schemas.py`：9 个请求模型集中定义。
-- `pages.py`（3 个 HTML）、`system.py`（health/readiness/agent-status/skills）。
+中间件管「进来的请求」，errors.py 管「出去的错误」。`register_exception_handlers(app)` 在 `create_app` 里注册五类全局异常处理器，路由从此不必逐个 try/except：
+
+```python
+@app.exception_handler(ToolGovernanceError)   # 治理拒绝 → 403(第 11 站契约抛出的异常在这里收口)
+async def handle_governance(request, exc):
+    return JSONResponse(status_code=403, content={"detail": str(exc)})
+
+@app.exception_handler(ValueError)             # 领域异常 → 400
+@app.exception_handler(RequestValidationError) # 参数校验 → 422(只回第一个错误字段,信息可读不泄内部)
+@app.exception_handler(StarletteHTTPException) # 路由显式抛的 HTTPException 原样透传(带 headers)
+@app.exception_handler(Exception)              # 兜底 → 500:完整堆栈写日志(带 request_id),响应只给通用提示
+```
+
+模块头注释写明了三层约定，值得记住（自建项目可直接复用）：
+
+1. 路由内**已知**业务错误继续显式抛 `HTTPException`（带准确状态码，如注册重名 409）；
+2. **领域异常**（`ValueError` / `ToolGovernanceError`）在此集中映射，路由无需逐个捕获；
+3. **兜底** `Exception` → 500：完整堆栈进日志（带 X-Request-ID，与 12.3 中间件串成一条线），响应只给「服务器内部错误，请稍后重试」——内部细节永不外泄。
+
+回连第 11 站：`governed_payload` 抛出的 `ToolGovernanceError` 正是靠这里变成 HTTP 403——治理在契约层拒绝，HTTP 层只负责把拒绝翻译成状态码，两层各司其职。这是「治理与业务正交」在错误路径上的最后一环。
+
+### 12.4 chat.py — 对话与会话路由（SSE 流式端点的实现）
+
+前两节是「骨架」，这里看学生端真正的入口。2.2 节时序图里画过的 `POST /api/chat/stream` 就在这里落地——这是全书唯一一段「后台线程 + 队列」的代码，也是理解 SSE 事件流的关键。
+
+`/api/chat`（阻塞版）只有五行核心：校验 → 限流 → 归属校验 → `agent_harness.run` → `asdict(response) | {"rate_limit_remaining": ...}`。真正值得读的是 `/api/chat/stream`：
+
+```python
+def sse_frame(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps({'event': event, **data}, ensure_ascii=False)}\n\n"
+
+def event_stream():
+    frames: queue.Queue = queue.Queue()
+
+    def emit(item: StreamEvent) -> None:
+        frames.put(sse_frame(item.event, item.data))
+
+    def run_pipeline() -> None:
+        try:
+            agent_harness.stream(message, owned_session_id, principal.user_id, emit=emit)
+        except Exception as exc:
+            fallback_response = orchestrator.handle(message, owned_session_id)
+            frames.put(sse_frame("error", {"event": "error", "message": str(exc)}))
+            frames.put(sse_frame("done", {"event": "done", "response": asdict(fallback_response)}))
+        finally:
+            frames.put(None)
+
+    threading.Thread(target=run_pipeline, daemon=True).start()
+    while True:
+        frame = frames.get()
+        if frame is None:
+            break
+        yield frame
+
+return StreamingResponse(event_stream(), media_type="text/event-stream")
+```
+
+三个设计要点：
+
+1. **生产-消费者解耦**：Agent 管线（8.1 的 `emit` 回调链）在**后台线程**跑，事件经 `queue.Queue` 实时交给生成器 `yield`——避免「等整个 run 跑完再一股脑倒出来」，这就是打字机效果的来源。
+2. **帧编码**：每帧是 `event: <语义名>\ndata: {json}\n\n`（空行分隔）；`StreamEvent.event` 是 1.2 节 `sse_event` 属性翻译好的语义名（`start`/`agent`/`skill`/`token`/`report`/`done`…），data 里同时带 `runtime_type`（原始枚举值）方便前端做细分。
+3. **流中异常兜底**：管线中途抛错（如模型超时）时转 `orchestrator.handle` 走阻塞路径拿一个兜底回复，再补发 `error` + `done` 两帧——前端不会白屏；但不会重试已发出的帧，这就是 Part 3「SSE 取舍」里说的「一旦开始接收 delta 就不再回退」。
+
+注意 `owned_session_id = store.ensure_session(...)` 在**开线程之前**就解析好了——SSE 的兜底回退路径也要用它，不能等到管线内才建（chat.py 注释原话）。
+
+与 8.1 衔接：低风险真流式时 `token` 事件来自 `finalize_plan` 的 `on_token` 回调（LLM 逐 token 产生）；mock 或中/高风险未直播时，编排器用 `_token_chunks` 把最终答案按 48 字切块模拟成 `token` 事件，保持打字机观感——判断依据是 `live_tokens["count"] == 0`（orchestrator.py）。
+
+### 12.5 其余路由模块
+
+- `schemas.py`：11 个请求模型集中定义（含第十八轮新增的 `ThemeRequest`；与第 1 站领域模型的分工：这里只装「HTTP 请求体」，验证与序列化归它管）。
+- `pages.py`（3 个 HTML）与 `system.py`（health/readiness/agent-status/skills）。pages.py 不是简单的静态文件直读：`_resolve_theme()` 会软解析当前用户主题（无会话/未登录/无偏好一律回退默认主题，不抛 401），再把 `data-theme` 内联脚本注入 `<head>` 最前——脚本先于 styles.css 解析执行，消除主题切换的首屏闪烁（完整链路见 12.5b）。
+- `auth_routes.py`：注册（教师凭邀请码，重名 409）/登录/登出/当前用户（`/api/auth/*`）——2.1 的 `verify_password` 在这里生效，成功即发会话令牌并种 Cookie（httponly + samesite=lax）。第十八轮起 `/api/auth/me` 随身份返回主题偏好，`PUT /api/auth/me/theme` 保存主题。
+- `admin.py`（约 315 行）：管理端薄路由——待审报告、个案、工具队列/死信、知识库、评测、审计等端点，绝大多数是「参数校验 → 调 store 或 ReportCaseService → 返回 JSON」；审批与派发任务的核心编排已在第 11 站拆到服务层（2.3 时序图），这里不重复业务。
+
+### 12.5b ROUND-18 主题持久化链路（表 → store → 端点 → 页面注入）
+
+一个横跨四层的小功能，正好检验你是否理解了「领域模型 / 存储 / 路由 / 页面」各层的分工：
+
+1. **表**：`UserPreference`（entities.py:255，第 20 张表）——`user_public_id` 唯一、一用户一行，`theme` 存当前主题键；
+2. **store**：`get_user_theme` / `set_user_theme`（store.py:314-335）——写入前用 `THEME_CHOICES = ("warm", "ocean", "forest", "playful")` 白名单校验，非法取值回退 `DEFAULT_THEME`（与治理层「白名单优先」同一思想）；存在则更新、不存在则插入；
+3. **端点**：`GET /api/auth/me` 随身份返回 theme、`PUT /api/auth/me/theme`（auth_routes.py:97）保存——前端切一次主题即写库，跨设备同步；
+4. **页面**：pages.py 渲染时把 `<script>document.documentElement.setAttribute("data-theme", "...")</script>` 注入 `<head>` 最前——脚本先于 CSS 解析，首屏即为目标主题、无闪烁。
+
+两个设计取舍：主题这类「用户界面偏好」不走 localStorage 而进数据库，是为了**跨设备同步**；`_resolve_theme` 故意**软解析**（任何一步失败都回退默认主题而不是 401），因为页面渲染不该因偏好读取失败而拒绝服务。取值过白名单则防止任意字符串被注入 HTML 属性。
+
+动手验证（接 12.5 的 TestClient，先登录）：`client.put("/api/auth/me/theme", json={"theme": "ocean"})` 返回 `{"theme": "ocean"}`；再 `client.get("/student")`，响应文本里应能找到 `data-theme","ocean"` 注入脚本。
 
 #### 动手试一试：用 TestClient 把 HTTP 层当积木玩
 
@@ -2090,18 +2432,45 @@ print(r.status_code)                          # 200,响应里种下会话 Cookie
 print(client.get("/api/auth/me").status_code) # 200 ← Cookie 自动携带,已登录
 ```
 
+扩展：抓一次 SSE 事件流（接上面的 `client`；默认 mock 下输出确定，若你的 `.env` 配了真模型建议先临时设 `AI_PROVIDER=mock` 跑通再放开）：
+
+```python
+def sse_events(text: str) -> list[str]:
+    """把 SSE 响应文本里所有 event: 行抽成语义事件名列表。"""
+    return [ln[7:].strip() for ln in text.splitlines() if ln.startswith("event: ")]
+
+# 低风险:mock 下先跑规则+模板,再以 token 事件模拟打字机切块,最终 done 收尾
+with client.stream("POST", "/api/chat/stream",
+                   json={"message": "我最近考试压力很大，晚上睡不着"}) as r:
+    text_low = "".join(r.iter_text())
+names_low = sse_events(text_low)
+print(names_low[0], "→", names_low[-1], "| token 条数:", names_low.count("token"))
+# start → done | token 条数: 7（随答案 48 字分块数浮动,恒 > 0）
+
+# 高风险:多出 report 事件,整条流仍以 done 收尾
+with client.stream("POST", "/api/chat/stream", json={"message": "我不想活了"}) as r:
+    text_high = "".join(r.iter_text())
+names_high = sse_events(text_high)
+print("有 report 事件?", "report" in names_high, "| 最后:", names_high[-1])
+# 有 report 事件? True | 最后: done
+```
+
+注：TestClient 要读逐帧内容必须用 `client.stream(...)` 上下文 + `iter_text()`；事件数量随版本浮动，断言只看形状（`start` 开头、`done` 收尾、是否含 `token`/`report`）。
+
 #### 常见易错点
 
 - **把业务判断写进路由**：路由只做「参数校验 + 鉴权 + 限流」；发现自己在路由里拼 Prompt 或查知识库，就说明该下沉到 Harness / 服务层了。
 - **混淆 health 与 readiness**：前者=进程活着，后者=数据库就绪；容器编排的存活探针与就绪探针各用各的，配反了会出现「活着但不该接流量」的窗口。
 - **在前端硬编码 Cookie 名**：`auth_session_cookie` 来自配置；改配置后硬编码的地方会悄悄失联。
 - **绕开 `app.state` 取依赖**：路由统一从 `request.app.state.xxx` 显式获取；从别处 import 全局单例会破坏「一个 app 实例一套依赖」的隔离，测试并行时互相污染。
+- **用 `client.post` 读 SSE 流**：流式端点要用 `client.stream(...)` + `iter_text()`/`iter_lines()` 才能拿全事件序列；事件数量随版本浮动，断言只看形状（12.4）。
 
 #### 练习
 
 1. 用 TestClient 复现 4.5 的「风险闭环」：学生发高危消息 → 管理员登录审批 → 查询工具任务状态全 success。
 2. 给 `attach_request_context` 中间件加一个 `X-Aegis-Version` 响应头，用 TestClient 断言其存在。
 3. 思考题：用 TestClient 的视角解释——为什么重构前「45 个路由闭包捕获变量」难以测试，而 `app.state` 注入可以？
+4. 给 `sse_frame` 之外再封装一个 `ping` 心跳帧（SSE 注释行 `: ping`），用 TestClient 断言它出现在流里——体会 SSE 帧就是纯字符串拼接（对照 12.4 帧编码）。
 
 ***
 
@@ -2118,6 +2487,7 @@ print(client.get("/api/auth/me").status_code) # 200 ← Cookie 自动携带,已�
 - `evaluation/report_html.py`：单文件 HTML 报告（内联 CSS），管理端一键可看。
 - `app/evaluation/rag.py`：RAG 专项（HitRate/Recall@4/Precision@4/MRR/NDCG@4，独立运行改用一次性 SQLite 评测库、不依赖 MySQL/pymysql），数据集在 `eval/fixtures/rag_queries.json`（77 条自然语言问句，基于当前 24 篇知识文档）。
 - `app/evaluation/harness/runner.py` + `factory.py`：工程级场景回放——8 套件（risk/routing/skills/rag/api/tool-queue/scaled/runtime-ab）验证端到端行为（如“审批后 5 个工具任务全部 success”“死信被正确创建”），失败退出码 1，可接 CI。`factory.py` 是重构产物：harness 与 `eval/run_eval.py` 共用一个装配工厂，消除两份漂移的样板。
+- `eval/run_eval.py`：综合评测 CLI（仅 22 行）——`build_harness_orchestrator(data_dir)` 用与 harness 同一个装配工厂造出 mock、隔离 SQLite 的编排器，再调 `run_evaluation(orchestrator, store, eval/fixtures, data/eval)`（`evaluation/runner.py` 的总入口，依次跑路由/风险/安全/技能/150 条双层基准/多轮一致性并汇总），最后打印 summary。与 harness 的分工：harness 断言「端到端行为对不对」（回归视角），run_eval 产出「能力指标好不好」（度量视角）——一个管回归、一个管度量，共用同一套装配，这就是 4.7 两条命令背后其实只有一个装配事实的原因。
 - `scripts/eval_risk_dual_path.py`（第十一轮历史实验）：风险 LLM 通道双路径评测——同 150 条语料分别跑 baseline（MockLLM + channel OFF）与 llm_stub（`MetaphorAwareStubClient` + channel ON），直调 `RiskGuardianAgent.assess()` 避免 response 生成/judge 等额外 LLM 调用；另有真实 GLM-4.7-flash 的 25 条扩展 best-effort probe。产出 `data/eval/risk_dual_path.json`。当前生产模型验收以 `D:\AegisTraining\reports\risk-qlora-eval-v9.json` 为准。
 - `scripts/probe_glm.py`（第十一轮新增）：GLM 端点探针——验证 endpoint/model/api_key 可用性，不打印 API key，退出码 0=可用。
 - `eval/fixtures/`：路由/风险/安全/多轮小型金标集 + `representative_corpus.json`（150 条）/ `rag_queries.json`（77 条）/ `multi_turn_corpus.json`（8 组）人工构造、人工标注的代表性数据集。
@@ -2336,6 +2706,71 @@ L1 管 Agent 协作内务；L2 管「用户现在是什么状态」（SCD-2 有�
 - [ ] HTTP 层纯净（鉴权/限流/路由），Agent 细节收口在 Harness（第 8、12 站）
 - [ ] 评测可重复：单测 + 端到端 harness + 三运行时 A/B + 风险 LLM 通道双路径验证（第 13 站）
 - [ ] 默认本地零依赖可跑，外部依赖（Redis/向量/SMTP/MCP）均可选且语义一致降级（第四部分）
+- [ ] 后台 worker 的失败语义（attempts+1 → run_after 退避 → 死信去重）能复述并复现（11.3）；全库 48 端点能对照附录 A 逐一冒烟，审批闭环后 5 个 ToolJob 全部 success（附录 A + 4.5）
+
+***
+
+<a id="appendix-a"></a>
+
+# 附录 A：后端 API 契约总表（48 端点 · 复现验收用）
+
+> 复现「功能一致」的后端时，对照本表逐端点冒烟。任何一端点行为不一致都说明对应站没复现对。
+> 自建核对：`python -c "from app.main import create_app; [print(sorted(r.methods), r.path) for r in create_app().routes if getattr(r, 'methods', None)]"` 可重新生成路由清单。
+> 鉴权列：**公开**＝无需登录；**登录**＝任意已登录用户（student/teacher/admin）；**属主**＝登录且会话归属当前用户（否则 403）；**员工**＝admin 或 teacher（`require_admin`，deps.py:33）；请求体列 = `schemas.py` 中对应模型（共 11 个）。
+
+## A.1 页面与系统
+
+| 方法与路径 | 鉴权 | 请求体 / 说明 |
+| --- | --- | --- |
+| GET / 、/student、/admin | 公开 | 返回静态 HTML；页面内注入登录用户主题（12.5b） |
+| GET /api/health | 公开 | 进程存活探针（`health`） |
+| GET /api/readiness | 公开 | 数据库就绪探针（与 health 语义不同，12.4 易错点） |
+| GET /api/agent/status | 登录 | 各 Agent 模型档案/状态（管理端 agent-status 页） |
+| GET /api/skills | 公开 | 技能注册表与策展 Skill 列表（只读） |
+
+## A.2 认证（/api/auth，auth_routes.py）
+
+| 方法与路径 | 鉴权 | 请求体 / 说明 |
+| --- | --- | --- |
+| POST /api/auth/register | 公开 | `RegisterRequest`；教师需邀请码，重名 409，注册即登录种 Cookie |
+| POST /api/auth/login | 公开 | `LoginRequest`；成功种 httponly + samesite=lax 会话 Cookie |
+| POST /api/auth/logout | 登录 | 注销会话并删 Cookie |
+| GET /api/auth/me | 登录 | 当前身份 + theme |
+| PUT /api/auth/me/theme | 登录 | `ThemeRequest`；保存主题偏好（白名单校验，12.5b） |
+
+## A.3 学生端对话与会话（chat.py）
+
+| 方法与路径 | 鉴权 | 请求体 / 说明 |
+| --- | --- | --- |
+| POST /api/chat | 登录 | `ChatRequest`；限流(429)→属主校验→Harness.run→ChatResponse |
+| POST /api/chat/stream | 登录 | `ChatRequest`；SSE 事件流（12.4） |
+| GET /api/sessions | 登录 | 当前用户会话列表 |
+| POST /api/sessions | 登录 | `SessionCreateRequest`；建会话（首条消息自动成标题，第 10 站） |
+| GET /api/sessions/{id} | 属主 | 会话详情（含消息） |
+| PATCH /api/sessions/{id} | 属主 | `SessionRenameRequest`；重命名 |
+| DELETE /api/sessions/{id} | 属主 | 删除会话 |
+
+## A.4 管理端（/api/admin，admin.py · 29 个端点，全部「员工」）
+
+| 方法/路径 | 请求体/说明 | 方法/路径 | 请求体/说明 |
+| --- | --- | --- | --- |
+| GET /api/admin/reports | 待审报告列表 | POST /api/admin/tool-jobs/run | 手动触发队列 |
+| PATCH /api/admin/reports/{id} | `ReportUpdate`；审批即派发 5 个 ToolJob（11.2） | GET /api/admin/tool-worker/status | worker 状态 |
+| GET /api/admin/traces | 对话回放 trace | POST /api/admin/tool-worker/run-once | 手动跑一轮 worker |
+| GET /api/admin/cases | 个案列表 | POST /api/admin/tool-jobs/{id}/retry | 重置任务为 PENDING 重试 |
+| POST /api/admin/cases/{id}/notes | `CaseNoteRequest` | GET /api/admin/dead-letters | 死信列表 |
+| PATCH /api/admin/cases/{id} | `CaseStatusUpdate` | GET /api/admin/knowledge/status | 知识库切块统计 |
+| GET /api/admin/tool-jobs | 工具任务列表 | GET /api/admin/knowledge/search | 检索知识（?q=…） |
+| GET /api/admin/tool-contracts | 契约清单（`list_tool_contracts`） | POST /api/admin/knowledge | `KnowledgeIngestRequest` |
+| GET /api/admin/tool-audits | 工具审计记录 | POST /api/admin/knowledge/rebuild | 全量重建知识块 |
+| GET /api/admin/excel-records | 台账记录 | POST /api/admin/knowledge/rebuild-vector | 重建向量索引 |
+| GET /api/admin/alert-records | 预警/邮件记录 | POST /api/admin/knowledge/backup | 备份知识目录 |
+| GET /api/admin/agent-models | Agent 模型档案 | POST /api/admin/knowledge/upload | `KnowledgeUploadRequest` + 文件 |
+| GET /api/admin/agent-memories | Agent 私有记忆 | POST /api/admin/knowledge/file | 上传 .md/.txt/.pdf（安全文件名校验） |
+| GET /api/admin/eval-results | 最近评测结果 | POST /api/admin/eval-results/run | 手动跑评测 |
+| GET /api/admin/audit-logs | 管理端审计日志 | | |
+
+> 备注：A.4 每个端点都是「参数校验 → 调 store/ReportCaseService → 返回 JSON」的薄壳（12.5）；审批后的业务编排全部在服务层，路由不含业务。
 
 ***
 
@@ -2344,6 +2779,11 @@ L1 管 Agent 协作内务；L2 管「用户现在是什么状态」（SCD-2 有�
 ***
 
 
-本指南对应 `main` 分支第十三轮之后的已提交状态（REFACTORING → OPTIMIZATION → AUTH-MYSQL → LANGGRAPH-DOCKER → DEEP-ENHANCEMENTS → LLM-RESPONSE-HUMANIZATION → MEMORY-ENHANCEMENT → CONFRONTATIONAL-DIALOGUE-TESTING → ROUND-9-CONSOLIDATION → CORPUS-LAYER-SPLIT → ROUND-11-RISK-LLM-DUAL-CHANNEL → ROUND-12-RAG-ENHANCEMENT-BENCHMARK → ROUND-13-MEMORY-SKILL-DISTILLATION → ROUND-15-FRONTEND-CALM-THEME → ROUND-16-ADMIN-TEACHER-GUIDE → ROUND-17-FRONTEND-OVERHAUL → ROUND-18-THEME-SWITCHER）。各轮详细变更见 [docs/records/](docs/records/) 系列文档；前端另有姊妹篇《[前端学习指南](docs/frontend-learning-guide.md)》。
+本指南对应 `main` 分支第十四轮（QLoRA 安全集成）之后的已提交状态（REFACTORING → OPTIMIZATION → AUTH-MYSQL → LANGGRAPH-DOCKER → DEEP-ENHANCEMENTS → LLM-RESPONSE-HUMANIZATION → MEMORY-ENHANCEMENT → CONFRONTATIONAL-DIALOGUE-TESTING → ROUND-9-CONSOLIDATION → CORPUS-LAYER-SPLIT → ROUND-11-RISK-LLM-DUAL-CHANNEL → ROUND-12-RAG-ENHANCEMENT-BENCHMARK → ROUND-13-MEMORY-SKILL-DISTILLATION → QLORA-SSE-PRODUCTION-IMPROVEMENTS → ROUND-15-FRONTEND-CALM-THEME → ROUND-16-ADMIN-TEACHER-GUIDE → ROUND-17-FRONTEND-OVERHAUL → ROUND-18-THEME-SWITCHER）。各轮详细变更见 [docs/records/](docs/records/) 系列文档与 [docs/QLORA-SSE-PRODUCTION-IMPROVEMENTS.md](docs/QLORA-SSE-PRODUCTION-IMPROVEMENTS.md)；前端另有姊妹篇《[前端学习指南](docs/frontend-learning-guide.md)》。
 
 本指南在此基础上做了面向学习的结构化扩充（保持原有章节与结论不变）：新增第零部分（预备知识与术语表）、开篇学习路径与全书目录、每站「动手试一试 / 常见易错点 / 练习」三件套与第六部分 FAQ；所有示例代码均在当前分支实测通过。若章节与代码行为不一致，以仓库源码为准并欢迎修订本指南。
+
+**2026-09-02 勘误与增补**（对照 main 分支源码逐项核对后的修订，详见《[Aegis学习指南审阅报告](Aegis学习指南审阅报告.md)》）：
+- 勘误：entities.py 表数 19→20（新增 `UserPreference`）；AgentEventType 全集补 `MESSAGE_SENT`；store.py 行数 1082→约 1173；admin.py 行数 248→约 315；auth_routes.py 职责补主题端点。
+- 增补：9.8「search_knowledge 总装走读」（store.py:803-905 逐段注释 + weighted/RRF 对比示例）；9.3/9.6 区分规则版与 LLM 版检索词改写；8.4 补 GraphState/条件边/SqliteSaver 源码锚点与三运行时对照点；12.3b「全局异常处理」（errors.py 分层异常约定）；12.5b「ROUND-18 主题持久化链路」；第 13 站补 `eval/run_eval.py` 装配走读；第 8 站练习 1 补三运行时 trace 预期形态。
+- 第二批次（同日，面向「学完能复现整个后端」的复现验收）：11.3 补 tool\_queue 失败状态机走读（run\_job 源码逐段注释 + always\_fail 死信示例）；第三部分补「自研 DB 任务队列 vs Celery/消息中间件」选型条目；11.6 补 `@mcp.tool` 骨架示例；新增附录 A「后端 API 契约总表」（48 端点 + 11 schema + 鉴权/请求体，含自建核对命令）；总结四补复现验收自检项；勘误 schemas「9 个请求模型」→ 11。

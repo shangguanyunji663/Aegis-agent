@@ -1,4 +1,4 @@
-﻿## 面向校园心理支持场景的多 Agent 风险识别与干预协作平台项目简介
+## 面向校园心理支持场景的多 Agent 风险识别与干预协作平台项目简介
 
 `Aegis Psych Agent` 是一个校园心理支持多 Agent 平台，围绕学生端倾诉、心理知识检索、风险识别、辅导员工作台和高风险工具执行闭环展开。项目不是简单的聊天机器人，而是把“学生侧即时支持”和“管理侧可审计干预”拆成两套独立信息架构，并通过后端 Agent Runtime Harness 统一处理意图路由、记忆注入、RAG 检索、风险报告、trace 落库和工具计划。
 
@@ -15,6 +15,7 @@
 | 模块 | 解决的问题 | 实现方式 |
 | --- | --- | --- |
 | 双端独立界面 | 学生倾诉体验和管理员处置流程关注点不同，混在一起会让产品边界混乱 | `/student` 提供学生对话与会话记忆，`/admin` 提供报告、个案、trace、知识库、工具队列和评测工作台 |
+| 四套疗愈主题可切换 | 心理支持场景需要按来访者状态切换视觉语气；单一主题难以覆盖低龄与深度倾诉 | CSS 变量四主题(`warm`/`ocean`/`forest`/`playful`) + `theme.js` 顶栏切换器 + `PUT /api/auth/me/theme` 按用户持久化 + `pages.py` 服务端首屏注入零闪烁(详见第十八轮) |
 | Agent Runtime Harness | Agent 调用、上下文注入、风险报告和工具计划分散在业务代码里会难以审计 | `AegisAgentHarness` 统一封装输入脱敏、运行时调用、trace 保存、消息持久化、报告生成和工具计划 |
 | 自治多 Agent 协作 | 单个 Lead Agent 串行分派容易变成“伪协作”，复杂场景缺少中间产物 | 默认 `autonomous` 运行时基于 append-only blackboard 实现任务发布、Agent claim、artifact 产出、风险 override 和最终验收；也可切换至 LangGraph 或 ordered 运行时 |
 | 分层 MemoryAgent | 心理支持需要连续性，单轮回复无法体现对用户状态变化的理解 | L1 Agent 私有记忆 + L2 跨会话结构化用户事实 + L3 会话滚动摘要 + L4 最近原话窗口；L2 以有效期截断处理状态冲突，并优先于可能过期的摘要注入 Prompt |
@@ -60,6 +61,7 @@ flowchart LR
 - 登录、退出、会话创建与新会话切换;会话重命名/删除目前仅提供 API 接口(`PATCH` / `DELETE /api/sessions/{id}`),界面暂无对应按钮。
 - 对话助手「小暖」:消息头像、入场动画与欢迎屏话题 chips;顶栏时段问候、服务状态圆点(60 秒自动刷新)。
 - 左栏实用卡片:「心情速选」2×2 图标卡一键填入表达、「需要立即帮助」卡(心理援助热线 12356 / 120)与「60 秒放松练习」。
+- 四套疗愈主题可切换:暖意疗愈(默认)/ 深海冥想 / 晨雾森林 / 童趣治愈贴贴,顶栏切换器即时换色并按用户持久化、跨设备同步;服务端首屏注入 `html[data-theme]`,无切换闪烁(详见 [第十八轮](docs/records/ROUND-18-THEME-SWITCHER.md))。
 - SSE 流式心理支持回复，兼容非流式 `/api/chat`。低风险对话在生成的同时逐字直播(真流式),中/高风险回复经安全复核通过后再输出。
 - 低风险陪伴、心理咨询建议、高风险安全回应三类回复路径。
 - L2/L3/L4 分层记忆：跨会话当前有效用户事实、会话滚动摘要与最近原话窗口共同注入回复；当前有效事实优先于可能过期的摘要，避免旧状态干扰当前回应。
@@ -101,7 +103,7 @@ flowchart LR
 | RAG | 多路召回（BM25 + 可选向量）+ 加权/RRF 融合 + 条件 rerank + 邻块扩展，Chroma/local 双后端，元数据过滤，进程内 LRU 精确查询缓存，四档消融评测 |
 | 工具协议 | FastMCP, governed ToolJob, background worker |
 | 存储 | SQLite local mode, MySQL（Compose）, optional PostgreSQL / Redis |
-| 前端 | 原生 HTML/CSS/JavaScript, student/admin 双端页面 |
+| 前端 | 原生 HTML/CSS/JavaScript, student/admin 双端页面, CSS 变量多主题切换(暖意疗愈/深海冥想/晨雾森林/童趣治愈贴贴), 服务端首屏注入零闪烁 |
 | 工程验证 | pytest, custom eval runner, RAG eval runner（双口径+消融）, harness runner, 本地性能 benchmark |
 | 部署 | Dockerfile, docker-compose |
 
@@ -342,7 +344,7 @@ python -m app.mcp.server --list
 ├── scripts/                      # 启动/联调/诊断脚本(start-local start-compose smoke_chat probe_glm migrate_sqlite_to_mysql eval_risk_dual_path run_benchmark analyze_layers)
 ├── docs/                         # 架构、安全、演示、教师手册与前端学习文档
 ├── Aegis项目逐文件学习指南.md      # 从零构建式逐模块学习指南
-├── docs/records/                 # 迭代记录（重构→提速→注册 MySQL→LangGraph→深度增强→回复真人化→记忆增强→对抗测试→文档整合→语料分层→风险双路径→RAG 增强→记忆分层与 Skill 自动蒸馏→前端整体改造:主题/页签化/全中文化/学习指南）
+├── docs/records/                 # 迭代记录（重构→提速→注册 MySQL→LangGraph→深度增强→回复真人化→记忆增强→对抗测试→文档整合→语料分层→风险双路径→RAG 增强→记忆分层与 Skill 自动蒸馏→前端整体改造:主题/页签化/全中文化/学习指南→多主题切换:四套疗愈主题/服务端注入零闪烁/跨设备持久化）
 ├── Dockerfile
 └── docker-compose.yml
 ```
@@ -352,7 +354,7 @@ python -m app.mcp.server --list
 | 类型 | 接口 |
 | --- | --- |
 | 系统状态 | `GET /api/health`, `GET /api/readiness`, `GET /api/agent/status`(需登录), `GET /api/skills` |
-| 认证 | `POST /api/auth/register`(注册), `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` |
+| 认证 | `POST /api/auth/register`(注册), `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`(含 `theme` 字段), `PUT /api/auth/me/theme`(切换并持久化主题偏好) |
 | 学生会话 | `GET /api/sessions`, `POST /api/sessions`, `GET /api/sessions/{id}`, `PATCH /api/sessions/{id}`, `DELETE /api/sessions/{id}` |
 | 聊天 | `POST /api/chat`, `POST /api/chat/stream` |
 | 管理端报告 | `GET /api/admin/reports`, `PATCH /api/admin/reports/{report_id}`, `GET /api/admin/traces`(对话回放) |
@@ -426,6 +428,7 @@ python -m app.mcp.server --list
 - [第十五轮前端疗愈主题升级(暖米白+鼠尾草绿/风险分级色条/无障碍)](docs/records/ROUND-15-FRONTEND-CALM-THEME.md)
 - [第十六轮咨询工作台教师使用手册(全板块按钮逐一覆盖)](docs/records/ROUND-16-ADMIN-TEACHER-GUIDE.md)
 - [第十七轮前端整体改造(后台页签化布局/固定一屏/全中文界面/前端学习指南)](docs/records/ROUND-17-FRONTEND-OVERHAUL.md)
+- [第十八轮前端多主题切换(四套疗愈主题/服务端注入零闪烁/跨设备持久化)](docs/records/ROUND-18-THEME-SWITCHER.md)
 
 ## 待改进与优化(Roadmap)
 

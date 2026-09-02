@@ -4,7 +4,7 @@
 > （第十四轮 QLoRA 风险模型的记录位于外部 `AegisTraining` 训练仓库，见 README「评测结果」节）
 > 性质:**三端统一视觉主题重构 + 风险分级色条 + 无障碍修复 + 死代码清理（纯前端轮次,不触碰任何 Python 行为）**
 
----
+***
 
 ## 1. 背景与动机
 
@@ -38,24 +38,33 @@ Aegis 是校园心理支持平台,但前端视觉仍是「工程演示」语气:
   (气泡/发送键渐变)、`--info(-soft)`(管理端次色)、风险三组 `--risk-*`/`--risk-*-soft`、
   `--ring` 焦点环、双层 `--shadow-sm/md`;`html[data-theme="dark"]` 变量同步更新
   (该主题当前无开关,保持变量流可用以便未来启用)。
+
 - **背景层**:`.portal-page`(居中暖光 + 两个呼吸圆 `::before/::after`)、
   `.student-page`(左上绿意 + 右下暖橙)、`.admin-page`(右上雾蓝 + 左下绿意)——
   替换旧的 32px 条纹网格;`background-attachment: fixed`。
+
 - **组件层**:
+
   - 输入:`input/textarea/select` 统一暖白底、聚焦时 `--calm` 边框 + `--ring`
     (select 首次纳入样式);`::placeholder` 柔化。
+
   - 气泡:`.message-bubble` 加大内边距、行高 1.7、不对称圆角
     (assistant `18 18 18 6` / user `18 18 6 18`);user 气泡改 `--calm-grad` 深绿渐变 +
-    白字(对比 ~4.6:1,旧浅绿底白字仅 ~2.9:1)。
+    白字(对比 \~4.6:1,旧浅绿底白字仅 \~2.9:1)。
+
   - Composer:`.split-composer` 变为圆角托盘(surface-2 底),发送键改胶囊形 +
     hover 上浮;`.signal-btn` 卡片化(hover 绿底);`.history-item(.active)` 绿染高亮。
+
   - 管理端:`.admin-metrics` 从 `repeat(5, …)` 改 `repeat(auto-fit, minmax(150px,1fr))`
     ——修复 6 张指标卡挤成 5+1 的换行怪相;`.report-row` 统一 4px 左色条
     (默认 `--border-strong`,tone 覆写);`.admin-logo` 等硬编码色收编为变量/渐变。
+
   - 登录页:登录卡 22px 圆角 + `--shadow-md`;`.entry-card` 顶部 4px 分色条
     (学生绿 / 管理蓝);`#toggle-auth` 首次获得可见样式(鼠尾草色 + 虚线下划线)。
+
 - **动效层**:`@keyframes breathe`;`.typing-dots` 改鼠尾草色;全局
   `@media (prefers-reduced-motion: reduce)` 关闭动画/过渡。
+
 - **死代码清理**:删除经全仓 grep 确认无引用的旧版三栏布局 CSS
   (`app-shell/sidebar/workspace/topbar/tabbar/auth-screen/auth-card/bubble-user/
   response/flow/avatar/chip/badge/trace-row/knowledge-result/hero-card/scroll-area` 等
@@ -99,27 +108,34 @@ function row(title, subtitle, data, actions = "", tone = "") {
 ## 4. 验证记录
 
 - **浏览器实测(1440×900,本机 uvicorn + 当前 .env 配置)**:
+
   - 登录页:暖光背景、入口卡分色条、呼吸圆光晕正常渲染;
+
   - 学生端:真实登录 → 发送「我最近有点睡不好,想找人聊聊」→ 观察流式全过程
     (THINKING/streaming 状态胶囊、打字点、user 深绿渐变气泡、assistant 白卡回复、
     DONE 收态、历史列表 active 高亮)全部正常;
+
   - 管理端:6 张指标卡单行排齐;高风险报告行陶红色条 + 标题着色、trace 行 low 风险
     鼠尾草色条、行 hover 反馈、两行截断均正常。
+
 - `node --check static/login.js static/student.js static/admin.js` → 通过。
+
 - `python -m pytest tests -q` → **76 passed, 1 failed**
   (`tests/test_langgraph_checkpoint.py::test_checkpoint_persists_across_instances`,
   LangGraph SqliteSaver 跨实例 `get_state` 返回 None)。**该失败与本轮无关**:
-  本轮仅改动 `static/` 下文件与文档,未触碰任何 Python 代码;测试使用独立 tmp_path
+  本轮仅改动 `static/` 下文件与文档,未触碰任何 Python 代码;测试使用独立 tmp\_path
   检查点库,与运行中的预览服务亦无交互。属既有后端问题,留待后续轮次处理。
+
 - 缓存指纹已升级,回滚方式:还原三个 HTML 的 `?v=` 即可强制客户端取回旧样式。
 
 ## 5. 本轮文件清单
 
-| 文件 | 改动 |
-| --- | --- |
-| `static/styles.css` | 主题重写(972 → 约 650 行):token/背景/组件/动效/无障碍/死代码 |
-| `static/admin.js` | `riskTone()` 辅助 + `row()` tone 参数 + 三处调用点 |
-| `static/index.html` `static/student.html` `static/admin.html` | 缓存指纹 `?v=0.3.0` → `?v=0.4.0` |
-| `README.md` | 文档清单追加本篇;records 演进链追加「前端疗愈主题」 |
-| `Aegis项目逐文件学习指南.md` | 文末轮次链追加 ROUND-15 |
-| `docs/records/ROUND-15-FRONTEND-CALM-THEME.md` | 本篇 |
+| 文件                                                            | 改动                                         |
+| ------------------------------------------------------------- | ------------------------------------------ |
+| `static/styles.css`                                           | 主题重写(972 → 约 650 行):token/背景/组件/动效/无障碍/死代码 |
+| `static/admin.js`                                             | `riskTone()` 辅助 + `row()` tone 参数 + 三处调用点  |
+| `static/index.html` `static/student.html` `static/admin.html` | 缓存指纹 `?v=0.3.0` → `?v=0.4.0`               |
+| `README.md`                                                   | 文档清单追加本篇;records 演进链追加「前端疗愈主题」             |
+| `Aegis项目逐文件学习指南.md`                                           | 文末轮次链追加 ROUND-15                           |
+| `docs/records/ROUND-15-FRONTEND-CALM-THEME.md`                | 本篇                                         |
+

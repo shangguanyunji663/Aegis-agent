@@ -6,7 +6,7 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from app.api.deps import current_principal
-from app.api.schemas import LoginRequest, RegisterRequest
+from app.api.schemas import LoginRequest, RegisterRequest, ThemeRequest
 from app.core.auth import AuthPrincipal
 from app.models import UserRole
 
@@ -88,5 +88,18 @@ def logout(
 
 
 @router.get("/me")
-def me(principal: AuthPrincipal = Depends(current_principal)) -> dict:
-    return {"user": {"id": principal.user_id, "username": principal.username, "role": principal.role}}
+def me(http_request: Request, principal: AuthPrincipal = Depends(current_principal)) -> dict:
+    store = http_request.app.state.store
+    theme = store.get_user_theme(principal.user_id)
+    return {"user": {"id": principal.user_id, "username": principal.username, "role": principal.role}, "theme": theme}
+
+
+@router.put("/me/theme")
+def update_theme(
+    request: ThemeRequest,
+    http_request: Request,
+    principal: AuthPrincipal = Depends(current_principal),
+) -> dict:
+    """保存当前用户的界面主题偏好(按用户持久化,跨设备同步)。"""
+    store = http_request.app.state.store
+    return store.set_user_theme(principal.user_id, request.theme)

@@ -31,6 +31,7 @@ from app.entities import (
     SessionMemory,
     ToolAuditRecord,
     UserMemoryFact,
+    UserPreference,
     ToolJob,
 )
 from app.models import AgentTrace, CaseStatus, PendingReport, ReportStatus, SkillResult, ToolJobStatus, UserRole
@@ -51,6 +52,10 @@ from app.services.report_case import ReportCaseService
 from app.services.tool_queue import ToolQueueService
 from app.services.tool_records import ToolRecordService
 from app.tools.contracts import governed_payload, normalize_tool_kind
+
+# 主题切换:可选主题键与默认主题。新增主题需同步 styles.css 的 html[data-theme="..."] 块。
+THEME_CHOICES: tuple[str, ...] = ("warm", "ocean", "forest", "playful")
+DEFAULT_THEME: str = "warm"
 
 
 class DatabaseStore:
@@ -305,6 +310,29 @@ class DatabaseStore:
             db.delete(session)
             db.commit()
             return True
+
+    def get_user_theme(self, user_public_id: str) -> str:
+        """读取用户主题偏好;无记录或用户不存在时回退 DEFAULT_THEME。"""
+        with self.db_factory() as db:
+            row = db.query(UserPreference).filter(UserPreference.user_public_id == user_public_id).first()
+            return row.theme if row and row.theme in THEME_CHOICES else DEFAULT_THEME
+
+    def set_user_theme(self, user_public_id: str, theme: str) -> dict:
+        """写入用户主题偏好;非法取值回退默认主题。一用户一行,存在则更新。"""
+        normalized = theme.strip().lower() if theme else DEFAULT_THEME
+        if normalized not in THEME_CHOICES:
+            normalized = DEFAULT_THEME
+        with self.db_factory() as db:
+            row = db.query(UserPreference).filter(UserPreference.user_public_id == user_public_id).first()
+            if row is None:
+                row = UserPreference(user_public_id=user_public_id, theme=normalized)
+                db.add(row)
+            else:
+                row.theme = normalized
+                row.updated_at = now_utc_naive()
+                db.add(row)
+            db.commit()
+            return {"theme": row.theme}
 
     def add_audit_log(
         self,

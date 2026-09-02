@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>心屿 · 学生端</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="/static/styles.css?v=0.13.0" />
+    <link rel="stylesheet" href="/static/styles.css?v=0.14.1" />
   </head>
   <body class="student-page">
     <header class="role-topbar">
@@ -21,6 +21,7 @@
         <span id="health" class="status-pill">检测中</span>
         <span id="model-state" class="status-pill secondary">模型状态</span>
         <div class="user-summary compact"><strong id="active-account">学生</strong><span>学生端</span></div>
+        <div id="theme-switcher" class="theme-switcher"></div>
         <button id="logout-btn" class="ghost-btn" type="button">退出</button>
       </div>
     </header>
@@ -108,5 +109,6 @@
     </main>
 
     <script src="/static/student.js?v=0.13.0"></script>
+    <script src="/static/theme.js?v=0.14.0"></script>
   </body>
 </html>

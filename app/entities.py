@@ -252,6 +252,24 @@ class AuthSession(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=now)
 
 
+class UserPreference(Base):
+    """用户界面偏好:当前仅存主题选择(theme),按用户持久化。
+
+    设计要点:
+    - 一用户一行(user_public_id 唯一),无偏好记录时回退默认主题;
+    - theme 取值受 THEME_CHOICES 约束(见 app.repository.store),写入前校验;
+    - 跨设备同步:前端切换即写库,下次任一页面渲染时由 pages 路由服务端注入。
+    """
+
+    __tablename__ = "user_preferences"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_public_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    theme: Mapped[str] = mapped_column(String(32), default="warm")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+
+
 class UserMemoryFact(Base):
     """L2 用户结构化记忆事实:跨会话、可精确查询、带有效期(状态冲突规则载体)。
 

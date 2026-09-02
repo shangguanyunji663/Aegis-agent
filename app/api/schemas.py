@@ -51,3 +51,9 @@ class RegisterRequest(BaseModel):
     password: str
     role: str = "student"
     invite_code: str = ""
+
+
+class ThemeRequest(BaseModel):
+    """前端主题切换请求体:theme 取值见 store.THEME_CHOICES。"""
+
+    theme: str

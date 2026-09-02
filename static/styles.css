@@ -1,6 +1,9 @@
 /* ============================================================
-   Aegis 静态前端主题 —— 「暖意疗愈」(第十五轮, v0.4.0)
-   暖米白底 + 鼠尾草绿主色 + 陶土橙点缀;零构建,系统字体。
+   Aegis 静态前端主题 —— 多主题切换(v0.14.0)
+   默认「暖意疗愈」(:root):暖米白底 + 鼠尾草绿主色 + 陶土橙点缀。
+   可选主题(html[data-theme]):ocean 深海冥想 / forest 晨雾森林 /
+   playful 童趣治愈贴贴。主题键与 store.THEME_CHOICES 对应,
+   由 pages 路由服务端注入或 theme.js 切换。零构建,系统字体。
    约束:.status-pill / .stack(.empty) / .report-row / .split-message /
    .message-bubble / .history-item 等类名被 JS 整体覆写,不可改名。
    ============================================================ */
@@ -70,6 +73,95 @@ html[data-theme="dark"] {
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, .3);
   --shadow-md: 0 2px 6px rgba(0, 0, 0, .32), 0 14px 34px rgba(0, 0, 0, .35);
 }
+
+/* ============================================================
+   主题切换:暖意疗愈沿用 :root(默认);以下为可选主题。
+   html[data-theme="..."] 由 pages 路由服务端注入或 theme.js 切换。
+   风险分级色(--risk-*)在所有主题下共享 :root 取值,保证语义一致、可读。
+   ============================================================ */
+
+/* 深海冥想:雾蓝底 + 深海青主色 + 海泡沫绿点缀,深邃安宁。 */
+html[data-theme="ocean"] {
+  --bg: #e8f1f4;
+  --surface: #f4f9fb;
+  --surface-2: #dbeaf0;
+  --text: #1a3a4a;
+  --muted: #5a7382;
+  --border: #cfe0e8;
+  --border-strong: #b3ccd8;
+  --accent: #5fb3a1;
+  --accent-hover: #4ea390;
+  --accent-soft: #d8efe9;
+  --calm: #2a7a8f;
+  --calm-strong: #1f5e70;
+  --calm-soft: #d6e9ee;
+  --calm-grad: linear-gradient(135deg, #2a7a8f, #1f5e70);
+  --info: #4a7a9a;
+  --info-soft: #e1ebf2;
+  --err: #c96f52;
+  --shadow-sm: 0 1px 2px rgba(20, 60, 80, .06), 0 2px 10px rgba(20, 60, 80, .05);
+  --shadow-md: 0 2px 6px rgba(20, 60, 80, .07), 0 14px 34px rgba(20, 60, 80, .10);
+  --ring: 0 0 0 3px color-mix(in srgb, var(--calm) 30%, transparent);
+}
+
+/* 晨雾森林:微绿雾白底 + 森林绿主色 + 晨光金点缀,清新通透。 */
+html[data-theme="forest"] {
+  --bg: #eef3ef;
+  --surface: #f8fbf9;
+  --surface-2: #e2ece5;
+  --text: #2d3a32;
+  --muted: #5c6b5f;
+  --border: #d4e0d7;
+  --border-strong: #b8c9bd;
+  --accent: #c9a96e;
+  --accent-hover: #b8975a;
+  --accent-soft: #f1e8d6;
+  --calm: #4a7c59;
+  --calm-strong: #355c42;
+  --calm-soft: #dceadf;
+  --calm-grad: linear-gradient(135deg, #4a7c59, #355c42);
+  --info: #5c7197;
+  --info-soft: #e6ecf0;
+  --err: #c96f52;
+  --shadow-sm: 0 1px 2px rgba(45, 70, 55, .05), 0 2px 10px rgba(45, 70, 55, .05);
+  --shadow-md: 0 2px 6px rgba(45, 70, 55, .06), 0 14px 34px rgba(45, 70, 55, .10);
+  --ring: 0 0 0 3px color-mix(in srgb, var(--calm) 30%, transparent);
+}
+
+/* 童趣治愈贴贴:薰衣草雾底 + 长春花紫主色 + 蜜桃点缀,童趣温暖。 */
+html[data-theme="playful"] {
+  --bg: #ede8f5;
+  --surface: #f7f4fc;
+  --surface-2: #e3dcf0;
+  --text: #3d3550;
+  --muted: #6b6480;
+  --border: #d8d0e8;
+  --border-strong: #c2b8d8;
+  --accent: #f4a79b;
+  --accent-hover: #ec8f80;
+  --accent-soft: #fbe5df;
+  --calm: #8b7ab8;
+  --calm-strong: #6f5fa0;
+  --calm-soft: #e3dcef;
+  --calm-grad: linear-gradient(135deg, #8b7ab8, #6f5fa0);
+  --info: #7fa1c4;
+  --info-soft: #e3eaf2;
+  --err: #c96f52;
+  --shadow-sm: 0 1px 2px rgba(80, 60, 110, .06), 0 2px 10px rgba(80, 60, 110, .05);
+  --shadow-md: 0 2px 6px rgba(80, 60, 110, .07), 0 14px 34px rgba(80, 60, 110, .12);
+  --ring: 0 0 0 3px color-mix(in srgb, var(--calm) 30%, transparent);
+}
+
+/* 童趣主题点缀:贴纸撕边阴影 + 更圆润的气泡,降低低龄来访者门槛。 */
+html[data-theme="playful"] .panel-card {
+  border-radius: 24px;
+  box-shadow: var(--shadow-sm), 3px 4px 0 var(--surface-2);
+}
+html[data-theme="playful"] .quick-card,
+html[data-theme="playful"] .entry-card { border-radius: 20px; }
+html[data-theme="playful"] .role-logo { border-radius: 18px; transform: rotate(-4deg); }
+html[data-theme="playful"] .intro-avatar { border-radius: 16px; }
+html[data-theme="playful"] .status-pill { font-weight: 800; }
 
 /* ---------- 基础 ---------- */
 
@@ -458,7 +550,9 @@ body.admin-page {
 
 .role-topbar {
   position: relative;
-  z-index: 1;
+  /* z-index 高于 .student-layout / .admin-layout(均为 1),使顶栏内的主题切换菜单
+     下拉时能盖住下方对话/工作台区域,不被 overflow:auto 的内容区遮挡。 */
+  z-index: 20;
   margin: 16px;
   padding: 18px 22px;
   border: 1px solid var(--border);
@@ -1266,4 +1360,93 @@ body.admin-page {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* ---------- 主题切换器 ---------- */
+
+.theme-switcher { position: relative; }
+
+.theme-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color .18s ease, background-color .18s ease, transform .18s ease;
+}
+
+.theme-btn:hover {
+  border-color: var(--calm);
+  background: var(--calm-soft);
+}
+
+.theme-btn:focus-visible {
+  outline: 2px solid var(--calm);
+  outline-offset: 2px;
+}
+
+.theme-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12);
+  flex: none;
+}
+
+.theme-btn .theme-label { font-size: 13px; font-weight: 600; }
+.theme-btn .chev { font-size: 10px; color: var(--muted); }
+
+.theme-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  min-width: 188px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+  display: none;
+}
+
+.theme-menu.open { display: block; }
+
+.theme-opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color .15s ease;
+}
+
+.theme-opt:hover { background: var(--surface-2); }
+
+.theme-opt .dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12);
+  flex: none;
+}
+
+.theme-opt .name { flex: 1; font-size: 13px; }
+.theme-opt .desc { display: block; font-size: 11px; color: var(--muted); }
+.theme-opt.active { background: var(--calm-soft); color: var(--calm-strong); font-weight: 700; }
+.theme-opt.active .desc { color: color-mix(in srgb, var(--calm-strong) 80%, transparent); }
+
+@media (max-width: 760px) {
+  .theme-menu { right: auto; left: 0; }
 }

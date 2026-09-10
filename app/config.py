@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     embedding_provider: str = "openai"  # openai(兼容API) | local(chromadb 本地嵌入,零外部依赖)
     embedding_timeout_seconds: float = 30.0
     ollama_base_url: str = "http://127.0.0.1:11434"
-    ollama_model: str = "qwen2.5:7b"
+    ollama_model: str = "qwen3:4b"
     llm_timeout_seconds: float = 15.0
     llm_thinking_enabled: bool = False
     llm_support_temperature: float = 0.6  # 支持性回复采样温度(偏高更像真人);风险/改写/评审仍固定 0.0

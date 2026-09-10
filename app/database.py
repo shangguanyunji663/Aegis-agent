@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
@@ -10,8 +12,8 @@ class Base(DeclarativeBase):
     pass
 
 
-def _engine_kwargs(database_url: str) -> dict:
-    kwargs = {"pool_pre_ping": True}
+def _engine_kwargs(database_url: str) -> dict[str, Any]:
+    kwargs: dict[str, Any] = {"pool_pre_ping": True}
     if database_url.startswith("sqlite"):
         kwargs["connect_args"] = {"check_same_thread": False}
     if database_url.startswith("mysql"):

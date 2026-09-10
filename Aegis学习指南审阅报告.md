@@ -175,3 +175,51 @@
 ## 修订状态（2026-09-02 23:30）
 
 上表 P1 + P2×2 + P3 已全部落地到指南（2641→2788 行）：11.3 补 `run_job` 失败状态机走读与 always\_fail 死信示例；Part 3 补「自研 DB 队列 vs Celery/RQ」条目；11.6 补 `@mcp.tool` 骨架示例；新增附录 A（48 端点契约总表，锚点 appendix-a，已入总目录）；总结四补复现验收自检项；另勘误 schemas「9 个请求模型」→ 11。附录内容逐一核对 admin.py/system.py/chat.py/auth_routes.py 源码（含 knowledge/search 的 q/top_k/topic 参数、upload 的安全文件名校验、eval-results/run 调 run_evaluation）。**复现目标现可判定：达标（功能级）**——仍需人工验证的只剩读者自建后跑一遍附录 A 冒烟。
+
+***
+
+# 第三轮复审记录（2026-09-03，面向「复现整个后端」的源码级全量比对）
+
+> 复审基线：修订后指南（2788 行 → 修订中）+ `main` 分支当前源码。
+> 复审方法：四个并行核查代理分别对「数据层与配置」「HTTP 层与附录 A」「领域逻辑（评估/技能/提示词/单轮 Agent）」「RAG/工具治理/自治协作」做逐文件逐声明比对，关键结论（第三人称输出、governed_payload 空等级放行、静态挂载、自伤覆写等）由主会话当场实测/读源码复核。
+
+## 复审结论（先行）
+
+第二轮判定「复现目标达标（功能级）」**偏乐观**：以「照文档重写出行为一致的后端」为硬标准，仍存在系统性缺口——**数据形状层（entities 172 列、config 90 字段、models 4 枚举）几乎未文档化**，另有一批会把错误固化进复现代码的事实错误。本轮全部修复。
+
+## 本轮发现并已修复的问题清单
+
+### A. 阻断复现（已补齐）
+
+1. **entities.py 20 张表中 19 张零字段信息**（172 个 mapped_column、67 索引、18 唯一约束全缺）→ 新增 **附录 B**：20 表逐列字段总表（脚本从源码机械生成）；1.3 加指针与级联关系说明；`AgentRunTrace` 补入代表表清单。
+2. **config.py 90 个 Settings 字段只展示 6 个** → 新增 **附录 C**：90 项字段/类型/默认值/环境变量总表；1.1 与 4.3 加指针；4.3 补 `.env.example` 缺约 24 个变量的差异提示。
+3. **models.py 覆盖不足** → 1.2 补 `ReportStatus/CaseStatus/ToolJobStatus/UserRole` 四枚举、`RuntimeEventType` 13 值全集与 13→8 的 SSE 映射、`ResponsePlan`（11 字段）、`ChatResponse`/`StreamEvent` 字段、`PendingReport` 默认值。
+4. **技能白名单 3 个技能名全文档 0 次出现**（`referral_resource_guidance`/`anxiety_grounding_support`/`academic_stress_planning`）→ 4.x 补完整规则白名单表（含 COMPANION+LOW 早退、三组触发关键词、auto 追加）；SKILL.md 数量 7→14（7 人工 + 7 auto）。
+5. **LeadAgent 自伤覆写分支未记载**（「伤害自己/自残」命中即 RISK，即使规则只判 MEDIUM——安全路径分歧）+ 16/34 词路由词表 → 第 6 站补完整判定顺序与词表。
+6. **12.1 装配清单漏 `/static` 挂载**（API 冒烟全过但前端 CSS/JS 全 404 的隐形坑，自建核对命令因 Mount 无 methods 而无法发现）→ 12.1 补挂载 + `app.state` 11 键清单 + 显式警告。
+7. **11 个 schema 无字段级信息** → 12.5 补字段级清单表（含枚举合法值、默认值、必填项）。
+
+### B. 事实错误（照旧文会写出错误实现，已勘误）
+
+1. 第 3 站预期输出第 3 行错误——实测为 `low | companion_support | ['轻生']`（旧文把 rationale 文本当成了 matched_indicators，stance 也写错）。
+2. `governed_payload` 空 `risk_level` 是**跳过校验放行**（源码 `if risk_level and ...`），旧伪代码写成无条件校验——语义相反。
+3. 11.3 演示脚本每轮调两次 `run_pending_tool_jobs()`，实际输出会是 `2/3/3` 而非文档的 `1/2/3`——改为每轮一次（保留预期输出）并加警示。
+4. 「分布式锁」→ 实为进程内 `threading.Lock`（`dispatch_lock`）。
+5. 9.8 走读缺两处融合守卫（RRF 双榜皆空 `continue`、weighted 双零 `continue`）与空集早退——照抄会以 0 分块充数；补齐并把行号 803-905 修为 803-913。
+6. 双 key 匹配的"理由"错误（两后端标识实为防御性冗余，非"标识不同"）。
+7. 5.2 引用的系统提示词是**第六轮改版前的旧文案**——替换为当前 12 句版本并重述结构。
+8. `LLMClient` Protocol 画进了 `assess_risk/chat_with_tools/judge_reply`——实际 Protocol 仅 4 方法 2 属性。
+9. 「全部无状态类（除 Counselor）」→ 实为三个 Agent 持依赖；`finalize_plan` 伪代码补 `on_token` 流式分支；`_fallback_answer` 三档→四档。
+10. `ToolContract` 补 `public_name`/`description` 两字段。
+11. 黑板 `tasks` 是 dict 非 list；`AgentArtifact` 补第一个字段 `id`；`AgentProfile` 补 `model_profile`。
+12. 协调器主循环补 ROUND_STARTED、执行后二次派生+验收、每 Agent 每轮单认领去重、`_try_accept_final` 的 `responseArtifactId` 校验。
+13. 8.1 `_run()` 分流片段补 langgraph 档；8.4 补无条件 `builder.compile()`；GraphState 补 `memory_used`。
+14. 9.5 记忆分层表列名勘误：`owner_user_id`→`user_public_id`、`session_id`→`session_public_id`（entities.py 无前 者）。
+15. SSE 语义名枚举补 `route` 与 `error`（全集 8 个）；附录 A 三处勘误（upload 非multipart、agent-memories 必填 query 参数、register 返回 201）+ deps.py 行号 33→36 + knowledge/search 参数 + chat 空消息 400。
+16. 其余小项：第三人称词表 6 词→26 词全集、评估六分支常量表（emotion/emotion_score/confidence/stance/escalation 全量）、`migrate_legacy_schema` 仅 SQLite 生效 + 6 表清单、`resolve_database_url` 落点解释、`_engine_kwargs` 补 mysql 分支、`expand_best_hit(ranked, chunks)` 签名、k=60 措辞（平滑常数而非防零）、重试机制（2 次退避 2s/4s + 流式部分返回）、`_parse_risk_json` 细节、judge 15s 超时帽、`JUDGE_SYSTEM_PROMPT`/`SKILL_SELECTION_SYSTEM_PROMPT` 要点、`build_rewrite_messages`、FC 成功路径也 `record_skill_usage`（漏了它自动蒸馏永不触发）、依赖门完整条件（risk_level=="high" + report/case id）、RateLimiter 仅 worker 路径注入、`create_alert` 副作用归属（JSONL+webhook；AlertRecord 由队列成功路径写）、ExcelRecord 仅 success 态去重、`OPENAI_BASE_URL` 默认值补 `/v1`、`fail_until_attempt` 钩子、skills.py 公开成员（schemas/standard_skill_status/PendingReportId）。
+
+## 修订后状态
+
+- 指南现含**附录 A（48 端点契约）+ 附录 B（20 表 172 列）+ 附录 C（90 配置项）**三张复现总表；第 1–12 站的关键数据形状、词表、分支常量、状态机均达"照文重写"粒度。
+- 复现验收路径不变：按 14 站重写 → `python -m app.init_db` + 4.5 三步 → `pytest tests -q` → harness 全套件 → 对照附录 A 逐端点冒烟（前后端一体时必须验证 `/static` 资源 200）。
+- 未覆盖且**有意不覆盖**：tests/ 逐文件走读（复现者应自写测试而非照抄）、`scripts/` 工具脚本（一次性迁移用途）、前端三文件（有独立姊妹篇）。`eval/run_eval.py` 与 harness 装配已在第 13 站覆盖。

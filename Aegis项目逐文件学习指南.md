@@ -53,6 +53,8 @@
 | [第六部分](#faq) | 常见问题解答（FAQ） | 「卡住了 / 想不通，看哪里？」 |
 | [第七部分](#part-7) | 总结与自检清单 | 「怎么确认自己学会了？」 |
 | [附录 A](#appendix-a) | 后端 API 契约总表（48 端点） | 「复现后端时怎么逐端点验收？」 |
+| [附录 B](#appendix-b) | 数据模型字段总表（20 张表 172 列） | 「建表时每张表有哪些列？」 |
+| [附录 C](#appendix-c) | Settings 全量字段表（90 项） | 「每个配置项的默认值与环境变量名？」 |
 
 快速跳转：[第〇章 学习路线总览](#station-0) · [第 1 站](#station-1) · [第 2 站](#station-2) · [第 3 站](#station-3) · [第 4 站](#station-4) · [第 5 站](#station-5) · [第 6 站](#station-6) · [第 7 站](#station-7) · [第 8 站](#station-8) · [第 9 站](#station-9) · [第 10 站](#station-10) · [第 11 站](#station-11) · [第 12 站](#station-12) · [第 13 站](#station-13) · [第 14 站](#station-14) · [术语表](#glossary) · [FAQ](#faq)
 
@@ -598,12 +600,12 @@ RISK_QLORA_TIMEOUT_SECONDS=8
 
 ## 4.3 配置 `.env`：最小可运行 vs 进阶
 
-`.env.example` 是推荐配置清单；但要区分三类值：**`Settings` 代码默认**、**示例文件建议值**和**部署时由 `.env`/系统环境变量覆盖的值**。例如 `embedding_provider` 的代码默认是 `openai`，`.env.example` 则推荐 `local` 以便无外部密钥演示；本地开发者自己的 `.env` 不属于仓库默认。最小可运行可直接使用代码默认（`AI_PROVIDER=mock`、SQLite、`VECTOR_ENABLED=false`、Redis 空）。按组理解关键变量：
+`.env.example` 是推荐配置清单；但要区分三类值：**`Settings` 代码默认**、**示例文件建议值**和**部署时由 `.env`/系统环境变量覆盖的值**。例如 `embedding_provider` 的代码默认是 `openai`，`.env.example` 则推荐 `local` 以便无外部密钥演示；本地开发者自己的 `.env` 不属于仓库默认。另注意 `.env.example` 并未覆盖全部 90 个 Settings 字段——SMTP 全组、告警目的地（`ALERT_EMAIL_*`）、`LANGGRAPH_CHECKPOINT_PATH`、`TOOL_OUTPUT_DIR`、`EXCEL_PATH`、`RAG_EVAL_*` 等约 24 项只存在于代码默认（见附录 C）；需要这些功能时以附录 C 的变量名为准。最小可运行可直接使用代码默认（`AI_PROVIDER=mock`、SQLite、`VECTOR_ENABLED=false`、Redis 空）。按组理解关键变量：
 
 | 分组  | 变量                                                           | 作用                                 | 默认                               |
 | --- | ------------------------------------------------------------ | ---------------------------------- | -------------------------------- |
 | 模型  | `AI_PROVIDER`                                                | `mock`/`openai`/`ollama`           | `mock`                           |
-| 模型  | `OPENAI_API_KEY`/`OPENAI_BASE_URL`/`OPENAI_MODEL`            | OpenAI 兼容端点                        | 空 / api.openai.com / gpt-4o-mini |
+| 模型  | `OPENAI_API_KEY`/`OPENAI_BASE_URL`/`OPENAI_MODEL`            | OpenAI 兼容端点                        | 空 / `https://api.openai.com/v1` / gpt-4o-mini |
 | 模型  | `OLLAMA_BASE_URL`/`OLLAMA_MODEL`                             | 本地 Ollama                          | 127.0.0.1:11434 / qwen2.5:7b     |
 | 模型  | `LLM_THINKING_ENABLED`                                       | 深度思考（接 GLM 建议关）                    | `false`                          |
 | 模型  | `LLM_SUPPORT_TEMPERATURE`                                    | 支持性回复采样温度（偏高更真人）                   | `0.6`                            |
@@ -760,6 +762,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 ```
 
+> 全文共 **90 个** Settings 字段（RAG 阈值、向量库、SMTP 告警、工具队列、技能蒸馏……），上面是节选。完整字段/类型/默认值/环境变量名对照表见 **[附录 C](#appendix-c)**；4.3 只解释常用项。
+
 - `BaseSettings` 来自 `pydantic-settings`：环境变量和 `.env` 文件自动映射到字段（`AI_PROVIDER=xxx` → `ai_provider`），大小写不敏感。
 - 每个字段都有安全默认值——你不写任何 .env，系统也能本地跑。
 - `project_root` 属性 + `resolve_path()` 把「相对路径配置」统一解析到项目根，兼容从任意工作目录启动：
@@ -790,7 +794,21 @@ class Intent(str, Enum):        # 意图:companion 陪伴 / counseling 咨询 / 
 
 class RiskLevel(str, Enum):     # 风险三级分流,整个系统的"红绿灯"
     LOW = "low"; MEDIUM = "medium"; HIGH = "high"
+
+class ReportStatus(str, Enum):  # 报告生命周期:pending 待审批 / approved 已批准 / dismissed 已驳回
+    PENDING = "pending"; APPROVED = "approved"; DISMISSED = "dismissed"
+
+class CaseStatus(str, Enum):    # 个案状态:open 处理中 / acknowledged 已确认
+    OPEN = "open"; ACKNOWLEDGED = "acknowledged"
+
+class ToolJobStatus(str, Enum): # 工具任务状态机:PENDING→RUNNING→SUCCESS;失败回 PENDING 重试,超限→DEAD(死信)
+    PENDING = "pending"; RUNNING = "running"; SUCCESS = "success"; DEAD = "dead"
+
+class UserRole(str, Enum):      # 角色:admin 管理员 / teacher 教师(后两者可进管理端) / student 学生
+    ADMIN = "admin"; TEACHER = "teacher"; STUDENT = "student"
 ```
+
+再加一个 13 值的事件枚举 `RuntimeEventType`（`run_started`/`route_decided`/`risk_assessed`/`knowledge_retrieved`/`agent_started`/`tool_requested`/`tool_completed`/`memory_updated`/`token_emitted`/`report_created`/`skills_selected`/`run_completed`/`run_failed`）。注意枚举值是 snake_case 内部名，与 SSE 前端事件名是两套词汇——翻译发生在 `RuntimeEvent.sse_event`（13 → 8：`route_decided→"route"`、`risk_assessed`/`knowledge_retrieved`/`agent_started`/`memory_updated→"agent"`、`tool_requested`/`tool_completed`/`skills_selected→"skill"`、`run_failed→"error"`，其余同名），详见 12.4。
 
 继承 `str, Enum` 是个小技巧：`RiskLevel.HIGH == "high"` 直接成立，和 JSON/数据库里的字符串无缝互转。
 
@@ -798,6 +816,9 @@ class RiskLevel(str, Enum):     # 风险三级分流,整个系统的"红绿灯"
 
 - `SkillResult` — 一次技能调用的结果（`name/output/side_effect`），`side_effect=True` 表示产生了外部副作用（如建报告）。
 - `AgentTrace(agent, action, detail)` — 一条执行痕迹，三个字符串，最终拼成管理端可读的时间线。
+- `ResponsePlan` — 各 Agent 跑完后交给 Counselor 收尾的「回复计划」载体（11 个字段）：`mode`/`response_agent`/`intent`/`risk_level` 加记忆与上下文载荷——`memory_brief`（L3 摘要）、`knowledge_snippets`、`grounding_steps`、`skill_context`、`prompt_messages`、`recent_messages`（L4 近期原文窗口）、`user_facts`（L2 有效事实）。第 6/8 站的流水线产物就是它。
+- `ChatResponse`（11 字段：`session_id/message_id/intent/risk_level/answer/skills/trace/pending_report/memory_summary/memory_used/response_plan`）— 一次对话的最终产物；`StreamEvent(event, data, runtime_type)` + `from_runtime()` — SSE 事件的信封，data 里除业务字段外总带一个 `runtime_type` 内部事件名。
+- `PendingReport` 自身字段带默认值（`intent=Intent.RISK`、`emotion="high_risk"`、`emotion_score=4.0`、`confidence=0.95`）——建报告按最坏假设取默认。
 
 ```python
 @classmethod
@@ -808,8 +829,7 @@ def from_dict(cls, data: dict[str, Any]) -> "PendingReport":
                status=ReportStatus(data["status"]), ...)
 ```
 
-- `RuntimeEvent` + `sse_event` 属性 — 把内部事件类型映射为 SSE 前端事件名（`RUN_COMPLETED → "done"`），流式输出的协议适配就在这一个小字典里。
-- `ChatResponse` — 一次对话的最终产物；`StreamEvent` — SSE 事件的信封。
+- `RuntimeEvent` + `sse_event` 属性 — 把内部事件类型映射为 SSE 前端事件名（13 → 8，见上），流式输出的协议适配就在这一个小字典里。
 
 
 
@@ -819,7 +839,9 @@ def from_dict(cls, data: dict[str, Any]) -> "PendingReport":
 
 SQLAlchemy 2.0 声明式实体，和 `models.py` 的关系是：models 是「怎么说」，entities 是「怎么存」。
 
-代表表：`ChatSession`（会话，含 `owner_user_public_id` 归属）、`ChatMessage`、`SessionMemory`（滚动记忆摘要）、`AuthUser`/`AuthSession`（口令与令牌）、`PsychologicalReport`（风险报告）、`RiskCase`+`CaseNote`（个案）、`KnowledgeChunk`（知识切块）、`ToolJob`/`ToolAuditRecord`/`DeadLetterRecord`（工具任务/审计/死信）、`ExcelRecord`/`AlertRecord`（副作用记录）、`AgentPrivateMemory`（Agent 私有记忆）、`AgentModelProfile`（每 Agent 模型档案）、`UserMemoryFact`（L2 用户事实，SCD-2 有效期版本，见 9.5）、`UserPreference`（界面主题偏好，一用户一行，第十八轮新增，见 12.5b）、`AdminAuditLog`（管理端审计）。
+代表表：`ChatSession`（会话，含 `owner_user_public_id` 归属）、`ChatMessage`、`SessionMemory`（滚动记忆摘要）、`AuthUser`/`AuthSession`（口令与令牌）、`PsychologicalReport`（风险报告）、`AgentRunTrace`（每次 Agent 运行的落库痕迹：intent/risk/agent_steps_json/skill_calls_json/answer）、`RiskCase`+`CaseNote`（个案）、`KnowledgeChunk`（知识切块）、`ToolJob`/`ToolAuditRecord`/`DeadLetterRecord`（工具任务/审计/死信）、`ExcelRecord`/`AlertRecord`（副作用记录）、`AgentPrivateMemory`（Agent 私有记忆，按 `agent_name + session_public_id` 隔离）、`AgentModelProfile`（每 Agent 模型档案）、`UserMemoryFact`（L2 用户事实，SCD-2 有效期版本，见 9.5）、`UserPreference`（界面主题偏好，一用户一行，第十八轮新增，见 12.5b）、`AdminAuditLog`（管理端审计）。
+
+> 20 张表的**逐列字段级总表**（列名/类型/索引/唯一约束/默认值，共 172 列）见 **[附录 B](#appendix-b)**——复现建表时照它逐列写即可。唯一一处 ORM 级联：`ChatSession.messages ↔ ChatMessage.session` 带 `cascade="all, delete-orphan"`，删会话会级联删消息。
 
 注意两个细节：
 
@@ -835,6 +857,9 @@ def _engine_kwargs(database_url: str) -> dict:
     kwargs = {"pool_pre_ping": True}          # 取连接前先 ping,自动剔除断连
     if database_url.startswith("sqlite"):
         kwargs["connect_args"] = {"check_same_thread": False}  # 允许后台线程共用
+    if database_url.startswith("mysql"):
+        # MySQL 闲置 wait_timeout(默认 8h)后会断连,定期回收避免 "server has gone away"
+        kwargs["pool_recycle"] = 3600
     return kwargs
 
 def build_session_factory(runtime_settings=None):
@@ -842,8 +867,9 @@ def build_session_factory(runtime_settings=None):
 ```
 
 -   工厂而非模块级单例  ：测试要用独立的 tmp 数据库，每个调用方自建 engine。
+- `resolve_database_url()`：把相对的 `sqlite:///...` 路径解析到**项目根**（并自动创建父目录）——这就是为什么无论从哪个目录启动，库总落在 `data/aegis.sqlite`。
 - `create_schema()` 里 `from app import entities` 是惰性导入——先注册全部 ORM 实体到 `Base.metadata`，再 `create_all`。
-- `migrate_legacy_schema()`：对旧库手写 `ALTER TABLE`/`CREATE TABLE` 补列补表，保证升级不丢数据。它与 entities.py 是两份 schema 真相，是已知的遗留债（见 REFACTORING.md 第 10 节）。
+- `migrate_legacy_schema()`：对旧库手写 `ALTER TABLE`/`CREATE TABLE` 补列补表，保证升级不丢数据。**仅 SQLite 生效**（函数开头 `if bind_engine.dialect.name != "sqlite": return`，MySQL 建库即新 schema 无需迁移）。清单：`chat_sessions` 补 `owner_user_public_id`、`knowledge_chunks` 补 `embedding_json`/`metadata_json`、`tool_jobs` 补 `run_after`，另新建 6 张表（agent_private_memories/agent_model_profiles/tool_audit_records/dead_letter_records/excel_records/alert_records）。它与 entities.py 是两份 schema 真相，是已知的遗留债（见 REFACTORING.md 第 10 节）。
 - `readiness_check()` 只做 `SELECT 1`，是 `/api/readiness` 的依据——和 `/api/health`（进程活着）区分。
 
 
@@ -1029,7 +1055,12 @@ HIGH_TERMS = ["自杀", "轻生", "不想活", "结束生命", "suicide", "kill 
               "一了百了", "离开这个世界", "结束这一切", "结束自己的生命",
               "活下去的理由", "活下去的力气", "不再醒来", "永远睡过去",
               "活着多余", "解脱", "死了算了", "做傻事"]   # 后 12 个为隐喻式表达
-THIRD_PERSON_MARKERS = ["新闻", "电影", "朋友", "论文", "听说", "别人", ...]  # 语境保护,防误升级
+THIRD_PERSON_MARKERS = [          # 语境保护,防误升级(全集 26 词)
+    "新闻", "电影", "同学", "朋友", "论文", "志愿者", "别人", "有人",
+    "讲座", "书", "电视剧", "报道", "听说", "看到", "网上", "网络",
+    "电视", "班里", "班上", "新闻里", "社交媒体", "帖", "文章", "课",
+    "小说", "新闻中",
+]
 MEDIUM_TERMS = ["伤害自己", "自残", "崩溃", "撑不住", "绝望", "panic", "hopeless"]
 DEPRESSED_TERMS = ["抑郁", "低落", "难过", "无助", "depress"]
 ANXIETY_TERMS = ["焦虑", "压力", "考试", "睡不着", "失眠", "panic", "anxious"]
@@ -1037,15 +1068,18 @@ ANXIETY_TERMS = ["焦虑", "压力", "考试", "睡不着", "失眠", "panic", "
 
 词表按「显式高危 → 隐喻式高危」两层设计：后 12 个词用于弥补对「一了百了」「解脱」等隐喻式自杀意念的漏判；`THIRD_PERSON_MARKERS` 则在命中高危词后检查语境——「新闻里有人轻生」「写自杀预防论文」这类提及**他人/虚构情境**的表达不升级为自身风险（规则引擎没有指代消解能力，用保守启发式先降误报，自身语境的隐喻表达交给 LLM 通道补召回）。
 
-`assess_message(text) -> AssessmentResult` 是纯函数：先匹配 HIGH（命中即 `risk_level=HIGH, confidence=0.95, report_eligible=True, escalation_policy="create_pending_report_and_require_admin_review"`），再 MEDIUM，再按抑郁/焦虑词给出 LOW，最后兜底「普通陪伴」。
+`assess_message(text) -> AssessmentResult` 是纯函数：先匹配 HIGH（命中即高危分支），再 MEDIUM，再按抑郁/焦虑词给出 LOW，最后兜底「普通陪伴」。六个分支的判定常量如下（复现时照抄即可，全部是 `assessment.py` 的字面值）：
 
-返回的 `AssessmentResult` 不只是等级，还带处置策略（`recommended_stance`/`escalation_policy`）：
+| 分支 | 触发条件 | emotion | emotion_score | confidence | recommended_stance | escalation_policy | report_eligible |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| HIGH | 命中 HIGH_TERMS 且无第三人称标记 | `high_risk` | 4.0 | 0.95 | `immediate_safety` | `create_pending_report_and_require_admin_review` | True |
+| HIGH→降级 | 命中 HIGH_TERMS 但命中任一 THIRD_PERSON_MARKERS | `normal` | 0.0 | 0.7 | `companion_support` | `no_report` | False（rationale 只取首个高危词、截 1 条） |
+| MEDIUM | 命中 MEDIUM_TERMS（emotion 按是否命中 DEPRESSED_TERMS 取 `depressed`/`anxiety`） | 二选一 | 3.1 | 0.78 | `stabilize_and_refer` | `offer_grounding_and_referral_guidance` | False |
+| LOW·抑郁 | 只命中 DEPRESSED_TERMS | `depressed` | 2.4 | 0.72 | `supportive_exploration` | `monitor_for_escalation` | False |
+| LOW·焦虑 | 只命中 ANXIETY_TERMS | `anxiety` | 2.0 | 0.72 | `supportive_planning` | `no_report` | False |
+| 兜底 | 什么都没命中 | `normal` | 0.0 | 0.66 | `companion_support` | `no_report` | False |
 
-- HIGH → `immediate_safety`：本地安全模板回复 + 建待审报告。
-- MEDIUM → `stabilize_and_refer`：稳定练习 + 转介指引。
-- LOW → 倾听陪伴。
-
-`as_skill_output()` 把结果转成扁平 dict，供技能层透传。
+`summary` 是计算属性：`"；".join(rationale)`。`as_skill_output()` 把结果转成扁平 dict（含 `emotion`/`emotion_score`），供技能层透传。
 
 
 
@@ -1074,10 +1108,10 @@ for text in ["我最近睡不着，压力好大",
 ```text
 low | supportive_planning | ['压力', '睡不着']
 high | immediate_safety | ['活着多余']
-low | supportive_planning | ['高危词（轻生）出现在提及他人/虚构情境的语境，判定为非自身风险，不升级']
+low | companion_support | ['轻生']
 ```
 
-第三行就是第三人称保护的现场：词命中了，但语境不是自身，不升级；「活着多余」这类隐喻表达则被新增的隐喻词表抓到。两者的分工（规则兜显式、LLM 通道补隐喻、第三人称防误报）正是双通道设计的动机。
+第三行就是第三人称保护的现场：高危词「轻生」命中了，但语境是他人/新闻，不升级——注意 `matched_indicators` 里**仍是被命中的高危词本身**（降级逻辑体现在 `escalation_policy="no_report"` 和 `report_eligible=False` 上，rationale 才是那句解释文字）；「活着多余」这类隐喻表达则被新增的隐喻词表抓到。两者的分工（规则兜显式、LLM 通道补隐喻、第三人称防误报）正是双通道设计的动机。
 
 #### 常见易错点
 
@@ -1131,7 +1165,24 @@ SkillRegistry(knowledge_dir, store.add_report, store.search_knowledge, settings=
 
 技能层不 import 仓储，而是接收函数——测试时可以塞假函数，这就是它可单测的原因。
 
-另一条线是**人工策展 Skill**：当前仓库有 7 个 `skills/*/SKILL.md` 文档，带 frontmatter。`response_skill_names(intent, risk, text)` 先按规则给出白名单（高风险 → 安全计划 + 交接摘要；命中「失眠」→ 睡眠支持……），`standard_context(names)` 再拼成提示词注入。这是「用文档约束模型输出结构」的轻量做法。
+另有几个公开成员复现时会用到：`schemas()` 返回每个注册技能的 `openai_schema()` 并按名合并策展 SKILL.md 的正文提示词（`prompt_context`）；`standard_skill_status()` 输出策展技能的 name/description/path/status/origin 清单（`/api/skills` 的数据源）；报告 ID 由 `PendingReportId.next()` 生成，格式 `risk-` + uuid 前 8 位；`create_pending_report(text, session_id, risk_level, rationale, intent="risk", emotion="high_risk", emotion_score=4.0, confidence=0.95, summary="")` ——`emotion`/`emotion_score`/`confidence` 都带最坏假设默认值（1.2 节）。
+
+另一条线是**人工策展 Skill**：当前仓库 `skills/` 下共 **14 个** `SKILL.md`（7 个人工策展 + `skills/auto/` 下 7 个已生成的 auto 技能，加载时 `rglob` 一起收）。人工 7 个是：`supportive_response_baseline`（恒注入的基础基线）、`high_risk_safety_plan`、`counselor_handoff_summary`、`referral_resource_guidance`、`anxiety_grounding_support`、`sleep_routine_support`、`academic_stress_planning`。
+
+`response_skill_names(intent, risk, text)` 的规则白名单完整逻辑（`skills.py`，顺序执行后去重）：
+
+| 条件 | 注入技能 |
+| --- | --- |
+| `COMPANION + LOW` | 直接返回 `[]`（陪聊不注入任何策展技能） |
+| 所有其余组合（恒有） | `supportive_response_baseline` |
+| `risk == HIGH` | 追加 `high_risk_safety_plan`、`counselor_handoff_summary` |
+| `risk == MEDIUM` | 追加 `referral_resource_guidance` |
+| 文本含「焦虑/panic/惊恐/紧张/心慌」 | 追加 `anxiety_grounding_support` |
+| 文本含「睡不着/失眠/睡眠/熬夜」 | 追加 `sleep_routine_support` |
+| 文本含「考试/绩点/论文/作业/学习」 | 追加 `academic_stress_planning` |
+| 末尾 | 追加命中的 auto 技能并去重（不参与二次蒸馏观察） |
+
+`standard_context(names)` 再把选中技能的 SKILL.md 正文拼成提示词注入。这是「用文档约束模型输出结构」的轻量做法。
 
 ### 4.1 Skill 自动蒸馏闭环（第十三轮）
 
@@ -1167,18 +1218,32 @@ _distill_skill() 写入 skills/auto/<slug>/SKILL.md
 def select_response_skills(llm_client, registry, intent, risk_level, message,
                            enabled: bool = True) -> tuple[list[str], str]:
     whitelist = registry.response_skill_names(intent, risk_level, message)   # ① 规则白名单
+    if not whitelist:
+        return [], "rules"                                                   # ⓪ 白名单本来就空(陪伴+低危)
     if not _supports_function_calling(llm_client, enabled):                  # ② 能力探测
         registry.record_skill_usage(intent, risk_level, whitelist)
         return whitelist, "rules"                                            #    不可用 → 整单兜底
-    tools = [func_call 工具描述 for name in whitelist]                       # ③ 把白名单描述给模型
-    chosen = llm_client.chat_with_tools(SKILL_SELECTION_SYSTEM_PROMPT, message, tools)
+    tools = [{"type": "function", "function": {                              # ③ OpenAI FC 定制 schema,
+        "name": name,                                                        #    不是 SkillSpec.openai_schema()
+        "description": registry.standard_skill_description(name),
+        "parameters": {"type": "object",
+                       "properties": {"reason": {"type": "string"}},
+                       "required": ["reason"]}}}                              #    模型必须给出选用理由
+             for name in whitelist]
+    try:
+        chosen = llm_client.chat_with_tools(SKILL_SELECTION_SYSTEM_PROMPT, message, tools)
+    except Exception:
+        chosen = None                                                        # 异常与 None 同罪
     if chosen is None:
+        registry.record_skill_usage(intent, risk_level, whitelist)
         return whitelist, "rules"                                            # None=失败/mock → 兜底
     if not chosen:
         return [], "fc"                                                      # 空列表≠失败:模型判断都不需要
     allowed = [name for name in chosen if name in whitelist]
     if not allowed:
+        registry.record_skill_usage(intent, risk_level, whitelist)
         return whitelist, "rules"                                            # ④ 幻觉守卫:全不在白名单 → 兜底
+    registry.record_skill_usage(intent, risk_level, allowed)                 # ⑤ FC 成功路径也记使用!
     return allowed, "fc"
 ```
 
@@ -1186,8 +1251,8 @@ def select_response_skills(llm_client, registry, intent, risk_level, message,
 
 1. **能力探测不看 provider 字符串**：`_supports_function_calling` 只判「开关打开且客户端存在」；客户端是否真支持 FC 由 `chat_with_tools` 的**返回值**决定（mock 返回 `None` → 走 rules）。任何覆写了该方法返回结果的真实客户端/stub 都会自然放行，不与实现细节耦合。
 2. **返回二元组 `(技能列表, "fc"|"rules")`**：下游 trace 里能一眼看出这轮是模型选的（`fc`）还是规则兜底的（`rules`）——8.1 的 `skill_mode` trace 记的就是它。
-3. **空列表 ≠ 失败**：`chat_with_tools` 返回 `[]` 表示模型明确判断「这条消息不需要任何技能」，与「失败（`None`）」是两种语义，只有后者才回退整张白名单。
-4. **幻觉守卫**：模型挑出的技能逐个核对白名单，**全部**不在白名单才回退整单（部分在则只留合法的）——模型永远没有把白名单外的技能塞进提示词的机会。
+3. **空列表 ≠ 失败**：`chat_with_tools` 返回 `[]` 表示模型明确判断「这条消息不需要任何技能」，与「失败（`None`/异常）」是两种语义，只有后者才回退整张白名单。
+4. **幻觉守卫 + 使用记录全覆盖**：模型挑出的技能逐个核对白名单，**全部**不在白名单才回退整单（部分在则只留合法的）。注意 `record_skill_usage` 在**三条路径**都被调用（rules 兜底、幻觉兜底、FC 成功）——漏掉 FC 成功路径，4.1 的自动蒸馏闭环就永远不会被模型选择触发。
 
 **学习要点**：FC 不是给模型更大权力，而是给规则白名单加一个「排序与裁剪」的后端——安全边界仍然由 `response_skill_names` 那一层负责，`side_effect` 标记让「哪些技能会改变世界」一眼可见，后续审计/评测都依赖它。
 
@@ -1275,12 +1340,13 @@ class LLMClient(Protocol):
     def generate_support_reply(self, context: LLMContext) -> str | None: ...
     def stream_support_reply(self, context, on_token) -> str | None: ...      # 真流式直播
     def rewrite_knowledge_query(self, message: str, memory_summary: str = "") -> str | None: ...
-    def assess_risk(self, text: str) -> dict | None: ...                      # 风险双通道
-    def chat_with_tools(self, system, user, tools) -> list[str] | None: ...   # Function Calling
-    def judge_reply(self, message, reply) -> dict | None: ...                 # LLM-as-Judge
 ```
 
+注意 Protocol 只声明上面 **4 方法 + 2 属性**；`assess_risk`（风险双通道）、`chat_with_tools`（Function Calling）、`judge_reply`（LLM-as-Judge）三个多通道方法**只存在于各实现类**、不写入 Protocol——调用方（RiskGuardian/skill_selection/评测）按需显式调用并在不可用时降级。想加新通道时先想清楚它是否需要进入「每个实现都必须有」的契约面。
+
 `LLMContext` 是喂给模型的结构化上下文包：用户消息、意图、风险等级、**L2 当前有效用户事实、L3 会话摘要、L4 最近原话窗口**、知识片段、稳定练习、技能约束——回复生成所需的一切都显式传入，模型不自己「想」。
+
+多通道客户端的另一条横切机制是**重试**（`client.py`）：`_MAX_RETRIES=2`，退避 2s/4s，仅对超时与 429/500/502/503/504 重试；流式则是「收到第一个 delta 后不再重试，直接返回已累积的部分回复」——宁可短，不可断。
 
 协议从最初的「一问一答」长成了多通道客户端：回复生成（阻塞）、回复直播（流式）、查询改写（RAG）、风险复核（双通道）、技能选择（FC）、质量评审（Judge）。新增通道全部遵守同一条铁律：失败/超时/mock 返回 None，调用方优雅降级——这正是全系统「LLM 永远不是安全关键路径」的落点。
 
@@ -1293,24 +1359,31 @@ class LLMClient(Protocol):
 
 `build_llm_client(settings)` 负责通用客户端装配；RiskGuardian 的 QLoRA 替换由编排器配置开关控制。
 
-**风险 judge prompt**（`RISK_ASSESS_SYSTEM_PROMPT`，`app/llm/client.py`；训练侧同源 `data_contract.py`）：LLM 通道的核心提示词，判定 high/medium/low 三档。当前契约 v2 已移除宽泛的「不配」「活着多余」示例，保留明确指向不存在/停止生存的表达，并标注第三人称/虚构语境不视为自身 high（"新闻里有人轻生/写论文提到自杀/朋友直播自杀"）。输出严格 JSON（`{"risk_level": "...", "reason": "..."}`），`_parse_risk_json()` 容忍代码块包裹与前后杂文。
+**风险 judge prompt**（`RISK_ASSESS_SYSTEM_PROMPT`，`app/llm/client.py`；训练侧同源 `data_contract.py`）：LLM 通道的核心提示词，判定 high/medium/low 三档。当前契约 v2 已移除宽泛的「不配」「活着多余」示例，保留明确指向不存在/停止生存的表达，并标注第三人称/虚构语境不视为自身 high（"新闻里有人轻生/写论文提到自杀/朋友直播自杀"）。输出严格 JSON（`{"risk_level": "...", "reason": "..."}`）；`_parse_risk_json()` 容忍代码块包裹与前后杂文，`level` 做白名单校验（非三档一律丢弃），reason 截 120 字，正则兜底提取。各通道超时帽不同：风险/技能选择 8s，judge 评审 15s。另有两个常驻提示词值得读：`JUDGE_SYSTEM_PROMPT`（1-5 整数三维分 + comment + 夹取）与 `SKILL_SELECTION_SYSTEM_PROMPT`（含关键指令「如果一个都不需要……直接回复：无」——4.2 的空列表语义就靠它）。
 
 ### 5.2 llm/prompts.py — 提示词模板
 
-系统提示词是安全边界的一部分，值得整段读：
+系统提示词是安全边界的一部分，值得整段读（当前版本，约 12 句）：
 
 ```python
 system = (
-    "你是校园心理支持产品中的咨询回复生成器。"
-    "只能提供支持性倾听、问题澄清、自助练习和求助准备；不能诊断，不能承诺保密，不能替代专业咨询。"
-    "高风险安全分流由上游规则处理，你不得输出内部风险分数、报告编号或后台审计细节。"
-    "回复要使用简体中文，温和、具体、简洁。"
+    "你是 Aegis，一名校园心理支持助手，正在和学生一对一聊天。"
+    "说话要像一个真实、温和、有耐心的人：用口语化的短句，贴着对方刚说的内容回应，先听懂再回应。"
+    "回复长短和对方的消息匹配——对方随口一句就简短回应，对方倾诉了很多再展开。"
+    "不要每条回复都套同一个格式：不必每次都列点，不必每次都以提问收尾，一次最多问一个问题。"
+    "建议只在对方需要时给，最多一两条，用自然的话说出来，而不是列成清单。"
+    "对方问你是谁时，用第一人称简单介绍（例如“我是 Aegis，校园里的心理支持助手”），"
+    "不要自称“生成器”“回复生成器”“产品组件”或任何系统内部叫法。"
+    "边界：只能提供支持性倾听、问题澄清、自助练习和求助准备；不能诊断，不能承诺保密，不能替代专业咨询。"
+    "高风险安全分流由上游规则处理，不得输出内部风险分数、报告编号或后台审计细节。"
+    "用户状态以“当前有效用户状态”为准：历史摘要里与之冲突的旧信息一律视为过期，不得引用。"
+    "回复使用简体中文。"
 )
 ```
 
-四句话分别划定：能力边界 / 禁止事项 / 与规则层的分工 / 输出风格。用户消息模板把 **L2 当前有效状态、L3 摘要、L4 原话**、意图、风险、知识、练习、技能逐块拼装，并显式要求“L2 优先，和摘要冲突的旧状态视为过期”；上下文工程就是把「该给的信息」按结构喂给模型。
+结构上分四组：人格与对话风格（前 6 句）/ 能力边界与禁止事项 / 与规则层的分工和防泄漏 / 状态优先级与语言。用户消息模板把 **L2 当前有效状态、L3 摘要、L4 原话**、意图、风险、知识、练习、技能逐块拼装，并显式标注「历史摘要……可能含过期信息」（内标签防泄漏：L4 块渲染为「用户：/助手：」，但要求模型不得把「用户提到/系统回应重点」等内部标签原文复述进回复）。
 
-第六轮把提示词从「机器人模板」改成「真人陪伴风格」：不再自称「咨询回复生成器」，改为「你是 Aegis，校园心理支持助手」；指令从「先共情→1-3步骤→开放问题」改成灵活对话指导（短句口语、长度匹配用户消息、一次最多一个问题、建议最多两条且只在合适时给）。历史摘要/知识/练习字段仍动态注入，但加了防泄漏指示——禁止把「用户提到/系统回应重点」等内部标签原文放进回复里。
+第六轮把提示词从「机器人模板」改成「真人陪伴风格」：不再自称「咨询回复生成器」，改为「你是 Aegis，校园心理支持助手」；指令从「先共情→1-3步骤→开放问题」改成灵活对话指导（短句口语、长度匹配用户消息、一次最多一个问题、建议最多两条且只在合适时给）。历史摘要/知识/练习字段仍动态注入。`prompts.py` 还有一个独立模板 `build_rewrite_messages`：把「消息 + 记忆摘要」改写成更适合检索的查询（RAG 检索词的 LLM 改写走它，与规则版 `chunking.rewrite_query` 是两条路径）。
 
 
 
@@ -1340,7 +1413,7 @@ print(client.generate_support_reply(ctx))   # None ← None 就是「请走本�
 - **把 `None` 当异常处理**：全协议约定「失败 / 超时 / mock → 返回 None」，调用方据此走模板兜底；把 None 抛成异常反而破坏了降级链。
 - **两个风险开关混为一谈**：`build_llm_client` 只按 `AI_PROVIDER` 装配**通用**客户端；风险通道的 QLoRA 替换由 `PsychOrchestrator` 按 `RISK_QLORA_ENABLED` 另行注入——一个是「大脑」，一个是「风险复核员」。
 - **以为温度只有一个**：支持性回复用 `LLM_SUPPORT_TEMPERATURE`（默认 0.6，偏口语更像真人），风险评估 / 改写 / 评审固定 0.0（要稳定）；调错对象会同时伤安全与质量。
-- **随手改系统提示词**：`prompts.py` 的四句话划定了「能力边界 / 禁止事项 / 分工 / 风格」，改动等于改安全边界，改完必须回归评测（第 13 站）。
+- **随手改系统提示词**：`prompts.py` 的系统提示词划定了「人格风格 / 能力边界 / 分工防泄漏 / 状态优先级」，改动等于改安全边界，改完必须回归评测（第 13 站）。
 
 #### 练习
 
@@ -1354,32 +1427,45 @@ print(client.generate_support_reply(ctx))   # None ← None 就是「请走本�
 
 ## 第 6 站 agents/classic.py — 六个单轮智能体
 
-这一层是「每个角色做一件小事」，全部是无状态类（除 Counselor 持有 registry/llm）：
+这一层是「每个角色做一件小事」，基本是无状态类——持有依赖的有三个：`RiskGuardianAgent(registry, llm_client, llm_channel_enabled)`、`KnowledgeAgent(registry, llm_client)`、`CounselorAgent(registry, llm_client)`，其余（Memory/Lead/Companion）零依赖：
 
 | Agent               | 方法                                         | 职责                                                             |
 | ------------------- | ------------------------------------------ | -------------------------------------------------------------- |
 | `MemoryAgent`       | `load / update`                            | 加载 L2 当前事实、L3 摘要和 L4 原话窗口；回复后更新 L3 并抽取 L2 事实 |
 | `RiskGuardianAgent` | `assess / create_report`                   | 调 assess\_risk 技能（规则∪LLM 双通道取并集，详见第 3 站）；HIGH 时建待审报告       |
-| `LeadAgent`         | `route`                                    | 关键词路由：高危→RISK；资料词→RESEARCH；咨询词或 MEDIUM→COUNSELING；否则 COMPANION |
+| `LeadAgent`         | `route`                                    | 关键词路由（见下方完整词表与自伤覆写分支） |
 | `KnowledgeAgent`    | `search / rewrite_query`                   | LLM 改写检索词（失败退化原文前 60 字）+ 检索                                    |
 | `CounselorAgent`    | `grounding / compose_plan / finalize_plan` | 组装 ResponsePlan 并生成最终回复                                        |
 | `CompanionAgent`    | —                                          | 空类，低风险陪伴的「占位角色」（回复实际复用 Counselor 的模板路径）                        |
 
-重点看 `CounselorAgent.finalize_plan` 的分层兜底：
+`LeadAgent.route` 的完整判定顺序（`classic.py`）：
+
+1. **自伤覆写**：`risk_level is HIGH` **或** 文本命中 `["伤害自己", "自残"]` → 直接 `Intent.RISK`——即使规则引擎只判 MEDIUM，自伤意念也必须进风险处置流（源码注释原话）。这是安全路径的关键一环：MEDIUM 词表里有「伤害自己/自残」，但路由覆写保证语义上的自伤表达不会被 MEDIUM 评级降格成咨询。
+2. **关键词路由**（LLM 意图通道关闭时的兜底，词表为通用中文心理求助表达）：
+   - `research_terms`（16 词）：`资料/研究/证据/为什么/原理/指南/权威/方法/改善/缓解/练习/预约/减压/了解/区别/途径` → `RESEARCH`
+   - `counseling_terms`（34 词）：`焦虑/抑郁/低落/压力/睡眠/失眠/难受/崩溃/人际/考试/吵架/冲突/孤独/孤单/迷茫/委屈/无助/想哭/情绪/心累/烦躁/不安/害怕/紧张/提不起劲/没动力/自责/自卑/敏感/内耗/社交/兴趣/难过/痛苦` → `COUNSELING`
+   - `risk_level is MEDIUM` → `COUNSELING`
+   - 都不命中 → `COMPANION`
+
+重点看 `CounselorAgent.finalize_plan` 的分层兜底（注意签名带 `on_token`——流式回调由调用方在低风险时传入）：
 
 ```python
-def finalize_plan(self, plan: ResponsePlan) -> tuple[str, AgentTrace]:
+def finalize_plan(self, plan: ResponsePlan, on_token=None) -> tuple[str, AgentTrace]:
     fallback = self._fallback_answer(...)          # ① 先无条件构造模板回复
     if risk_level is RiskLevel.HIGH:
         return fallback, ...                       # ② 高风险:永远用模板,不给模型机会
     context = LLMContext(...)                      # ③ 低/中风险:组装上下文问模型
-    generated = self.llm_client.generate_support_reply(context)
+    generated = None
+    if on_token is not None:
+        generated = self.llm_client.stream_support_reply(context, on_token)  # ④ 先流式,token 边生成边回调
+    if not generated:
+        generated = self.llm_client.generate_support_reply(context)          # ⑤ 流式无产出 → 回退阻塞生成
     if generated:
-        return generated.strip(), ...              # ④ 模型可用:用生成结果
-    return fallback, ...                           # ⑤ 模型不可用/mock:模板兜底
+        return generated.strip(), ...              # ⑥ 模型可用:用生成结果
+    return fallback, ...                           # ⑦ 模型不可用/mock:模板兜底(带 warning 日志)
 ```
 
-`_fallback_answer` 的模板按风险分三档开头（高危段直接给出「联系可信任的人/心理中心/紧急服务」），再拼 L3 摘要回显、稳定练习、知识首条、意图化收尾——这就是 mock 模式下学生看到的回复来源。注意边界：L2/L4 已传入真实 LLM Prompt，但当前模板兜底主要读取 L3 摘要；因此 L2/L4 对“贴着原话、避免引用过期状态”的改善主要体现于真实 LLM 可用的路径。
+`_fallback_answer` 的模板按风险分**四档**开头（HIGH 高危安全段 / MEDIUM 稳定转介段 / COMPANION 轻松段 / 其余通用段），再拼 L3 摘要回显、稳定练习、知识首条（只取第一条 `content[:240]`）、意图化收尾——这就是 mock 模式下学生看到的回复来源。知识段的来源标注由 `format_source_label()` 映射（如 `response_plan→内部建议`）；HIGH 时跳过摘要回显与知识段。注意边界：L2/L4 已传入真实 LLM Prompt，但当前模板兜底主要读取 L3 摘要；因此 L2/L4 对“贴着原话、避免引用过期状态”的改善主要体现于真实 LLM 可用的路径。
 
 
 
@@ -1437,8 +1523,8 @@ companion | LeadAgent route | intent=companion, risk=low
 
 - `AgentEventType`：TURN\_STARTED / ROUND\_STARTED / TASK\_CREATED / TASK\_CLAIMED / TASK\_CLOSED / TASK\_REOPENED / MESSAGE\_SENT / ARTIFACT\_PUBLISHED / CRITIQUE\_PUBLISHED / SAFETY\_OVERRIDE / REVISION\_REQUESTED / FINAL\_ACCEPTED / BUDGET\_EXHAUSTED（events.py 的真实枚举全集，共 13 个；MESSAGE\_SENT 由 `send_message()` 在 Agent 间互发消息时发出）
 - `AgentTask`：带 `required_capabilities`（能力要求）、`priority`、`status`、`metadata`。
-- `AgentArtifact`：`(owner, kind, payload, confidence, task_id, metadata)`——一切中间产物，kind 取值：`memory`/`intent`/`risk`/`context`/`response_proposal`/`safety_review`/`critique`/`pending_report`。
-- `CollaborationBlackboard`：核心结构，`turn_id/session_id/user_input` + `tasks/artifacts/messages/events` 四个列表 + `final_artifact_id`（验收通过后落下总工件 id）。
+- `AgentArtifact`：`(id, owner, kind, payload, confidence, task_id, metadata)`——一切中间产物，第一个字段就是 `id`（事件里的 `artifact_id` 指向它）；kind 取值：`memory`/`intent`/`risk`/`context`/`response_proposal`/`safety_review`/`critique`/`pending_report`。
+- `CollaborationBlackboard`：核心结构，`turn_id/session_id/user_input` + `tasks`（**dict**，按任务 id 索引，`add_task` 即 upsert）+ `artifacts/messages/events` 三个 tuple + `final_artifact_id`（验收通过后落下总工件 id）。
 
 `CollaborationBlackboard` 是 `frozen dataclass`——所有「修改」方法都不改自己，而是**复制一份改完返回新对象**。看真实的 `add_artifact`（events.py 第 152~163 行）：
 
@@ -1462,7 +1548,7 @@ def add_artifact(self, artifact: AgentArtifact) -> "CollaborationBlackboard":
 ### 7.2 autonomous/registry.py — 能力与决策
 
 - `AgentCapability` 五种能力：MEMORY / UNDERSTANDING / SAFETY / CONTEXT / RESPONSE。
-- `AgentProfile(name, capabilities, system_prompt, memory_policy, tool_permissions)`：Agent 的「名片」。`tool_permissions` 声明它可触碰的工具——权限是声明的，不是散落的 if——。
+- `AgentProfile(name, capabilities, system_prompt, memory_policy, model_profile, tool_permissions)`：Agent 的「名片」。`model_profile` 指向 8.3 的模型档案名（默认 `"default"`）；`tool_permissions` 声明它可触碰的工具——权限是声明的，不是散落的 if——。
 - `AutonomousAgentRegistry.candidate_decisions_for(task, board)`：过滤出能力匹配的 Agent，逐个问 `decide()`，把愿意认领的按置信度排序——认领制（claim-based）的核心——。
 
 ### 7.3 autonomous/board.py — 黑板共享读取（去重产物）
@@ -1487,19 +1573,21 @@ def intent_from_board(board, *, use_board_risk=True, use_hard_terms=True) -> Int
 
 ```
 每轮:
+  0. 发 ROUND_STARTED 事件(管理端 trace 的轮次分界来自它)
   1. _derive_missing_work   派生缺失任务:没有 memory 工件→建"读记忆"任务;
                            没有 intent→建"路由"任务;…没有 response→视条件建"提案"任务;
                            有新提案但没 safety_review → 建"安全复核"任务
   2. _try_accept_final      已有提案+复核通过+置信度≥阈值 → accept_final,结束
-  3. _claim_candidates      各 Agent decide() 认领,按(任务优先级, 置信度)排序,
-                           每轮最多 max_claims_per_round 个、每 Agent 最多 max_claims_per_agent 次
+  3. _claim_candidates      各 Agent decide() 认领,按(任务优先级, 置信度)排序;
+                           每轮最多 max_claims_per_round 个、每 Agent 每轮只认领一个任务
+                           (selected_agents 去重),累计每 Agent 不超 max_claims_per_agent 次
   4. 逐个执行:agent.act(task, board) → board.apply_turn_result(...)
-  5. 回到 1
+  5. 执行完再走一遍 1+2(新产物可能立刻满足验收) → 不满足则回到 0 进入下一轮
 ```
 
-进入循环前，协调器先 `_ensure_root_task` 建一个根任务（`task:root`）——输入命中硬高危词时根任务直接标 CRITICAL（`hard_high_risk`，第 3 站的词表仍是单一来源）。
+进入循环前，协调器先 `_ensure_root_task` 建一个根任务（`task:root`）——输入命中硬高危词时根任务直接标 CRITICAL（`hard_high_risk`，第 3 站的词表仍是单一来源）。第 3 步无候选认领时，会以 `force_response=True` 再派生一轮任务逼出回复（仍无候选才退出循环）。
 
-预算护栏体现在三处：轮次上限（超了发 `BUDGET_EXHAUSTED`）、每轮认领上限、单 Agent 认领上限。`force_response=True` 分支保证即使前置缺失也会被逼着产出一个回复——学生端永远有答案——。
+`_try_accept_final` 的验收条件比「有提案+有复核」更严：`safety_review.metadata["responseArtifactId"]` 必须**精确等于**当前最新 `response_proposal.id`——防止「旧提案 + 新复核」错配被验收。预算护栏体现在三处：轮次上限（超了发 `BUDGET_EXHAUSTED`）、每轮认领上限、单 Agent 累计认领上限。`force_response=True` 分支保证即使前置缺失也会被逼着产出一个回复——学生端永远有答案——。
 
 ### 7.5 autonomous/agents.py — 六个自治 Agent
 
@@ -1578,7 +1666,10 @@ print(board is new_board, len(board.artifacts), len(new_board.artifacts))
 `_run()` 开头的分流是双/三运行时开关：
 
 ```python
-if getattr(self.settings, "agent_runtime", "autonomous") == "autonomous":
+runtime_mode = str(getattr(self.settings, "agent_runtime", "autonomous")).lower()
+if runtime_mode == "langgraph" and self.langgraph_runtime is not None:
+    return self._run_langgraph(message, session_id, emit)    # 第三档:LangGraph 状态图
+if runtime_mode == "autonomous":
     return self._run_autonomous(message, session_id, emit)   # 默认:黑板自治
 # 否则:有序流水线(第 6 站的 Agent 按固定顺序跑)
 ```
@@ -1615,6 +1706,7 @@ def _prepare(self, message, session_id, owner_user_public_id):
 class GraphState(TypedDict, total=False):        # ① 状态形状:total=False 允许节点只返回"增量字段"
     session_id: str; message: str
     memory_summary: str; recent_messages: list[dict[str, str]]; user_facts: list[str]
+    memory_used: bool                            # 记忆是否命中(空会话时为 False)
     risk: SkillResult; risk_level: RiskLevel; intent: Intent
     knowledge: SkillResult | None; grounding: SkillResult | None
     pending_report: PendingReport | None; response_plan: ResponsePlan | None
@@ -1640,6 +1732,7 @@ def _build_graph(self):                          # ③ 声明式装配:节点=�
     builder.add_edge(START, "load_memory")
     builder.add_conditional_edges("route_intent", _skip_context, {"context": "context", "compose": "compose"})
     ...
+    graph = builder.compile()                    # 先无条件编译(检查点关闭时也要有图可用)
     if self.checkpointer is not None:            # SqliteSaver 仅在开关打开时挂载;缺依赖返回 None 零开销
         graph = builder.compile(checkpointer=self.checkpointer)  # thread_id=会话 ID,跨进程可恢复
     return graph
@@ -1757,8 +1850,8 @@ new_line = f"用户提到：{compact_sentence(user_message, 120)}；系统回应
 
 | 层级 | 存储与作用域 | 存什么 | 读写时机 | 是否进入回复 Prompt |
 | --- | --- | --- | --- | --- |
-| **L1 Agent 私有记忆** | `agent_private_memories`；`agent_name + session_id` 隔离 | Agent 的协作策略、已完成任务等内部记录 | 各自治 Agent 按需读写 | 不作为统一用户画像直接注入 |
-| **L2 用户事实** | `user_memory_facts`；登录用户按 `owner_user_id` 跨会话聚合，匿名会话以 `session_id` 隔离 | 睡眠、情绪、学业/人际压力、求助进展，以及有限的年级/专业背景 | 每轮回复后确定性抽取并写入；下一轮加载 | **是，且优先级最高** |
+| **L1 Agent 私有记忆** | `agent_private_memories`；`agent_name + session_public_id` 隔离 | Agent 的协作策略、已完成任务等内部记录 | 各自治 Agent 按需读写 | 不作为统一用户画像直接注入 |
+| **L2 用户事实** | `user_memory_facts`；登录用户按 `user_public_id` 跨会话聚合，匿名会话以 `session_public_id` 隔离 | 睡眠、情绪、学业/人际压力、求助进展，以及有限的年级/专业背景 | 每轮回复后确定性抽取并写入；下一轮加载 | **是，且优先级最高** |
 | **L3 会话摘要** | `session_memories`；会话级 | 历史对话压缩要点 | 每轮追加并按字符预算裁剪 | 是，但可能含过期状态 |
 | **L4 原话窗口** | `chat_messages`；会话级精确读取 | 最近 `MEMORY_RECENT_MESSAGES` 条角色/内容原文 | 每轮加载，默认 15 条 | 是，用于贴近近期措辞 |
 
@@ -1851,7 +1944,7 @@ final_score = w_vector * normalized_vector + w_bm25 * normalized_bm25
 ```python
 # 不看分数，只看排名
 rrf_score(doc) = sum(1 / (k + rank_in_bm25), 1 / (k + rank_in_vector))
-# k=60 是经验常数，防止分母为 0
+# k=60 是经验平滑常数(rank 从 1 起,分母本就 ≥61):让头部排名间的分差更平缓、抑制个别榜单的极端影响
 ```
 
 - **优点**：对分数尺度鲁棒，只依赖相对排名，企业 RAG 高频选择。
@@ -1882,7 +1975,7 @@ final = base_score * 0.55                          # 融合分保底
 
 **问题**：固定步长切块（512 字符，重叠 64）会把一段完整答案拦腰截断，用户看到的是"半句话"。
 
-**解决**：`expand_best_hit(top_chunk, all_chunks)`
+**解决**：`expand_best_hit(ranked, chunks)`（scoring.py:114；入参是已排序的全部 `(chunk, score)` 列表与全量块，不是单个冠军块——冠军取 `ranked[0]`）
 ```python
 # 找到排名第一的块（冠军块）
 # 查找同源文件（source 相同）且位置相邻的块（offset 连续）
@@ -1949,9 +2042,9 @@ self._knowledge_cache: OrderedDict[str, tuple[datetime, list[dict]]] = ...
 - 严格口径 HitRateStrict：**0.8831**（68/77）
 - MRR / NDCG@4：0.8203 / 0.8323
 
-### 9.8 search_knowledge 总装走读（store.py:803-905）
+### 9.8 search_knowledge 总装走读（store.py:803-913）
 
-前面九小节讲的是「每一环的算法」，本节走读「把这些环串起来的那段代码」——`store.search_knowledge`（store.py:803-905，约 110 行）。这也是 RAG 子系统从「知识」变成「服务」的装配点：
+前面九小节讲的是「每一环的算法」，本节走读「把这些环串起来的那段代码」——`store.search_knowledge`（store.py:803-913，约 110 行）。这也是 RAG 子系统从「知识」变成「服务」的装配点：
 
 ```python
 def search_knowledge(self, query, top_k=3, topic=None, risk_level=None, audience=None) -> list[dict]:
@@ -1965,7 +2058,9 @@ def search_knowledge(self, query, top_k=3, topic=None, risk_level=None, audience
     vector_results: list[dict] = []
     if self.vector_backend.enabled():                     # ③ 向量路:仅 VECTOR_ENABLED=true 时参与
         try:
-            candidate_k = ...                             #    召回候选数取 candidate_k 与 vector_top_k 的较小值
+            candidate_k = max(1, min(self.settings.knowledge_candidate_k,
+                                     self.settings.vector_top_k or self.settings.knowledge_candidate_k))
+            #    ↑ 候选数 = min(candidate_k, vector_top_k);vector_top_k 未配置(0)时回退 candidate_k,再 max(1,) 钳制
             vector_results = self.vector_backend.search(rewritten_query, candidate_k)
         except Exception as exc:
             self.vector_error = str(exc)                  #    挂了先记原因(管理端可查)
@@ -1976,16 +2071,23 @@ def search_knowledge(self, query, top_k=3, topic=None, risk_level=None, audience
     with self.db_factory() as db:
         chunks = [chunk for chunk in db.query(KnowledgeChunk).all()
                   if metadata_matches(loads_or(chunk.metadata_json, {}), topic=topic, ...)]  # ④ 元数据过滤
+        if not chunks:                                    # ④b 空集早退:过滤后一块不剩直接 []
+            return []
         scores = bm25_scores(rewritten_query, chunks)     # ⑤ BM25 路:对过滤后的全量块打分
 
-        # ⑥ 向量候选按双 key 建两张映射:Chroma 真向量带 db_id;LocalVectorBackend 伪向量只有 source:source_index
+        # ⑥ 向量候选按双 key 建两张映射:防御性冗余——upsert 传了 chunk_ids 时两种后端都会带 db_id,
+        #    也会带 source/source_index;两套映射保证任一标识缺失时仍能对上号
         vector_by_db_id = {int(i["db_id"]): float(i["score"]) for i in vector_results if i.get("db_id") is not None}
         vector_by_source_key = {f"{i.get('source')}:{i.get('source_index')}": float(i["score"]) ...}
 
         for chunk in chunks:
             if fusion_mode == "rrf":                      # ⑦ RRF:只看两路排名,rrf_fused_score(k=60)(9.7.2)
+                if vector_rank_map.get(id) is None and bm25_rank_map.get(id) is None:
+                    continue                              #    两路都没进榜单的块不参与(否则零分充数)
                 score = rrf_fused_score(vector_rank_map.get(chunk_id), bm25_rank_map.get(chunk_id))
             else:                                         # ⑧ weighted:两路分数各自归一后线性加权(9.7.2)
+                if base_bm25 <= 0 and base_vector <= 0:
+                    continue                              #    双零块跳过:小语料下防止 0 分块凑满 top_k
                 score = fused_score(base_vector, base_bm25, w_vector, w_bm25)
                 if fusion_mode != "rrf" and self.settings.knowledge_rerank_enabled:
                     score = rerank_score(rewritten_query, chunk.content, score)  # 仅 weighted 叠加四路词法 rerank
@@ -2002,8 +2104,8 @@ def search_knowledge(self, query, top_k=3, topic=None, risk_level=None, audience
 四个值得停下来想的工程决策：
 
 1. **向量异常的两档处置**（③）：`vector_required=false`（代码默认）时向量挂了只记原因、BM25 继续服务——检索是「可用性优先」的组件；`vector_required=true` 才让向量故障升级为请求失败。这是「可选依赖语义一致降级」哲学在 RAG 内部的再现。
-2. **双 key 匹配**（⑥）：向量后端可插拔（Chroma / local-hash），两种后端返回的候选标识不同，所以两种映射都要建——改向量后端不改这段融合代码。
-3. **融合与重排的耦合边界**（⑦⑧）：`rerank_score` 只在 weighted 分支叠加，RRF 分支直接邻块扩展——对应 9.7.5 消融里「hybrid_rerank 与 rrf 是两条独立链路，不应假设同构」。
+2. **双 key 匹配**（⑥）：`db_id` 与 `source:index` 两张映射是**防御性冗余**——常规入库路径两个标识都写入（LocalVectorBackend 传 chunk_ids 时同样带 `db_id`，Chroma 返回里也带 `source/source_index`），双 map 保证任何一个标识缺失/类型不符时融合仍能对上号，而不是「两种后端标识不同」。
+3. **融合与重排的耦合边界**（⑦⑧）：`rerank_score` 只在 weighted 分支叠加，RRF 分支直接邻块扩展——对应 9.7.5 消融里「hybrid_rerank 与 rrf 是两条独立链路，不应假设同构」。另注意 ⑦⑧ 的 `continue` 守卫：**两路都没命中的块不会进入候选**——没有这两条，小语料下 0 分块会凑满 top_k，把「确实没命中」伪装成「检索到低分结果」。
 4. **缓存读写点不对称**（②⑪）：读只走进程内 LRU，Redis 只写不读（预留跨进程能力）——多进程部署不要指望 Redis 命中（9.7.6 的边界声明）。
 
 顺手跑一次：同一查询在两种融合模式下的对比（接 `try_station8.py` 的 `store`，或按同法重建；改 settings 属性仅为演示，正式切换用 `KNOWLEDGE_FUSION_MODE` 环境变量）：
@@ -2135,6 +2237,8 @@ print(audits[0]["tool_kind"], audits[0]["decision"], "|", audits[0]["reason"])
 @dataclass(frozen=True)
 class ToolContract:
     kind: str
+    public_name: str                   # 对外展示名(管理端契约页/MCP 清单用)
+    description: str                   # 一句话说明(list_tool_contracts 的数据来源)
     required_role: str                  # 只有 admin 能触发
     allowed_risk_levels: tuple[str, ...]
     approval_required: bool
@@ -2147,7 +2251,9 @@ class ToolContract:
 ```python
 def governed_payload(kind, payload, role, approved) -> dict:
     if role != contract.required_role: raise ToolGovernanceError(...)        # ① 角色
-    if risk_level not in contract.allowed_risk_levels: raise ...             # ② 风险等级
+    if risk_level and risk_level not in contract.allowed_risk_levels: raise ...
+    #    ↑ ② 风险等级:注意「空 risk_level 直接放行」——载荷不带 risk_level 时不做等级校验
+    #      (后台补发/重放的载荷常无等级,由依赖门与执行前复查兜底,见 11.3)
     if contract.approval_required and not approved: raise ...                # ③ 审批
     redacted, fields = redact_payload(payload, contract.redacted_fields)     # ④ 脱敏
     return {**payload, "tool_kind": ..., "redacted_payload": redacted, ...}  # ⑤ 盖章放行
@@ -2161,18 +2267,18 @@ def governed_payload(kind, payload, role, approved) -> dict:
 
 ### 11.3 services/tool\_queue.py — 队列与后台 worker
 
-- `ToolQueueService.run_pending(db, limit)`：批量取 PENDING 任务，检查依赖（`_dependency_ready`：同 case 的 handoff 完成后 email 才发）、执行、记录结果。
+- `ToolQueueService.run_pending(db, limit)`：批量取 PENDING 任务，检查依赖（`_dependency_ready`：**仅 send_email 且载荷 `risk_level=="high"` 且带 report/case id** 时生效——等同 case 的 write_ledger/create_alert 先 SUCCESS，否则延后）、执行、记录结果。
 - 失败处理：attempts+1，未超限则改回 PENDING 并设 `run_after`（延迟重试）；超限写 `DeadLetterRecord`——死信是可运营的失败——，管理端有专门页面。
-- `RateLimiter`：邮件每分钟限 N 封，超了不算失败，只延迟。
-- `ToolQueueWorker`：线程池 + 轮询的后台常驻进程，FastAPI lifespan 里启停；`run_once()` 供手动触发（加分布式锁防并发）。
+- `RateLimiter`：邮件每分钟限 N 封，超了不算失败，只延迟。注意限流器只在 `ToolQueueWorker` 线程路径注入；`store.run_pending_tool_jobs()` 手动路径不经过它。
+- `ToolQueueWorker`：线程池 + 轮询的后台常驻进程，FastAPI lifespan 里启停；`run_once()` 供手动触发（用**进程内 `threading.Lock`** 防本进程并发——它不是跨进程分布式锁，多进程部署要靠 DB 状态机本身保证幂等）。
 
 这些条目合起来是一个**状态机**，值得读 `run_job`（tool\_queue.py:69-115）的源码看清它：
 
 ```python
 def run_job(self, db, row, email_limiter=None) -> None:
-    ready, wait_reason = self._dependency_ready(db, row)   # ① 依赖门:send_email 要等同 case 的
-    if not ready:                                          #    write_ledger/create_alert 先 SUCCESS
-        row.run_after = now_utc() + timedelta(seconds=retry_delay)  # 未就绪 → 延后重试,不算失败
+    ready, wait_reason = self._dependency_ready(db, row)   # ① 依赖门:仅 send_email 且载荷 risk_level=="high"
+    if not ready:                                          #    且带 report/case id 时生效——要等同 case 的
+        row.run_after = now_utc() + timedelta(seconds=retry_delay)  #    write_ledger/create_alert 先 SUCCESS
         governance.audit(row, "execute", "deferred", wait_reason, payload)
         return
     if kind == "send_email" and not email_limiter.allow(...):   # ② 邮件限流:超限只延迟
@@ -2210,12 +2316,14 @@ job = store.create_tool_job(
 job_id = job["id"]
 svc = ToolQueueService(store.settings)
 for i in range(1, 4):
-    store.run_pending_tool_jobs()                         # 领取并执行到期 PENDING(内部即 svc.run_pending)
-    head = next(j for j in store.run_pending_tool_jobs()["jobs"] if j["id"] == job_id)
+    result = store.run_pending_tool_jobs()                # 每轮只调一次:领取执行 + 返回刷新后的任务列表
+    head = next(j for j in result["jobs"] if j["id"] == job_id)   # ("jobs" 含全部状态,按 updated_at 倒序前 100)
     print(f"第{i}轮", head["status"], "attempts =", head["attempts"])
 letters = store.list_dead_letters()
 print("死信条数:", len(letters), "| 原因:", letters[0]["dead_letter"]["reason"][:40])
 ```
+
+> ⚠️ 每轮**只能调一次** `run_pending_tool_jobs()`：它每次调用都会重新领取执行到期的 PENDING 任务。若同一轮调两次，attempts 会一次跳两格（第 1 轮就到 2），轮次和状态对不上。
 
 预期输出（字段名以实际返回为准，形状固定）：
 
@@ -2228,11 +2336,11 @@ print("死信条数:", len(letters), "| 原因:", letters[0]["dead_letter"]["rea
 
 ### 11.4 services/tool\_executor.py — 真实副作用
 
-`execute(kind, payload, attempts)` 分发到：`write_ledger`（openpyxl 追加 Excel 行）、`create_alert`（建 AlertRecord + 可选 webhook）、`send_email`（SMTP 真发或 log 模式）、`create_handoff_summary`（写 Markdown 文件）、`append_jsonl`（通用 JSONL 追加）。`always_fail` 载荷是故意留的测试钩子——harness 用它验证重试与死信路径。
+`execute(kind, payload, attempts)` 分发到：`write_ledger`（openpyxl 追加 Excel 行）、`create_alert`（追加 `alert-records.jsonl` + 可选 webhook——**不写数据库**，DB 里的 AlertRecord 由 `ToolQueueService` 成功路径的 `_record_success` 落库）、`send_email`（SMTP 真发或 log 模式）、`create_handoff_summary`（写 Markdown 文件）、`append_jsonl`（通用 JSONL 追加）。`always_fail` 载荷是故意留的测试钩子——harness 用它验证重试与死信路径；另有一个瞬态失败钩子 `fail_until_attempt`（第 N 次前必抛，之后成功），用于验证「重试后成功」的分支。
 
 ### 11.5 services/tool\_records.py + tool\_governance.py
 
-前者持久化 ExcelRecord/AlertRecord（去重：同报告同个案只记一条）；后者提供执行前授权检查与审计写入，供 MCP 边界复用。
+前者持久化 ExcelRecord/AlertRecord（去重口径注意：ExcelRecord 只对 `status=="success"` 且同报告同个案的行去重，失败记录总是追加；AlertRecord **无去重**——重试成功一次记一条）；后者提供执行前授权检查与审计写入，供 MCP 边界复用。
 
 ### 11.6 tools/gateway.py + app/mcp/server.py + app/mcp/client.py — MCP 边界
 
@@ -2295,7 +2403,11 @@ print("tool_kind" in g, "redacted_payload" in g)   # True True ← 盖章字段
 
 ### 12.1 main.py — 只做装配（约 90 行）
 
-`create_app()` 顺序：settings → engine/会话工厂/建表 → DatabaseStore（默认账号+知识库种子）→ RuntimeServices → SkillRegistry → LLM 客户端 → Orchestrator → Harness → 工具网关 → 队列 worker。全部挂 `app.state`，注册中间件与 5 个路由模块。lifespan 里启停 worker。
+`create_app()` 顺序：settings → engine/会话工厂/建表 → DatabaseStore（默认账号+知识库种子）→ RuntimeServices → SkillRegistry → LLM 客户端 → Orchestrator → Harness → 工具网关 → 队列 worker。全部挂 `app.state`，`app.mount("/static", StaticFiles(directory=STATIC_DIR))` 挂载静态目录，注册中间件与 5 个路由模块。lifespan 里启停 worker。模块末尾还有一行 `app = create_app()`——uvicorn 以 `app.main:app` 为入口时靠它。
+
+`app.state` 的 11 个键（路由统一 `request.app.state.<key>` 取用）：`settings`、`engine`、`store`、`registry`（SkillRegistry）、`llm_client`、`orchestrator`、`agent_harness`、`runtime`、`tool_gateway`、`tool_worker`、`knowledge_dir`。
+
+> ⚠️ 复现时漏掉 `/static` 挂载是隐形坑：48 个 API 端点全部正常、附录 A 冒烟照样通过（自建核对命令按 `r.methods` 过滤，Mount 没有 methods 会被排除，清单仍是 48），但三端 HTML 引用的 `/static/styles.css`、`/static/*.js` 全部 404，前端直接裸奔。前后端一起复现时务必带上这行。
 
 
 
@@ -2388,7 +2500,7 @@ return StreamingResponse(event_stream(), media_type="text/event-stream")
 三个设计要点：
 
 1. **生产-消费者解耦**：Agent 管线（8.1 的 `emit` 回调链）在**后台线程**跑，事件经 `queue.Queue` 实时交给生成器 `yield`——避免「等整个 run 跑完再一股脑倒出来」，这就是打字机效果的来源。
-2. **帧编码**：每帧是 `event: <语义名>\ndata: {json}\n\n`（空行分隔）；`StreamEvent.event` 是 1.2 节 `sse_event` 属性翻译好的语义名（`start`/`agent`/`skill`/`token`/`report`/`done`…），data 里同时带 `runtime_type`（原始枚举值）方便前端做细分。
+2. **帧编码**：每帧是 `event: <语义名>\ndata: {json}\n\n`（空行分隔）；`StreamEvent.event` 是 1.2 节 `sse_event` 属性翻译好的语义名，语义名全集 **8 个**：`start`/`route`/`agent`/`skill`/`token`/`report`/`done`/`error`——`route`（路由决策完成，每次运行都会发，前端切换「正在分析」态的依据）与 `error`（流中异常，见要点 3）也各有事件；data 里同时带 `runtime_type`（原始枚举值）方便前端做细分。
 3. **流中异常兜底**：管线中途抛错（如模型超时）时转 `orchestrator.handle` 走阻塞路径拿一个兜底回复，再补发 `error` + `done` 两帧——前端不会白屏；但不会重试已发出的帧，这就是 Part 3「SSE 取舍」里说的「一旦开始接收 delta 就不再回退」。
 
 注意 `owned_session_id = store.ensure_session(...)` 在**开线程之前**就解析好了——SSE 的兜底回退路径也要用它，不能等到管线内才建（chat.py 注释原话）。
@@ -2397,7 +2509,21 @@ return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 ### 12.5 其余路由模块
 
-- `schemas.py`：11 个请求模型集中定义（含第十八轮新增的 `ThemeRequest`；与第 1 站领域模型的分工：这里只装「HTTP 请求体」，验证与序列化归它管）。
+- `schemas.py`：11 个请求模型集中定义（含第十八轮新增的 `ThemeRequest`；与第 1 站领域模型的分工：这里只装「HTTP 请求体」，验证与序列化归它管）。字段级清单（冒烟构造请求体照此写）：
+
+| 模型 | 字段（类型 = 默认） | 用在哪 |
+| --- | --- | --- |
+| `ChatRequest` | `message: str`（必填）；`session_id: str \| None = None`（不传则自动建会话） | chat 两个端点 |
+| `SessionCreateRequest` | `title: str = "新对话"` | 建会话 |
+| `SessionRenameRequest` | `title: str` | 会话改名 |
+| `ReportUpdate` | `status: ReportStatus`（合法值 `pending/approved/dismissed`） | 审批报告 |
+| `CaseStatusUpdate` | `status: CaseStatus`（合法值 `open/acknowledged`） | 个案状态 |
+| `CaseNoteRequest` | `note: str` | 个案备注 |
+| `KnowledgeIngestRequest` | `source: str`、`content: str`（都必填；空 content → 400） | 知识录入 |
+| `KnowledgeUploadRequest` | `filename: str`、`content: str`（**纯 JSON**，文件内容读成字符串；不是 multipart） | 知识文本上传 |
+| `LoginRequest` | `username: str`、`password: str` | 登录 |
+| `RegisterRequest` | `username: str`、`password: str`；`role: str = "student"`、`invite_code: str = ""`（teacher 注册需邀请码） | 注册（成功返回 **201**） |
+| `ThemeRequest` | `theme: str`（取值须在 `THEME_CHOICES` 白名单内） | 主题保存 |
 - `pages.py`（3 个 HTML）与 `system.py`（health/readiness/agent-status/skills）。pages.py 不是简单的静态文件直读：`_resolve_theme()` 会软解析当前用户主题（无会话/未登录/无偏好一律回退默认主题，不抛 401），再把 `data-theme` 内联脚本注入 `<head>` 最前——脚本先于 styles.css 解析执行，消除主题切换的首屏闪烁（完整链路见 12.5b）。
 - `auth_routes.py`：注册（教师凭邀请码，重名 409）/登录/登出/当前用户（`/api/auth/*`）——2.1 的 `verify_password` 在这里生效，成功即发会话令牌并种 Cookie（httponly + samesite=lax）。第十八轮起 `/api/auth/me` 随身份返回主题偏好，`PUT /api/auth/me/theme` 保存主题。
 - `admin.py`（约 315 行）：管理端薄路由——待审报告、个案、工具队列/死信、知识库、评测、审计等端点，绝大多数是「参数校验 → 调 store 或 ReportCaseService → 返回 JSON」；审批与派发任务的核心编排已在第 11 站拆到服务层（2.3 时序图），这里不重复业务。
@@ -2406,7 +2532,7 @@ return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 一个横跨四层的小功能，正好检验你是否理解了「领域模型 / 存储 / 路由 / 页面」各层的分工：
 
-1. **表**：`UserPreference`（entities.py:255，第 20 张表）——`user_public_id` 唯一、一用户一行，`theme` 存当前主题键；
+1. **表**：`UserPreference`（entities.py:255）——`user_public_id` 唯一、一用户一行，`theme` 存当前主题键。表数口径：按「第十八轮新增后总数达 20」它是收官的一张；若按文件内声明顺序它其实是第 18 个类（后面还有 `UserMemoryFact`、`AdminAuditLog`）。
 2. **store**：`get_user_theme` / `set_user_theme`（store.py:314-335）——写入前用 `THEME_CHOICES = ("warm", "ocean", "forest", "playful")` 白名单校验，非法取值回退 `DEFAULT_THEME`（与治理层「白名单优先」同一思想）；存在则更新、不存在则插入；
 3. **端点**：`GET /api/auth/me` 随身份返回 theme、`PUT /api/auth/me/theme`（auth_routes.py:97）保存——前端切一次主题即写库，跨设备同步；
 4. **页面**：pages.py 渲染时把 `<script>document.documentElement.setAttribute("data-theme", "...")</script>` 注入 `<head>` 最前——脚本先于 CSS 解析，首屏即为目标主题、无闪烁。
@@ -2716,7 +2842,7 @@ L1 管 Agent 协作内务；L2 管「用户现在是什么状态」（SCD-2 有�
 
 > 复现「功能一致」的后端时，对照本表逐端点冒烟。任何一端点行为不一致都说明对应站没复现对。
 > 自建核对：`python -c "from app.main import create_app; [print(sorted(r.methods), r.path) for r in create_app().routes if getattr(r, 'methods', None)]"` 可重新生成路由清单。
-> 鉴权列：**公开**＝无需登录；**登录**＝任意已登录用户（student/teacher/admin）；**属主**＝登录且会话归属当前用户（否则 403）；**员工**＝admin 或 teacher（`require_admin`，deps.py:33）；请求体列 = `schemas.py` 中对应模型（共 11 个）。
+> 鉴权列：**公开**＝无需登录；**登录**＝任意已登录用户（student/teacher/admin）；**属主**＝登录且会话归属当前用户（否则 403）；**员工**＝admin 或 teacher（`require_admin`，deps.py:36）；请求体列 = `schemas.py` 中对应模型（共 11 个，字段清单见 12.5）。
 
 ## A.1 页面与系统
 
@@ -2732,7 +2858,7 @@ L1 管 Agent 协作内务；L2 管「用户现在是什么状态」（SCD-2 有�
 
 | 方法与路径 | 鉴权 | 请求体 / 说明 |
 | --- | --- | --- |
-| POST /api/auth/register | 公开 | `RegisterRequest`；教师需邀请码，重名 409，注册即登录种 Cookie |
+| POST /api/auth/register | 公开 | `RegisterRequest`；成功返回 **201**；教师需邀请码，重名 409，注册即登录种 Cookie |
 | POST /api/auth/login | 公开 | `LoginRequest`；成功种 httponly + samesite=lax 会话 Cookie |
 | POST /api/auth/logout | 登录 | 注销会话并删 Cookie |
 | GET /api/auth/me | 登录 | 当前身份 + theme |
@@ -2742,8 +2868,8 @@ L1 管 Agent 协作内务；L2 管「用户现在是什么状态」（SCD-2 有�
 
 | 方法与路径 | 鉴权 | 请求体 / 说明 |
 | --- | --- | --- |
-| POST /api/chat | 登录 | `ChatRequest`；限流(429)→属主校验→Harness.run→ChatResponse |
-| POST /api/chat/stream | 登录 | `ChatRequest`；SSE 事件流（12.4） |
+| POST /api/chat | 登录 | `ChatRequest`；空 message → 400 → 限流(429)→属主校验→Harness.run→ChatResponse |
+| POST /api/chat/stream | 登录 | `ChatRequest`；空 message → 400、限流 → 429；SSE 事件流（12.4） |
 | GET /api/sessions | 登录 | 当前用户会话列表 |
 | POST /api/sessions | 登录 | `SessionCreateRequest`；建会话（首条消息自动成标题，第 10 站） |
 | GET /api/sessions/{id} | 属主 | 会话详情（含消息） |
@@ -2760,17 +2886,400 @@ L1 管 Agent 协作内务；L2 管「用户现在是什么状态」（SCD-2 有�
 | GET /api/admin/cases | 个案列表 | POST /api/admin/tool-jobs/{id}/retry | 重置任务为 PENDING 重试 |
 | POST /api/admin/cases/{id}/notes | `CaseNoteRequest` | GET /api/admin/dead-letters | 死信列表 |
 | PATCH /api/admin/cases/{id} | `CaseStatusUpdate` | GET /api/admin/knowledge/status | 知识库切块统计 |
-| GET /api/admin/tool-jobs | 工具任务列表 | GET /api/admin/knowledge/search | 检索知识（?q=…） |
+| GET /api/admin/tool-jobs | 工具任务列表 | GET /api/admin/knowledge/search | 检索知识（`?q=…` 必填；`top_k` 默认 5、钳制 1-10；`topic/risk_level/audience` 元数据过滤） |
 | GET /api/admin/tool-contracts | 契约清单（`list_tool_contracts`） | POST /api/admin/knowledge | `KnowledgeIngestRequest` |
 | GET /api/admin/tool-audits | 工具审计记录 | POST /api/admin/knowledge/rebuild | 全量重建知识块 |
 | GET /api/admin/excel-records | 台账记录 | POST /api/admin/knowledge/rebuild-vector | 重建向量索引 |
 | GET /api/admin/alert-records | 预警/邮件记录 | POST /api/admin/knowledge/backup | 备份知识目录 |
-| GET /api/admin/agent-models | Agent 模型档案 | POST /api/admin/knowledge/upload | `KnowledgeUploadRequest` + 文件 |
-| GET /api/admin/agent-memories | Agent 私有记忆 | POST /api/admin/knowledge/file | 上传 .md/.txt/.pdf（安全文件名校验） |
+| GET /api/admin/agent-models | Agent 模型档案 | POST /api/admin/knowledge/upload | `KnowledgeUploadRequest`（纯 JSON：filename + content 字符串） |
+| GET /api/admin/agent-memories | Agent 私有记忆；**必填查询参数** `?agent=…&session_id=…`（缺则 422） | POST /api/admin/knowledge/file | 上传 .md/.txt/.pdf（multipart 文件；安全文件名校验） |
 | GET /api/admin/eval-results | 最近评测结果 | POST /api/admin/eval-results/run | 手动跑评测 |
 | GET /api/admin/audit-logs | 管理端审计日志 | | |
 
 > 备注：A.4 每个端点都是「参数校验 → 调 store/ReportCaseService → 返回 JSON」的薄壳（12.5）；审批后的业务编排全部在服务层，路由不含业务。
+
+***
+
+<a id="appendix-b"></a>
+
+# 附录 B：数据模型字段总表（entities.py · 20 张表 · 复现建表用）
+
+> 本附录由源码逐列机械生成（生成时基线 `main`），列名/类型/默认值/索引与 `app/entities.py` 一一对应。所有表的主键均为自增 `id: Integer`；`created_at`/`updated_at` 类时间列默认 naive UTC `now()`。唯一一张带 ORM 关系的表是 `ChatSession`：`messages = relationship("ChatMessage", back_populates="session", cascade="all, delete-orphan")`，对应 `ChatMessage.session`（删除会话级联删除消息）。
+
+## `chat_sessions`（`ChatSession`，entities.py）
+
+| 列名 | 类型 | 约束/默认 |
+| --- | --- | --- |
+| `id` | `int` / Integer | 主键 |
+| `public_id` | `str` / String(64) | 唯一；索引 |
+| `owner_user_public_id` | `str` / String(64) | 索引；默认 "" |
+| `title` | `str` / String(160) | — |
+| `created_at` | `datetime` / DateTime | 默认 now |
+| `updated_at` | `datetime` / DateTime | 默认 now |
+
+## `chat_messages`（`ChatMessage`，entities.py）
+
+| 列名 | 类型 | 约束/默认 |
+| --- | --- | --- |
+| `id` | `int` / Integer | 主键 |
+| `session_id` | `int` / — | 索引；FK → chat_sessions.id |
+| `role` | `str` / String(32) | — |
+| `content` | `str` / Text | — |
+| `created_at` | `datetime` / DateTime | 默认 now |
+
+## `session_memories`（`SessionMemory`，entities.py）
+
+| 列名 | 类型 | 约束/默认 |
+| --- | --- | --- |
+| `id` | `int` / Integer | 主键 |
+| `session_public_id` | `str` / String(64) | 唯一；索引 |
+| `summary` | `str` / Text | 默认 "" |
+| `covered_message_count` | `int` / Integer | 默认 0 |
+| `created_at` | `datetime` / DateTime | 默认 now |
+| `updated_at` | `datetime` / DateTime | 默认 now |
+
+## `agent_private_memories`（`AgentPrivateMemory`，entities.py）
+
+| 列名 | 类型 | 约束/默认 |
+| --- | --- | --- |
+| `id` | `int` / Integer | 主键 |
+| `agent_name` | `str` / String(80) | 索引 |
+| `session_public_id` | `str` / String(64) | 索引 |
+| `content` | `str` / Text | — |
+| `metadata_json` | `str` / Text | 默认 "{}" |
+| `created_at` | `datetime` / DateTime | 默认 now |
+
+## `agent_model_profiles`（`AgentModelProfile`，entities.py）
+
+| 列名 | 类型 | 约束/默认 |
+| --- | --- | --- |
+| `id` | `int` / Integer | 主键 |
+| `agent_name` | `str` / String(80) | 唯一；索引 |
+| `provider` | `str` / String(32) | 默认 "inherit" |
+| `model` | `str` / String(128) | 默认 "" |
+| `temperature` | `float` / Float | 默认 0.2 |
+| `system_prompt` | `str` / Text | 默认 "" |
+| `enabled` | `str` / String(8) | 默认 "true" |
+| `created_at` | `datetime` / DateTime | 默认 now |
+| `updated_at` | `datetime` / DateTime | 默认 now |
+
+## `knowledge_chunks`（`KnowledgeChunk`，entities.py）
+
+| 列名 | 类型 | 约束/默认 |
+| --- | --- | --- |
+| `id` | `int` / Integer | 主键 |
+| `source` | `str` / String(256) | 索引 |
+| `source_index` | `int` / Integer | — |
+| `content` | `str` / Text | — |
+| `metadata_json` | `str` / Text | 默认 "{}" |
+| `embedding_json` | `str` / Text | 默认 "[]" |
+| `created_at` | `datetime` / DateTime | 默认 now |
+
+## `psychological_reports`（`PsychologicalReport`，entities.py）
+
+| 列名 | 类型 | 约束/默认 |
+| --- | --- | --- |
+| `id` | `int` / Integer | 主键 |
+| `public_id` | `str` / String(64) | 唯一；索引 |
+| `session_public_id` | `str` / String(64) | 索引 |
+| `message` | `str` / Text | — |
+| `intent` | `str` / String(32) | 默认 "" |
+| `emotion` | `str` / String(32) | 默认 "" |
+| `emotion_score` | `float` / Float | 默认 0.0 |
+| `risk_level` | `str` / String(32) | 索引 |
+| `confidence` | `float` / Float | 默认 0.0 |
+| `rationale_json` | `str` / Text | 默认 "[]" |
+| `summary` | `str` / Text | 默认 "" |
+| `status` | `str` / String(32) | 索引 |
+| `created_at` | `datetime` / DateTime | 默认 now |
+| `updated_at` | `datetime` / DateTime | 默认 now |
+
+## `agent_run_traces`（`AgentRunTrace`，entities.py）
+
+| 列名 | 类型 | 约束/默认 |
+| --- | --- | --- |
+| `id` | `int` / Integer | 主键 |
+| `session_public_id` | `str` / String(64) | 索引 |
+| `message_id` | `str` / String(64) | 索引 |
+| `intent` | `str` / String(32) | 索引 |
+| `risk_level` | `str` / String(32) | 索引 |
+| `agent_steps_json` | `str` / Text | 默认 "[]" |
+| `skill_calls_json` | `str` / Text | 默认 "[]" |
+| `answer` | `str` / Text | 默认 "" |
+| `created_at` | `datetime` / DateTime | 默认 now |
+
+## `risk_cases`（`RiskCase`，entities.py）
+
+| 列名 | 类型 | 约束/默认 |
+| --- | --- | --- |
+| `id` | `int` / Integer | 主键 |
+| `public_id` | `str` / String(64) | 唯一；索引 |
+| `report_public_id` | `str` / String(64) | 唯一；索引 |
+| `session_public_id` | `str` / String(64) | 索引 |
+| `risk_level` | `str` / String(32) | 索引 |
+| `status` | `str` / String(32) | 索引 |
+| `owner` | `str` / String(128) | 默认 "unassigned" |
+| `summary` | `str` / Text | 默认 "" |
+| `handoff_summary` | `str` / Text | 默认 "" |
+| `created_at` | `datetime` / DateTime | 默认 now |
+| `updated_at` | `datetime` / DateTime | 默认 now |
+
+## `case_notes`（`CaseNote`，entities.py）
+
+| 列名 | 类型 | 约束/默认 |
+| --- | --- | --- |
+| `id` | `int` / Integer | 主键 |
+| `case_public_id` | `str` / String(64) | 索引 |
+| `actor` | `str` / String(128) | 默认 "admin" |
+| `note` | `str` / Text | — |
+| `created_at` | `datetime` / DateTime | 默认 now |
+
+## `tool_jobs`（`ToolJob`，entities.py）
+
+| 列名 | 类型 | 约束/默认 |
+| --- | --- | --- |
+| `id` | `int` / Integer | 主键 |
+| `public_id` | `str` / String(64) | 唯一；索引 |
+| `kind` | `str` / String(64) | 索引 |
+| `status` | `str` / String(32) | 索引 |
+| `report_public_id` | `str` / String(64) | 索引；默认 "" |
+| `case_public_id` | `str` / String(64) | 索引；默认 "" |
+| `payload_json` | `str` / Text | 默认 "{}" |
+| `attempts` | `int` / Integer | 默认 0 |
+| `max_attempts` | `int` / Integer | 默认 3 |
+| `last_error` | `str` / Text | 默认 "" |
+| `run_after` | `datetime` / DateTime | 默认 now |
+| `created_at` | `datetime` / DateTime | 默认 now |
+| `updated_at` | `datetime` / DateTime | 默认 now |
+
+## `tool_audit_records`（`ToolAuditRecord`，entities.py）
+
+| 列名 | 类型 | 约束/默认 |
+| --- | --- | --- |
+| `id` | `int` / Integer | 主键 |
+| `public_id` | `str` / String(64) | 唯一；索引 |
+| `tool_kind` | `str` / String(80) | 索引 |
+| `action` | `str` / String(80) | 索引 |
+| `decision` | `str` / String(32) | 索引 |
+| `reason` | `str` / Text | 默认 "" |
+| `actor_role` | `str` / String(32) | 索引；默认 "" |
+| `risk_level` | `str` / String(32) | 索引；默认 "" |
+| `report_public_id` | `str` / String(64) | 索引；默认 "" |
+| `case_public_id` | `str` / String(64) | 索引；默认 "" |
+| `job_public_id` | `str` / String(64) | 索引；默认 "" |
+| `payload_json` | `str` / Text | 默认 "{}" |
+| `created_at` | `datetime` / DateTime | 默认 now |
+
+## `dead_letter_records`（`DeadLetterRecord`，entities.py）
+
+| 列名 | 类型 | 约束/默认 |
+| --- | --- | --- |
+| `id` | `int` / Integer | 主键 |
+| `public_id` | `str` / String(64) | 唯一；索引 |
+| `job_public_id` | `str` / String(64) | 索引 |
+| `tool_kind` | `str` / String(80) | 索引 |
+| `reason` | `str` / Text | 默认 "" |
+| `payload_json` | `str` / Text | 默认 "{}" |
+| `created_at` | `datetime` / DateTime | 默认 now |
+
+## `excel_records`（`ExcelRecord`，entities.py）
+
+| 列名 | 类型 | 约束/默认 |
+| --- | --- | --- |
+| `id` | `int` / Integer | 主键 |
+| `public_id` | `str` / String(64) | 唯一；索引 |
+| `report_public_id` | `str` / String(64) | 索引；默认 "" |
+| `case_public_id` | `str` / String(64) | 索引；默认 "" |
+| `file_path` | `str` / Text | 默认 "" |
+| `status` | `str` / String(32) | 索引；默认 "" |
+| `message` | `str` / Text | 默认 "" |
+| `payload_json` | `str` / Text | 默认 "{}" |
+| `created_at` | `datetime` / DateTime | 默认 now |
+| `updated_at` | `datetime` / DateTime | 默认 now |
+
+## `alert_records`（`AlertRecord`，entities.py）
+
+| 列名 | 类型 | 约束/默认 |
+| --- | --- | --- |
+| `id` | `int` / Integer | 主键 |
+| `public_id` | `str` / String(64) | 唯一；索引 |
+| `report_public_id` | `str` / String(64) | 索引；默认 "" |
+| `case_public_id` | `str` / String(64) | 索引；默认 "" |
+| `channel` | `str` / String(32) | 索引；默认 "" |
+| `recipient` | `str` / Text | 默认 "" |
+| `status` | `str` / String(32) | 索引；默认 "" |
+| `message` | `str` / Text | 默认 "" |
+| `payload_json` | `str` / Text | 默认 "{}" |
+| `created_at` | `datetime` / DateTime | 默认 now |
+| `updated_at` | `datetime` / DateTime | 默认 now |
+
+## `auth_users`（`AuthUser`，entities.py）
+
+| 列名 | 类型 | 约束/默认 |
+| --- | --- | --- |
+| `id` | `int` / Integer | 主键 |
+| `public_id` | `str` / String(64) | 唯一；索引 |
+| `username` | `str` / String(80) | 唯一；索引 |
+| `password_salt` | `str` / String(128) | — |
+| `password_hash` | `str` / String(256) | — |
+| `role` | `str` / String(32) | 索引 |
+| `is_active` | `str` / String(8) | 默认 "true" |
+| `created_at` | `datetime` / DateTime | 默认 now |
+| `updated_at` | `datetime` / DateTime | 默认 now |
+
+## `auth_sessions`（`AuthSession`，entities.py）
+
+| 列名 | 类型 | 约束/默认 |
+| --- | --- | --- |
+| `id` | `int` / Integer | 主键 |
+| `public_id` | `str` / String(64) | 唯一；索引 |
+| `user_public_id` | `str` / String(64) | 索引 |
+| `session_token` | `str` / String(256) | 唯一；索引 |
+| `expires_at` | `datetime` / DateTime | 索引 |
+| `created_at` | `datetime` / DateTime | 默认 now |
+| `updated_at` | `datetime` / DateTime | 默认 now |
+
+## `user_preferences`（`UserPreference`，entities.py）
+
+| 列名 | 类型 | 约束/默认 |
+| --- | --- | --- |
+| `id` | `int` / Integer | 主键 |
+| `user_public_id` | `str` / String(64) | 唯一；索引 |
+| `theme` | `str` / String(32) | 默认 "warm" |
+| `created_at` | `datetime` / DateTime | 默认 now |
+| `updated_at` | `datetime` / DateTime | 默认 now |
+
+## `user_memory_facts`（`UserMemoryFact`，entities.py）
+
+| 列名 | 类型 | 约束/默认 |
+| --- | --- | --- |
+| `id` | `int` / Integer | 主键 |
+| `public_id` | `str` / String(64) | 唯一；索引 |
+| `user_public_id` | `str` / String(64) | 索引；默认 "" |
+| `session_public_id` | `str` / String(64) | 索引；默认 "" |
+| `fact_key` | `str` / String(128) | 索引 |
+| `fact_value` | `str` / Text | 默认 "" |
+| `effective_from` | `datetime` / DateTime | 默认 now |
+| `superseded_by` | `str` / String(64) | 默认 "" |
+| `created_at` | `datetime` / DateTime | 默认 now |
+
+## `admin_audit_logs`（`AdminAuditLog`，entities.py）
+
+| 列名 | 类型 | 约束/默认 |
+| --- | --- | --- |
+| `id` | `int` / Integer | 主键 |
+| `public_id` | `str` / String(64) | 唯一；索引 |
+| `actor_user_public_id` | `str` / String(64) | 索引；默认 "" |
+| `actor_username` | `str` / String(80) | 索引；默认 "" |
+| `actor_role` | `str` / String(32) | 索引；默认 "" |
+| `action` | `str` / String(80) | 索引 |
+| `target_type` | `str` / String(80) | 索引；默认 "" |
+| `target_public_id` | `str` / String(80) | 索引；默认 "" |
+| `payload_json` | `str` / Text | 默认 "{}" |
+| `created_at` | `datetime` / DateTime | 默认 now |
+
+> 清点：20 张表 / 172 个 `mapped_column` 列。
+
+<a id="appendix-c"></a>
+
+# 附录 C：Settings 全量字段表（config.py · 90 项 · 复现配置用）
+
+> 环境变量名 = 字段名大写（`model_config` 未设 env_prefix；`.env` 由 pydantic-settings 自动加载，`extra=ignore`）。带「路径」标记的字段经 `resolve_path()` 解析（相对路径锚定项目根）。节选自第 4.3 节的常用项此处不再重复解释。
+
+| 字段 | 类型 | 默认值 | 环境变量 |
+| --- | --- | --- | --- |
+| `database_url` | str | `"sqlite:///data/aegis.sqlite"` | `DATABASE_URL` |
+| `ai_provider` | str | `"mock"` | `AI_PROVIDER` |
+| `openai_api_key` | str | `""` | `OPENAI_API_KEY` |
+| `openai_base_url` | str | `"https://api.openai.com/v1"` | `OPENAI_BASE_URL` |
+| `openai_model` | str | `"gpt-4o-mini"` | `OPENAI_MODEL` |
+| `openai_embedding_model` | str | `"text-embedding-3-small"` | `OPENAI_EMBEDDING_MODEL` |
+| `embedding_provider` | str | `"openai"  # openai(兼容API) | local(chromadb 本地嵌入,零外部依赖)` | `EMBEDDING_PROVIDER` |
+| `embedding_timeout_seconds` | float | `30.0` | `EMBEDDING_TIMEOUT_SECONDS` |
+| `ollama_base_url` | str | `"http://127.0.0.1:11434"` | `OLLAMA_BASE_URL` |
+| `ollama_model` | str | `"qwen2.5:7b"` | `OLLAMA_MODEL` |
+| `llm_timeout_seconds` | float | `15.0` | `LLM_TIMEOUT_SECONDS` |
+| `llm_thinking_enabled` | bool | `False` | `LLM_THINKING_ENABLED` |
+| `llm_support_temperature` | float | `0.6  # 支持性回复采样温度(偏高更像真人);风险/改写/评审仍固定 0.0` | `LLM_SUPPORT_TEMPERATURE` |
+| `risk_llm_channel_enabled` | bool | `True` | `RISK_LLM_CHANNEL_ENABLED` |
+| `risk_qlora_enabled` | bool | `False` | `RISK_QLORA_ENABLED` |
+| `risk_qlora_url` | str | `"https://qlora-endpoint.example.invalid"` | `RISK_QLORA_URL` |
+| `risk_qlora_timeout_seconds` | float | `8.0` | `RISK_QLORA_TIMEOUT_SECONDS` |
+| `function_calling_enabled` | bool | `True` | `FUNCTION_CALLING_ENABLED` |
+| `langgraph_checkpoint_enabled` | bool | `True` | `LANGGRAPH_CHECKPOINT_ENABLED` |
+| `langgraph_checkpoint_path` | str | `"data/langgraph-checkpoints.sqlite"` | `LANGGRAPH_CHECKPOINT_PATH` |
+| `knowledge_dir` | str | `"knowledge"` | `KNOWLEDGE_DIR` |
+| `max_knowledge_upload_bytes` | int | `1_000_000` | `MAX_KNOWLEDGE_UPLOAD_BYTES` |
+| `knowledge_top_k` | int | `4` | `KNOWLEDGE_TOP_K` |
+| `knowledge_candidate_k` | int | `16` | `KNOWLEDGE_CANDIDATE_K` |
+| `knowledge_chunk_size` | int | `512` | `KNOWLEDGE_CHUNK_SIZE` |
+| `knowledge_chunk_overlap` | int | `64` | `KNOWLEDGE_CHUNK_OVERLAP` |
+| `knowledge_hybrid_vector_weight` | float | `0.65` | `KNOWLEDGE_HYBRID_VECTOR_WEIGHT` |
+| `knowledge_hybrid_bm25_weight` | float | `0.35` | `KNOWLEDGE_HYBRID_BM25_WEIGHT` |
+| `knowledge_rerank_enabled` | bool | `True` | `KNOWLEDGE_RERANK_ENABLED` |
+| `knowledge_fusion_mode` | str | `"weighted"  # weighted | rrf` | `KNOWLEDGE_FUSION_MODE` |
+| `knowledge_cache_enabled` | bool | `False` | `KNOWLEDGE_CACHE_ENABLED` |
+| `knowledge_cache_ttl_seconds` | int | `300` | `KNOWLEDGE_CACHE_TTL_SECONDS` |
+| `knowledge_cache_max_entries` | int | `128` | `KNOWLEDGE_CACHE_MAX_ENTRIES` |
+| `rag_eval_dataset` | str | `"eval/fixtures/rag_queries.json"` | `RAG_EVAL_DATASET` |
+| `rag_eval_output` | str | `"data/eval/rag-eval-report.json"` | `RAG_EVAL_OUTPUT` |
+| `memory_recent_messages` | int | `15` | `MEMORY_RECENT_MESSAGES` |
+| `memory_summary_max_chars` | int | `3000` | `MEMORY_SUMMARY_MAX_CHARS` |
+| `vector_enabled` | bool | `False` | `VECTOR_ENABLED` |
+| `vector_required` | bool | `False` | `VECTOR_REQUIRED` |
+| `vector_backend` | str | `"chroma"` | `VECTOR_BACKEND` |
+| `chroma_dir` | str | `"data/chroma"` | `CHROMA_DIR` |
+| `chroma_host` | str | `""` | `CHROMA_HOST` |
+| `chroma_port` | int | `8000` | `CHROMA_PORT` |
+| `chroma_collection_name` | str | `"aegis_knowledge"` | `CHROMA_COLLECTION_NAME` |
+| `chroma_snapshot_dir` | str | `"data/chroma-snapshots"` | `CHROMA_SNAPSHOT_DIR` |
+| `chroma_snapshot_keep` | int | `5` | `CHROMA_SNAPSHOT_KEEP` |
+| `vector_top_k` | int | `16` | `VECTOR_TOP_K` |
+| `redis_url` | str | `""` | `REDIS_URL` |
+| `redis_lock_timeout_seconds` | int | `30` | `REDIS_LOCK_TIMEOUT_SECONDS` |
+| `chat_rate_limit_per_minute` | int | `40` | `CHAT_RATE_LIMIT_PER_MINUTE` |
+| `server_host` | str | `"127.0.0.1"` | `SERVER_HOST` |
+| `server_port` | int | `8091` | `SERVER_PORT` |
+| `auth_session_cookie` | str | `"aegis_session"` | `AUTH_SESSION_COOKIE` |
+| `auth_session_ttl_hours` | int | `24` | `AUTH_SESSION_TTL_HOURS` |
+| `auth_default_admin_username` | str | `"admin"` | `AUTH_DEFAULT_ADMIN_USERNAME` |
+| `auth_default_admin_password` | str | `"admin123!"` | `AUTH_DEFAULT_ADMIN_PASSWORD` |
+| `auth_default_student_username` | str | `"student"` | `AUTH_DEFAULT_STUDENT_USERNAME` |
+| `auth_default_student_password` | str | `"student123!"` | `AUTH_DEFAULT_STUDENT_PASSWORD` |
+| `auth_teacher_invite_code` | str | `"aegis-teacher"` | `AUTH_TEACHER_INVITE_CODE` |
+| `slow_request_threshold_ms` | int | `800` | `SLOW_REQUEST_THRESHOLD_MS` |
+| `tool_backend` | str | `"internal"` | `TOOL_BACKEND` |
+| `tool_output_dir` | str | `"data/tool-outputs"` | `TOOL_OUTPUT_DIR` |
+| `excel_path` | str | `"data/tool-outputs/aegis-risk-ledger.xlsx"` | `EXCEL_PATH` |
+| `alert_email_delivery_mode` | str | `"log"` | `ALERT_EMAIL_DELIVERY_MODE` |
+| `alert_email_to` | str | `""` | `ALERT_EMAIL_TO` |
+| `alert_email_from` | str | `""` | `ALERT_EMAIL_FROM` |
+| `alert_email_subject_prefix` | str | `"[Aegis 高风险预警]"` | `ALERT_EMAIL_SUBJECT_PREFIX` |
+| `alert_webhook_url` | str | `""` | `ALERT_WEBHOOK_URL` |
+| `smtp_host` | str | `""` | `SMTP_HOST` |
+| `smtp_port` | int | `587` | `SMTP_PORT` |
+| `smtp_username` | str | `""` | `SMTP_USERNAME` |
+| `smtp_password` | str | `""` | `SMTP_PASSWORD` |
+| `smtp_use_tls` | bool | `True` | `SMTP_USE_TLS` |
+| `smtp_use_ssl` | bool | `False` | `SMTP_USE_SSL` |
+| `smtp_timeout_seconds` | float | `10.0` | `SMTP_TIMEOUT_SECONDS` |
+| `alert_email_rate_limit_per_minute` | int | `10` | `ALERT_EMAIL_RATE_LIMIT_PER_MINUTE` |
+| `tool_queue_enabled` | bool | `True` | `TOOL_QUEUE_ENABLED` |
+| `tool_queue_poll_interval_seconds` | float | `2.0` | `TOOL_QUEUE_POLL_INTERVAL_SECONDS` |
+| `tool_queue_batch_size` | int | `20` | `TOOL_QUEUE_BATCH_SIZE` |
+| `tool_queue_worker_threads` | int | `4` | `TOOL_QUEUE_WORKER_THREADS` |
+| `tool_queue_retry_delay_seconds` | float | `5.0` | `TOOL_QUEUE_RETRY_DELAY_SECONDS` |
+| `mcp_enabled` | bool | `False` | `MCP_ENABLED` |
+| `agent_runtime` | str | `"autonomous"` | `AGENT_RUNTIME` |
+| `agent_max_rounds` | int | `8` | `AGENT_MAX_ROUNDS` |
+| `agent_max_claims_per_round` | int | `4` | `AGENT_MAX_CLAIMS_PER_ROUND` |
+| `agent_max_claims_per_agent` | int | `3` | `AGENT_MAX_CLAIMS_PER_AGENT` |
+| `agent_final_acceptance_min_confidence` | float | `0.6` | `AGENT_FINAL_ACCEPTANCE_MIN_CONFIDENCE` |
+| `skill_distill_enabled` | bool | `True` | `SKILL_DISTILL_ENABLED` |
+| `skill_distill_min_repeat` | int | `3` | `SKILL_DISTILL_MIN_REPEAT` |
+| `skill_distill_dir` | str | `"skills/auto"` | `SKILL_DISTILL_DIR` |
+
+> 清点：90 个字段。
 
 ***
 

@@ -8,17 +8,19 @@ from app.agents.skill_selection import select_response_skills
 from app.agents.model_profiles import AgentModelRegistry
 from app.agents.classic import CompanionAgent, CounselorAgent, KnowledgeAgent, LeadAgent, MemoryAgent, RiskGuardianAgent
 from app.autonomous.runtime import AutonomousAgentRuntime
+from app.config import Settings
 from app.llm import LLMClient, MockLLMClient
 from app.models import AgentTrace, ChatResponse, Intent, PendingReport, RiskLevel, RuntimeEvent, RuntimeEventType, StreamEvent
+from app.repository.store import DatabaseStore
 from app.skills import SkillRegistry
 
 
 class PsychOrchestrator:
-    def __init__(self, registry: SkillRegistry, store, llm_client: LLMClient | None = None):
+    def __init__(self, registry: SkillRegistry, store: DatabaseStore, llm_client: LLMClient | None = None):
         self.registry = registry
         self.store = store
         self.llm_client = llm_client or MockLLMClient()
-        self.settings = getattr(store, "settings", None)
+        self.settings = store.settings
         self.model_registry = AgentModelRegistry(self.settings, self.store, self.llm_client)
         self.model_registry.ensure_defaults()
         self.memory_agent = MemoryAgent()
@@ -460,4 +462,3 @@ class PsychOrchestrator:
         if len(text) <= 48:
             return [text]
         return [text[idx:idx + 48] for idx in range(0, len(text), 48)]
-

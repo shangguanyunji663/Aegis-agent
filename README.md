@@ -266,7 +266,7 @@ RISK_QLORA_TIMEOUT_SECONDS=8
 │   ├── llm/                     # 模型后端：Mock / OpenAI / Ollama / RiskQloraClient + prompts
 │   ├── agents/                  # 智能体层：classic | harness | model_profiles | orchestrator | runtime | skill_selection | langgraph_runtime
 │   ├── autonomous/              # 自治协作：events | registry | board | coordinator | agents | runtime
-│   ├── rag/                     # 检索与记忆：text | scoring | chunking | facts(L2) | memory(L3) | vector_store
+│   ├── rag/                     # 检索与记忆：text | scoring | chunking | facts(L2) | memory(L3) | vector_store | reranker(CE 精排)
 │   ├── repository/              # 持久化仓储：会话、L2 用户事实、知识库、报告与工具任务
 │   ├── tools/                   # 工具治理：contracts（契约）| gateway（网关）
 │   ├── services/                # 业务服务：report_case | tool_executor | tool_queue | tool_records | tool_governance
@@ -277,11 +277,12 @@ RISK_QLORA_TIMEOUT_SECONDS=8
 ├── eval/                        # 评测 CLI 与 fixtures（路由 / 风险 / 安全 / 多轮 / 检索 / RAG 数据集）
 ├── skills/                      # 人工策展 Skill 规范；运行时可在 skills/auto/ 生成 auto Skill
 ├── static/                      # 前端：index | login | student | admin 页面 + styles.css + theme.js
-├── tests/                       # pytest 测试（15 个模块）
+├── tests/                       # pytest 测试（16 个模块）
 ├── scripts/                     # 启动/联调/诊断：start-local | start-compose | smoke_chat | probe_glm
 │                                #                migrate_sqlite_to_mysql | eval_risk_dual_path | run_benchmark | analyze_layers
+│                                #                eval_minilm_ablation_tmp | eval_ce_tmp（第十九轮 RAG 对照评测）
 ├── docs/                        # 架构、安全、演示、教师手册与前端学习文档
-│   └── records/                 # 迭代记录（第 1 ~ 18 轮）
+│   └── records/                 # 迭代记录（第 1 ~ 19 轮）
 ├── Dockerfile
 ├── docker-compose.yml
 └── requirements.txt
@@ -348,6 +349,9 @@ RISK_QLORA_TIMEOUT_SECONDS=8
 | `EMBEDDING_PROVIDER` | `openai`（默认）或 `local`（Chroma 本地嵌入）；`.env.example` 用 `local` 作为无密钥演示示例 |
 | `VECTOR_BACKEND` | 向量后端，默认 `chroma`；仅在 `VECTOR_ENABLED=true` 时参与检索 |
 | `KNOWLEDGE_FUSION_MODE` | `weighted`（默认，线性加权）或 `rrf`（倒数排名融合） |
+| `KNOWLEDGE_RERANK_ENGINE` | 重排引擎：`lexical`（默认，纯 Python 词法公式，全库重打分）或 `cross_encoder`（ONNX 模型精排，两段式 top-N，见第十九轮） |
+| `KNOWLEDGE_RERANK_TOP_N` | Cross-Encoder 精排候选数；默认 `16`（仅 `cross_encoder` 引擎使用） |
+| `RERANKER_MODEL_DIR` | Cross-Encoder ONNX 模型目录；默认 `data/models/bge-reranker-base-onnx`（含 `model_quantized.onnx` 与 `tokenizer.json`，模型下载见第十九轮记录） |
 | `KNOWLEDGE_CACHE_ENABLED` | 进程内 LRU 精确查询缓存开关；默认 `false`，可配 TTL 与最大条目数。Redis 写入为预留能力，检索读取仍以进程内缓存为准 |
 | `RISK_LLM_CHANNEL_ENABLED` | 通用 LLM 风险通道开关；默认 `true`。`RISK_QLORA_ENABLED=true` 时由 QLoRA 通道接管 |
 | `RISK_QLORA_ENABLED` | QLoRA 风险增强开关；默认 `false` |
@@ -427,6 +431,7 @@ python -m app.mcp.server --list
 | :--- | :--- | :--- |
 | 路由 / 风险 / 规模化基准 | `eval/fixtures/representative_corpus.json`，150 条人工构造金标样本，含 `layer`（base / stress）与 `source` 双层拆分标记 | `data/eval/latest.json`，2026-08-19 |
 | RAG 检索 | `eval/fixtures/rag_queries.json`，77 条自然语言问句，基于 24 篇知识文档 | `data/eval/rag-eval-report.json`，2026-08-20 |
+| RAG 语义重排与真向量实测（第十九轮） | 同 77 条问句；Chroma+MiniLM 嵌入与 bge-reranker-base Cross-Encoder 逐条对照 | `data/eval/minilm-eval-report.json` / `data/eval/ce-eval-report.json`，2026-09-29 |
 | 多轮回归 | `eval/fixtures/multi_turn_corpus.json`，8 组多轮场景 | `data/eval/latest.json`，2026-08-19 |
 | 三运行时 A/B | 10 条代表性消息 | `data/harness/runtime-ab-report.md`，2026-08-20 |
 | 性能基准 | `scripts/run_benchmark.py`，MockLLM + `VECTOR_ENABLED=false` | `data/eval/benchmark.json`，2026-08-20 |
@@ -440,6 +445,7 @@ python -m app.mcp.server --list
 | 风险双通道 + QLoRA 微调 | 历史规则/stub/GLM sanity 与当前真实 v9 QLoRA 冻结 stress 87 条验收 | **当前以 v9 QLoRA 为准**：`RISK_QLORA_ENABLED=true` 时八门槛全过 |
 | 多轮回归 | 8 组多轮场景（含升级到中/高风险、第三人称转自身） | **2026-08-19**：最终关键内容命中率 **0.875**（7/8） |
 | RAG 检索 | 77 条问句 Top-4；专项消融使用 local-hash 向量配置 | **2026-08-20**：宽松 HitRate@4 **0.935**、严格来源命中 **0.883**、Recall@4 **0.935**、Precision@4 **0.351**、MRR **0.820**、NDCG@4 **0.832** |
+| RAG 语义重排（第十九轮实测） | 同 77 条问句：BM25+Cross-Encoder 精排、Chroma+MiniLM 真向量混合 | **2026-09-29**：BM25+Cross-Encoder **0.948**（73/77，历史最优）；真 MiniLM 混合 **0.857**（被英文嵌入模型拖累，暂不启用，需换中文嵌入模型重测）；CE 延迟 ~850ms/条（CPU int8） |
 | 三运行时 A/B | langgraph / autonomous / ordered 对比延迟、trace 步数、LLM 调用数与判定一致性 | **2026-08-20**：三运行时判定完全一致；意图准确率 **0.8**、风险准确率 **0.9**，含 1 条规则引擎漏判的隐式高危边界样本 |
 | Harness 验证 | Risk Safety、Agent Routing、Standard Skills、RAG、API、Tool Queue、Runtime A/B 等链路（验证工程行为，不强制满分） | **历史快照**：`data/harness/current-verification.json` 为 **8/8 通过**；`latest.json` 是旧的 7-suite 存档，建议重跑后覆盖 |
 | 本地性能 benchmark | MockLLM 确定性环境，20 条代表性消息 × 并发 [1,4,8] | **2026-08-20**：并发 1 → avg 66ms / P95 71ms / 15.1 req/s；并发 4 → avg 316ms / P95 729ms / 12.3 req/s；并发 8 → avg 517ms / P95 1260ms / 13.5 req/s。缓存命中 <0.01ms；ToolJob 5/5 成功、0 死信 |
@@ -552,7 +558,7 @@ python -m app.mcp.server --list
 - [逐文件学习指南](Aegis项目逐文件学习指南.md)
 
 <details>
-<summary><b>展开：迭代记录（第 1 ~ 18 轮）</b></summary>
+<summary><b>展开：迭代记录（第 1 ~ 19 轮）</b></summary>
 
 | 轮次 | 主题 | 文档 |
 | :--- | :--- | :--- |
@@ -573,6 +579,7 @@ python -m app.mcp.server --list
 | 第十六轮 | 咨询工作台教师使用手册 | [ROUND-16-ADMIN-TEACHER-GUIDE.md](docs/records/ROUND-16-ADMIN-TEACHER-GUIDE.md) |
 | 第十七轮 | 前端整体改造（页签化 / 固定一屏 / 全中文） | [ROUND-17-FRONTEND-OVERHAUL.md](docs/records/ROUND-17-FRONTEND-OVERHAUL.md) |
 | 第十八轮 | 前端多主题切换与零闪烁注入 | [ROUND-18-THEME-SWITCHER.md](docs/records/ROUND-18-THEME-SWITCHER.md) |
+| 第十九轮 | RAG 语义重排引擎（Cross-Encoder）与真 MiniLM 实测 | [ROUND-19-RAG-SEMANTIC-RERANK.md](docs/records/ROUND-19-RAG-SEMANTIC-RERANK.md) |
 
 </details>
 

@@ -61,7 +61,7 @@ flowchart TD
 | `app/autonomous/coordinator.py`                                    | 基于 claim 的有限轮次协调器,控制任务认领、产物验收和安全复核                                                                                                                                                               |
 | `app/autonomous/agents.py`                                         | Memory、Lead、RiskGuardian、Knowledge、Counselor、Companion 等 Agent                                                                                                                                   |
 | `app/repository/store.py`                                          | 会话、消息、知识库、报告、个案、工具任务、审计与用户主题偏好持久化(DatabaseStore);`THEME_CHOICES`/`DEFAULT_THEME` 常量为前端四主题切换的单一真相源                                                                                                |
-| `app/rag/`                                                         | 检索子系统:text(分词)、scoring(BM25/重排/融合)、chunking(切块)、memory(会话摘要)、vector\_store(Chroma 向量与本地降级)                                                                                                       |
+| `app/rag/`                                                         | 检索子系统:text(分词)、scoring(BM25/重排/融合)、chunking(切块)、memory(会话摘要)、vector\_store(Chroma 向量与本地降级)、reranker(Cross-Encoder 精排引擎,第十九轮)                                                                               |
 | `app/tools/contracts.py`                                           | 工具契约:角色、风险等级、审批要求、脱敏字段和重试限制                                                                                                                                                                      |
 | `app/tools/gateway.py` / `app/mcp/server.py` / `app/mcp/client.py` | internal/FastMCP 工具边界                                                                                                                                                                            |
 | `app/services/`                                                    | 报告个案、工具执行、工具治理、队列 worker、记录表等服务层                                                                                                                                                                 |
@@ -282,6 +282,15 @@ flowchart TD
 | `MEMORY_SUMMARY_MAX_CHARS`     | `3000`                                   | 会话摘要字符上限                                              |
 | `LANGGRAPH_CHECKPOINT_ENABLED` | `true`                                   | LangGraph checkpoint 持久化                              |
 | `AGENT_RUNTIME`                | `autonomous`                             | 默认 Agent 编排器                                          |
+
+### 9.8 检索重排双引擎（第十九轮）
+
+重排槽位支持两种引擎，由 `KNOWLEDGE_RERANK_ENGINE` 切换（默认 `lexical`，行为与历史版本完全一致）：
+
+- **词法引擎（默认）**：四路词面信号加权（base*0.55 + 词面*0.25 + 覆盖率*0.15 + 短语*0.05），纯 Python、全库重打分、零模型成本；
+- **Cross-Encoder 引擎**：`app/rag/reranker.py` 加载 ONNX 模型（bge-reranker-base int8，`RERANKER_MODEL_DIR`），按融合分截取 top-N（`KNOWLEDGE_RERANK_TOP_N=16`）做两段式精排；模型缺失/推理失败自动回退词法公式并记录 `vector_error`，检索永不中断。
+
+实测（77 条问句，2026-09-29）：BM25+Cross-Encoder **73/77 (0.948)** 为历史最优；真 MiniLM 混合召回 **66/77** 被英文嵌入模型拖累、暂不启用（需换中文嵌入模型重测）。逐条报告见 `data/eval/ce-eval-report.json` / `minilm-eval-report.json`，迭代记录见 [ROUND-19](records/ROUND-19-RAG-SEMANTIC-RERANK.md)。
 
 ## 10. 前端主题切换（第十八轮）
 

@@ -869,6 +869,9 @@ class DatabaseStore:
                 }
             )
 
+            rerank_engine = ""
+            if fusion_mode != "rrf" and self.settings.knowledge_rerank_enabled:
+                rerank_engine = str(getattr(self.settings, "knowledge_rerank_engine", "lexical") or "lexical")
             for chunk in chunks:
                 if chunk.id is None:
                     continue
@@ -890,9 +893,11 @@ class DatabaseStore:
                         self.settings.knowledge_hybrid_vector_weight,
                         self.settings.knowledge_hybrid_bm25_weight,
                     )
-                if fusion_mode != "rrf" and self.settings.knowledge_rerank_enabled:
+                if rerank_engine == "lexical":
                     score = rerank_score(rewritten_query, chunk.content, score)
                 ranked.append((chunk, score))
+            if rerank_engine == "cross_encoder":
+                ranked = self._apply_cross_encoder_rerank(rewritten_query, ranked)
             ranked.sort(key=lambda item: item[1], reverse=True)
             ranked = expand_best_hit(ranked, chunks)
             results = []
@@ -911,6 +916,23 @@ class DatabaseStore:
             if self.settings.knowledge_cache_enabled:
                 self._set_cache(cache_key, results)
             return results
+
+    def _apply_cross_encoder_rerank(self, query: str, ranked: list) -> list:
+        """两段式精排:按融合分取 top-N 交 Cross-Encoder 重打分;失败回退词法公式(全库)。
+
+        对应学习指南 9.7.0 Q3:词法引擎可全库重打分,模型引擎只能对粗排头部精排。
+        """
+        from app.rag.reranker import cross_encoder_rerank
+
+        top_n = max(1, int(getattr(self.settings, "knowledge_rerank_top_n", 16) or 16))
+        head, tail = ranked[:top_n], ranked[top_n:]
+        try:
+            model_dir = str(getattr(self.settings, "reranker_model_dir", "") or "")
+            reranked = cross_encoder_rerank(query, head, model_dir)
+        except Exception as exc:  # noqa: BLE001 - 模型缺失/损坏时检索不中断
+            self.vector_error = f"cross-encoder rerank failed, fallback to lexical: {exc}"
+            return [(chunk, rerank_score(query, chunk.content, score)) for chunk, score in ranked]
+        return reranked + tail
 
     def _check_cache(self, key: str) -> list[dict] | None:
         if not self.settings.knowledge_cache_enabled:

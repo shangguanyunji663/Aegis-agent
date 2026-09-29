@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     knowledge_hybrid_vector_weight: float = 0.65
     knowledge_hybrid_bm25_weight: float = 0.35
     knowledge_rerank_enabled: bool = True
+    # 重排引擎:lexical(默认,纯 Python 词法公式,全库重打分) | cross_encoder(ONNX 模型精排,两段式 top-N)
+    knowledge_rerank_engine: str = "lexical"
+    knowledge_rerank_top_n: int = 16
+    reranker_model_dir: str = "data/models/bge-reranker-base-onnx"
     knowledge_fusion_mode: str = "weighted"  # weighted | rrf
     knowledge_cache_enabled: bool = False
     knowledge_cache_ttl_seconds: int = 300

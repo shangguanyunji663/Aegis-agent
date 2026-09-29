@@ -5,6 +5,7 @@
 > 读者定位：刚接触 Agent 应用开发、有 Python 基础的学生。你不需要先懂 LangChain 或 RAG——本文档从「为什么需要这个东西」讲起。读完并按引导走完，你应当能依据思路独立搭出结构相同、功能一致的项目，而不是照抄代码。
 >
 > 文档结论的「正确性」以仓库当前 `main` 分支为准；本文档在多处给出「为什么这么选」的判断，便于你在自己的项目里做取舍。
+> **双册学习路径**：本指南覆盖 **Agent 侧**（编排 / RAG / 工具治理 / 记忆）。配套的「模型侧」学习手册在隔离训练仓：`D:\AegisTraining\training\LEARNING-GUIDE.md`——QLoRA 微调、数据契约、泄漏防护、冻结验收与发布回滚，含易混淆点澄清、岗位能力映射、面试追问预演与简历 STAR 模板。两册合读 = 完整的「Agent 开发实习」能力拼图；面试叙事建议把两个仓库讲成**一个系统的两半**（训练侧模型经受保护 HTTP 契约接入本项目的 max 融合链路）。
 
 ***
 
@@ -564,7 +565,7 @@ python -m app.init_db
 uvicorn app.main:app --host 127.0.0.1 --port 8091
 ```
 
-如果要使用已经通过八门槛验收的 v9 QLoRA 风险模型，先启动 D 盘隔离推理服务，再启动 FastAPI：
+如果要使用已经通过八门槛验收的 v9 QLoRA 风险模型，先启动 D 盘隔离推理服务，再启动 FastAPI（该模型的训练配置、八门槛验收记录与数据来源声明见 [`docs/training/`](docs/training/OVERVIEW.md)）：
 
 ```bat
 set AEGIS_TRAINING_ROOT=D:\AegisTraining
@@ -1087,7 +1088,7 @@ ANXIETY_TERMS = ["焦虑", "压力", "考试", "睡不着", "失眠", "panic", "
 
 **学习要点（风险双通道）**：`assess_message` 是规则通道；`RiskGuardianAgent` 会再用可选模型通道复核——通用 LLM 或开启 `RISK_QLORA_ENABLED` 后的 v9 QLoRA 隔离服务，严格 JSON、8s 短超时；两通道取并集，任一判 high 即 high；模型失败/超时/mock 一律回退纯规则，输出 `risk_channels` 溯源。
 
-- **第十四轮真实 QLoRA 验收**：v9 使用新提示词契约 v2，在冻结 stress 87 条上八门槛全部通过：FPR 0、隐喻新增 +6、medium 召回 0.88、第三人称准确率 0.82、P95 1.37s。推理服务脚本位于 `D:\AegisTraining\training\scripts\serve_risk_qlora.py`，路径可通过 `AEGIS_TRAINING_ROOT` / `AEGIS_QLORA_MODEL_DIR` 覆盖。
+- **第十四轮真实 QLoRA 验收**：v9 使用新提示词契约 v2，在冻结 stress 87 条上八门槛全部通过：FPR 0、隐喻新增 +6、medium 召回 0.88、第三人称准确率 0.82、P95 1.37s。推理服务脚本位于 `D:\AegisTraining\training\scripts\serve_risk_qlora.py`，路径可通过 `AEGIS_TRAINING_ROOT` / `AEGIS_QLORA_MODEL_DIR` 覆盖。验收证据摘要已入主仓库 [`docs/training/V9-ACCEPTANCE.md`](docs/training/V9-ACCEPTANCE.md)（P95 存在 0.95s/1.37s 双口径，见 OVERVIEW 的口径备注）。
 - **第十一轮历史双路径验证**：150 条语料的 baseline/stub/GLM 数字仍保留在 `data/eval/risk_dual_path.json`，只代表历史测试替身，不代表当前 v9 生产模型。
 - `HIGH_TERMS` 是单一事实来源——`autonomous/board.py` 的 `hard_high_risk()` 也引用它，改关键词只改一处。
 - 规则评估可解释（命中了哪个词一目了然）、可单测、零成本零延迟。代价是召回有限，隐喻式高危由模型通道补强。
@@ -2763,7 +2764,7 @@ print("有 report 事件?", "report" in names_high, "| 最后:", names_high[-1])
 - `app/evaluation/rag.py`：RAG 专项（HitRate/Recall@4/Precision@4/MRR/NDCG@4，独立运行改用一次性 SQLite 评测库、不依赖 MySQL/pymysql），数据集在 `eval/fixtures/rag_queries.json`（77 条自然语言问句，基于当前 24 篇知识文档）。
 - `app/evaluation/harness/runner.py` + `factory.py`：工程级场景回放——8 套件（risk/routing/skills/rag/api/tool-queue/scaled/runtime-ab）验证端到端行为（如“审批后 5 个工具任务全部 success”“死信被正确创建”），失败退出码 1，可接 CI。`factory.py` 是重构产物：harness 与 `eval/run_eval.py` 共用一个装配工厂，消除两份漂移的样板。
 - `eval/run_eval.py`：综合评测 CLI（仅 22 行）——`build_harness_orchestrator(data_dir)` 用与 harness 同一个装配工厂造出 mock、隔离 SQLite 的编排器，再调 `run_evaluation(orchestrator, store, eval/fixtures, data/eval)`（`evaluation/runner.py` 的总入口，依次跑路由/风险/安全/技能/150 条双层基准/多轮一致性并汇总），最后打印 summary。与 harness 的分工：harness 断言「端到端行为对不对」（回归视角），run_eval 产出「能力指标好不好」（度量视角）——一个管回归、一个管度量，共用同一套装配，这就是 4.7 两条命令背后其实只有一个装配事实的原因。
-- `scripts/eval_risk_dual_path.py`（第十一轮历史实验）：风险 LLM 通道双路径评测——同 150 条语料分别跑 baseline（MockLLM + channel OFF）与 llm_stub（`MetaphorAwareStubClient` + channel ON），直调 `RiskGuardianAgent.assess()` 避免 response 生成/judge 等额外 LLM 调用；另有真实 GLM-4.7-flash 的 25 条扩展 best-effort probe。产出 `data/eval/risk_dual_path.json`。当前生产模型验收以 `D:\AegisTraining\reports\risk-qlora-eval-v9.json` 为准。
+- `scripts/eval_risk_dual_path.py`（第十一轮历史实验）：风险 LLM 通道双路径评测——同 150 条语料分别跑 baseline（MockLLM + channel OFF）与 llm_stub（`MetaphorAwareStubClient` + channel ON），直调 `RiskGuardianAgent.assess()` 避免 response 生成/judge 等额外 LLM 调用；另有真实 GLM-4.7-flash 的 25 条扩展 best-effort probe。产出 `data/eval/risk_dual_path.json`。当前生产模型验收结论以训练仓 `reports/V9-TRAINING-EVAL-SUMMARY.md` 为准（原始 JSON 未随训练仓保留；仓库内转载见 [`docs/training/V9-ACCEPTANCE.md`](docs/training/V9-ACCEPTANCE.md)）。
 - `scripts/probe_glm.py`（第十一轮新增）：GLM 端点探针——验证 endpoint/model/api_key 可用性，不打印 API key，退出码 0=可用。
 - `eval/fixtures/`：路由/风险/安全/多轮小型金标集 + `representative_corpus.json`（150 条）/ `rag_queries.json`（77 条）/ `multi_turn_corpus.json`（8 组）人工构造、人工标注的代表性数据集。
 
@@ -2966,7 +2967,7 @@ L1 管 Agent 协作内务；L2 管「用户现在是什么状态」（SCD-2 有�
 3.   读一次黑板  ：`tests/test_orchestrator.py` 里的高风险用例断言了 SAFETY\_OVERRIDE 的传播；再对照 `autonomous/runtime.py` 的 `_trace_from_board` 看事件如何变成 trace。
 4.   改一个小东西试试  ：往 `assessment.HIGH_TERMS` 加一个词，跑 `python -m pytest tests -q` 与 `python -m app.evaluation.harness.runner --suite risk`——体会「单一来源 + 评测护栏」如何让修改变得安全。
 5.   换个模型  ：设 `AI_PROVIDER=ollama` 起服务，其余什么都不用改；风险通道若启用微调模型，另设 `RISK_QLORA_ENABLED=true` 并启动 D 盘隔离服务，路径由 `AEGIS_TRAINING_ROOT` / `AEGIS_QLORA_MODEL_DIR` 配置。
-6.   跑一次历史双路径验证  ：`python scripts/eval_risk_dual_path.py`——看 baseline 与 stub-LLM 的历史对比；当前真实 QLoRA 结果见 `D:\AegisTraining\reports\risk-qlora-eval-v9.json`。
+6.   跑一次历史双路径验证  ：`python scripts/eval_risk_dual_path.py`——看 baseline 与 stub-LLM 的历史对比；当前真实 QLoRA 验收结论见训练仓 `reports/V9-TRAINING-EVAL-SUMMARY.md`（仓库内转载：[`docs/training/V9-ACCEPTANCE.md`](docs/training/V9-ACCEPTANCE.md)）。
 
 ## 总结四：按引导式路线「从零重建」的检查清单
 

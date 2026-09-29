@@ -67,7 +67,7 @@ class GraphState(TypedDict, total=False):
 
 def _skip_context(state: GraphState) -> str:
     """条件边:陪伴类低风险闲聊不触发 RAG 检索,直接进入提案。"""
-    if state["intent"] is Intent.COMPANION and state["risk_level"] is RiskLevel.LOW:
+    if state.get("intent") is Intent.COMPANION and state.get("risk_level") is RiskLevel.LOW:
         return "compose"
     return "context"
 

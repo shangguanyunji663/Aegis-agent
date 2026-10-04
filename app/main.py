@@ -27,9 +27,9 @@ from app.services.tool_queue import ToolQueueWorker
 from app.skills import SkillRegistry
 from app.tools.gateway import build_tool_gateway
 
-# 项目根目录与静态资源目录
+# 项目根目录;前端构建产物(见 frontend/README 与 app/api/pages.py)
 ROOT = Path(__file__).resolve().parents[1]
-STATIC_DIR = ROOT / "static"
+DIST_DIR = ROOT / "frontend" / "dist"
 # 应用日志记录器
 logger = logging.getLogger("aegis.app")
 
@@ -60,7 +60,6 @@ def create_app(runtime_settings: Settings | None = None) -> FastAPI:
             tool_worker.stop()
 
     app = FastAPI(title="Aegis Psych Agent", version="0.2.0", lifespan=lifespan)
-    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     app.state.settings = settings
     app.state.engine = engine
     app.state.store = store
@@ -80,6 +79,11 @@ def create_app(runtime_settings: Settings | None = None) -> FastAPI:
     app.include_router(auth_routes.router)
     app.include_router(chat.router)
     app.include_router(admin.router)
+
+    # SPA 静态资源:/assets/*、/favicon.svg 等直接取自 dist;
+    # 挂在页面路由之后,使 / /student /admin 优先走带主题注入的 pages 路由。
+    if DIST_DIR.exists():
+        app.mount("/", StaticFiles(directory=DIST_DIR, html=True), name="spa")
     return app
 
 

@@ -53,9 +53,10 @@ from app.services.tool_queue import ToolQueueService
 from app.services.tool_records import ToolRecordService
 from app.tools.contracts import governed_payload, normalize_tool_kind
 
-# 主题切换:可选主题键与默认主题。新增主题需同步 styles.css 的 html[data-theme="..."] 块。
-THEME_CHOICES: tuple[str, ...] = ("warm", "ocean", "forest", "playful")
-DEFAULT_THEME: str = "warm"
+# 主题档位:亮/暗两档。旧值(warm/ocean/forest/playful)读取时自动回退 DEFAULT_THEME,
+# 无需迁移;前端以 html[data-theme] 接收首屏注入。
+THEME_CHOICES: tuple[str, ...] = ("light", "dark")
+DEFAULT_THEME: str = "light"
 
 
 class DatabaseStore:

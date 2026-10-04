@@ -1,0 +1,598 @@
+/* ============================================================
+   精美层 (premium):落地页的氛围工艺。
+   对标精美落地页四要素:
+   1. 氛围光 —— 多层径向光晕 + 暗角,告别纯平色块
+   2. 渐变走线 —— 卡片描边改为渐变 hairline + 顶部内高光 + 层叠投影
+   3. 超大水印字 —— 品牌字以描边空心字沉入背景,做版面纵深
+   4. 排版精修 —— kicker 小字距标签 + 大号口号 + 平衡留白
+   全部 CSS 原生,零图像资产;动效均受 reduced-motion 约束。
+   加载顺序:在本文件于 fx.css 之后注入,确保覆盖 lgh-* 基础规则。
+   ============================================================ */
+
+/* ---------- 1. 氛围光:三概念各自的场景底色(真实摄影垫底) ----------
+   照片在独立图层 .lgh-photo:Ken Burns 慢推 + 鼠标视差(见动效区)。
+   图源 Lorem Picsum(Unsplash 授权,可商用):
+   letter#416 Elaine Li / radio#149 Guillaume / atlas#865 Federico Bottos */
+
+html[data-concept="letter"] .lgh-portal {
+  background:
+    radial-gradient(1000px 560px at 10% -12%, color-mix(in srgb, var(--pine) 15%, transparent), transparent 62%),
+    radial-gradient(760px 500px at 98% 112%, color-mix(in srgb, var(--seal) 11%, transparent), transparent 62%),
+    radial-gradient(closest-side at 50% 118%, color-mix(in srgb, var(--amber) 7%, transparent), transparent 70%),
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--paper) 46%, transparent) 0%,
+      color-mix(in srgb, var(--paper) 82%, transparent) 52%,
+      var(--paper) 92%),
+    var(--paper);
+}
+
+html[data-concept="radio"] .lgh-portal {
+  background:
+    radial-gradient(1100px 520px at 18% 4%, color-mix(in srgb, var(--teal) 9%, transparent), transparent 60%),
+    radial-gradient(900px 480px at 84% 96%, color-mix(in srgb, var(--amber) 8%, transparent), transparent 60%),
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--bg) 30%, transparent) 0%,
+      color-mix(in srgb, var(--bg) 74%, transparent) 55%,
+      color-mix(in srgb, var(--bg) 92%, transparent) 100%),
+    var(--bg);
+}
+
+html[data-concept="atlas"] .lgh-portal {
+  background:
+    radial-gradient(940px 520px at 88% -14%, color-mix(in srgb, var(--sea) 13%, transparent), transparent 62%),
+    radial-gradient(closest-side at 50% 120%, color-mix(in srgb, var(--brass) 6%, transparent), transparent 70%),
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--fog) 44%, transparent) 0%,
+      color-mix(in srgb, var(--fog) 80%, transparent) 52%,
+      var(--fog) 92%),
+    var(--fog);
+}
+
+/* 照片图层:Ken Burns 慢推(动画) × 鼠标视差(--mx-n/--my-n,fx 提供) */
+.lgh-portal > .lgh-photo {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  transform: translate(calc(var(--mx-n, 0) * -14px), calc(var(--my-n, 0) * -10px));
+  transition: transform .9s var(--ease-premium);
+}
+
+.lgh-portal > .lgh-photo::before {
+  content: "";
+  position: absolute;
+  inset: -4%;
+  background: var(--lgh-photo) center / cover no-repeat;
+  animation: premium-kenburns 44s var(--ease-premium) infinite alternate;
+  will-change: transform;
+}
+
+html[data-concept="letter"] .lgh-portal > .lgh-photo::before { --lgh-photo: url("../assets/hero-letter.jpg"); }
+html[data-concept="radio"] .lgh-portal > .lgh-photo::before { --lgh-photo: url("../assets/hero-radio.jpg"); }
+html[data-concept="atlas"] .lgh-portal > .lgh-photo::before { --lgh-photo: url("../assets/hero-atlas.jpg"); }
+
+@keyframes premium-kenburns {
+  from { transform: scale(1.05) translate(0.6%, 0.4%); }
+  to { transform: scale(1.15) translate(-1.4%, -1%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lgh-portal > .lgh-photo::before { animation: none; }
+  .lgh-portal > .lgh-photo { transform: none; }
+}
+
+/* 上浮光尘:fx 注入 .lgh-motes,缓慢升起的环境颗粒 */
+.lgh-motes {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.lgh-motes i {
+  position: absolute;
+  bottom: -12px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 60%, transparent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 40%, transparent);
+  opacity: 0;
+  animation: premium-mote linear infinite;
+}
+
+.lgh-motes i:nth-child(1) { left: 8%;  animation-duration: 19s; animation-delay: -2s; }
+.lgh-motes i:nth-child(2) { left: 21%; animation-duration: 24s; animation-delay: -9s; width: 3px; height: 3px; }
+.lgh-motes i:nth-child(3) { left: 34%; animation-duration: 16s; animation-delay: -5s; }
+.lgh-motes i:nth-child(4) { left: 47%; animation-duration: 27s; animation-delay: -14s; width: 4px; height: 4px; }
+.lgh-motes i:nth-child(5) { left: 58%; animation-duration: 21s; animation-delay: -1s; }
+.lgh-motes i:nth-child(6) { left: 66%; animation-duration: 18s; animation-delay: -11s; width: 3px; height: 3px; }
+.lgh-motes i:nth-child(7) { left: 74%; animation-duration: 25s; animation-delay: -7s; }
+.lgh-motes i:nth-child(8) { left: 85%; animation-duration: 22s; animation-delay: -16s; width: 4px; height: 4px; }
+.lgh-motes i:nth-child(9) { left: 93%; animation-duration: 17s; animation-delay: -4s; }
+
+@keyframes premium-mote {
+  0% { transform: translateY(0); opacity: 0; }
+  10% { opacity: .55; }
+  80% { opacity: .3; }
+  100% { transform: translateY(-104vh); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lgh-motes { display: none; }
+}
+
+/* 全站环境光斑:fx 注入 .fx-ambient,两枚模糊光团缓慢游移(登录/信桌/工作台都有) */
+.fx-ambient {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+#root { position: relative; z-index: 1; }
+
+.fx-ambient i {
+  position: absolute;
+  width: 42vmax;
+  height: 42vmax;
+  border-radius: 50%;
+  filter: blur(72px);
+  opacity: .1;
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent, #6f9d8b) 60%, transparent), transparent 68%);
+}
+
+.fx-ambient i:nth-child(1) { top: -12vmax; left: -8vmax; animation: fx-orbit 26s ease-in-out infinite alternate; }
+.fx-ambient i:nth-child(2) { bottom: -16vmax; right: -10vmax; animation: fx-orbit 34s ease-in-out infinite alternate-reverse; }
+
+@keyframes fx-orbit {
+  from { transform: translate(0, 0) scale(1); }
+  to { transform: translate(9vmax, 6vmax) scale(1.18); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-ambient { display: none; }
+}
+
+/* CTA 流光:每 6 秒一道高光扫过胶囊按钮 */
+.lgh-go {
+  position: relative;
+  overflow: hidden;
+}
+
+.lgh-go::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 42%;
+  left: -60%;
+  background: linear-gradient(105deg, transparent, rgba(255, 255, 255, .38), transparent);
+  transform: skewX(-18deg);
+  animation: premium-sheen 6s var(--ease-premium) infinite;
+  animation-delay: 2.4s;
+  pointer-events: none;
+}
+
+@keyframes premium-sheen {
+  0% { left: -60%; }
+  42%, 100% { left: 132%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lgh-go::after { animation: none; }
+}
+
+/* 水印字反向视差:与照片形成景深 */
+html[data-concept="letter"] .lgh-portal::before,
+html[data-concept="radio"] .lgh-portal::before,
+html[data-concept="atlas"] .lgh-portal::before {
+  transform: translateY(-52%) translateX(calc(var(--mx-n, 0) * 9px)) translateY(calc(var(--my-n, 0) * 6px));
+  transition: transform .9s var(--ease-premium);
+}
+
+/* 呼吸光斑:背景最高层缓慢漂移,给平面加「空气感」 */
+.lgh-portal::after {
+  content: "";
+  position: absolute;
+  right: 8%;
+  top: 10%;
+  width: min(34vw, 430px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(58px);
+  background: radial-gradient(circle,
+    color-mix(in srgb, var(--accent) 13%, transparent),
+    transparent 66%);
+  animation: premium-drift 16s ease-in-out infinite alternate;
+}
+
+@keyframes premium-drift {
+  from { transform: translate(0, 0) scale(1); opacity: .8; }
+  to { transform: translate(-46px, 34px) scale(1.12); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lgh-portal::after { animation: none; }
+}
+
+/* ---------- 3. 超大水印字:品牌字描边空心沉底 ---------- */
+
+.lgh-portal::before {
+  content: "屿";
+  position: absolute;
+  right: -3vw;
+  top: 50%;
+  transform: translateY(-52%);
+  font: 700 clamp(300px, 36vw, 500px) / 1 var(--wm-font, "Noto Serif SC", serif);
+  color: transparent;
+  -webkit-text-stroke: 1.5px color-mix(in srgb, var(--accent) 13%, transparent);
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
+}
+
+html[data-concept="radio"] .lgh-portal::before {
+  content: "夜";
+  font-family: var(--mono);
+  letter-spacing: -.04em;
+  -webkit-text-stroke-color: color-mix(in srgb, var(--teal) 12%, transparent);
+}
+
+html[data-concept="atlas"] .lgh-portal::before {
+  content: "航";
+  -webkit-text-stroke-color: color-mix(in srgb, var(--sea) 14%, transparent);
+}
+
+html[data-concept="letter"] .lgh-portal { --wm-font: "LXGW WenKai", "Kaiti SC", "Noto Serif SC", serif; }
+
+.lgh-portal > * { position: relative; z-index: 1; }
+
+/* ---------- 4. 排版精修:kicker + 口号 ---------- */
+
+.lgh-slogan {
+  font-size: clamp(30px, 4.4vw, 50px);
+  line-height: 1.4;
+  letter-spacing: .03em;
+  margin-bottom: 30px;
+}
+
+.lgh-slogan::before {
+  content: "校园心理支持平台";
+  display: block;
+  font: 600 11px / 1 var(--sans);
+  letter-spacing: .46em;
+  text-indent: .46em;
+  color: var(--muted);
+  margin-bottom: 20px;
+}
+
+html[data-concept="radio"] .lgh-slogan::before { content: "LATE-NIGHT SUPPORT RADIO"; }
+html[data-concept="atlas"] .lgh-slogan::before { content: "CAMPUS SUPPORT ATLAS"; }
+
+/* ---------- 2. 渐变走线:输入条与认证卡 ---------- */
+
+.lgh-inputbar,
+.lgh-portal .lg-slip,
+.lgh-portal .rg-console,
+.lgh-portal .at-logbook {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--accent) 46%, var(--line-strong)),
+      var(--line) 34%,
+      color-mix(in srgb, var(--line-strong) 88%, transparent) 78%,
+      color-mix(in srgb, var(--accent) 22%, var(--line))) border-box;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 52%, transparent),
+    0 1px 2px color-mix(in srgb, var(--ink) 6%, transparent),
+    0 14px 40px color-mix(in srgb, var(--accent) 10%, rgba(0, 0, 0, .09));
+}
+
+html[data-theme="dark"] .lgh-inputbar,
+html[data-theme="dark"] .lgh-portal .lg-slip,
+html[data-theme="dark"] .lgh-portal .rg-console,
+html[data-theme="dark"] .lgh-portal .at-logbook {
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 9%, transparent),
+    0 1px 2px rgba(0, 0, 0, .4),
+    0 16px 44px color-mix(in srgb, var(--accent) 9%, rgba(0, 0, 0, .42));
+}
+
+.lgh-inputbar {
+  padding: 19px 20px;
+  border-radius: 16px;
+  font-size: 16px;
+}
+
+.lgh-inputbar:hover,
+.lgh-inputbar:focus-visible {
+  transform: translateY(-2px);
+  border-color: transparent;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 52%, transparent),
+    0 2px 4px color-mix(in srgb, var(--ink) 6%, transparent),
+    0 18px 48px color-mix(in srgb, var(--accent) 20%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.lgh-inputbar .lgh-go {
+  border-radius: 11px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, #fff), var(--accent));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 42%, transparent),
+    0 2px 8px color-mix(in srgb, var(--accent) 32%, transparent);
+}
+
+.lgh-chip {
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+}
+
+/* 认证卡出现动画:升起 + 光晕展开 */
+.lgh-portal .lg-slip,
+.lgh-portal .rg-console,
+.lgh-portal .at-logbook {
+  animation: premium-card-in .5s cubic-bezier(.16, 1, .3, 1) both;
+}
+
+@keyframes premium-card-in {
+  from { opacity: 0; transform: translateY(18px) scale(.985); }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lgh-portal .lg-slip,
+  .lgh-portal .rg-console,
+  .lgh-portal .at-logbook { animation: none; }
+}
+
+/* 页脚:发丝线分隔 */
+.lgh-foot {
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+/* ---------- 工作台轻量同步:面板同款走线 ---------- */
+
+.cns-pane {
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 40%, transparent),
+    0 1px 2px color-mix(in srgb, var(--ink) 5%, transparent),
+    0 10px 30px color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+html[data-theme="dark"] .cns-pane {
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 7%, transparent),
+    0 10px 30px rgba(0, 0, 0, .38);
+}
+
+.cns-btn.primary {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, #fff), var(--accent));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 38%, transparent);
+}
+
+/* ---------- 暗色下水印与光斑微调 ---------- */
+
+html[data-theme="dark"] .lgh-portal::before {
+  -webkit-text-stroke-color: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+html[data-theme="dark"] .lgh-portal::after { opacity: .55; }
+
+/* ============================================================
+   字体环境系统:每个概念的字体与它的场景同频。
+   letter 信笺 → 楷体展示(手写的信) + 黑体正文 + 等宽数字
+   radio  电台 → 宋体标题卡(广播时代) + 等宽仪表 + 黑体正文
+   atlas  海图 → 宋体雕版标题 + 等宽坐标 + 黑体正文
+   ============================================================ */
+
+html[data-concept="letter"] {
+  --font-display: "LXGW WenKai", "Kaiti SC", "STKaiti", KaiTi, serif;
+  --display-track: .08em;
+  --kicker-font: "LXGW WenKai", "Kaiti SC", serif;
+}
+html[data-concept="radio"] {
+  --font-display: "Noto Serif SC", "Songti SC", serif;
+  --display-track: .14em;
+  --kicker-font: "IBM Plex Mono", ui-monospace, monospace;
+}
+html[data-concept="atlas"] {
+  --font-display: "Noto Serif SC", "Songti SC", serif;
+  --display-track: .05em;
+  --kicker-font: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+/* 中西文自动间距(渐进增强,Chrome 120+) */
+body { text-autospace: normal; font-kerning: normal; }
+
+/* Hero 口号:概念展示字 + 概念字距 + 场景色 */
+.lgh-slogan {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: var(--display-track);
+}
+
+html[data-concept="letter"] .lgh-slogan { color: var(--ink); }
+html[data-concept="radio"] .lgh-slogan { color: var(--ink); text-shadow: 0 2px 24px rgba(0, 0, 0, .35); }
+html[data-concept="atlas"] .lgh-slogan { color: var(--ink); }
+
+/* kicker 小标签同频:信笺用楷、电台/群岛用等宽 */
+.lgh-slogan::before { font-family: var(--kicker-font); }
+
+/* 顶栏品牌字与话题 chips 同频 */
+.lgh-top .lz-brand h1,
+.lgh-top .at-brand h1 { font-family: var(--font-display); }
+html[data-concept="letter"] .lgh-chip,
+html[data-concept="letter"] .lgh-topic,
+html[data-concept="letter"] .lgh-alt,
+html[data-concept="letter"] .lgh-foot { font-family: var(--font-display); }
+
+/* 电台水印「夜」改宋体更有广播标题卡的气质 */
+html[data-concept="radio"] .lgh-portal::before {
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  font-weight: 700;
+}
+
+/* 信笺输入条文字也是"正在写信"的手 */
+html[data-concept="letter"] .lgh-inputbar > span:nth-child(2) { font-family: var(--font-display); }
+
+/* 工作台同步:面板标题/徽章随概念展示字 */
+.cns-doc-title { font-family: var(--font-display); }
+html[data-concept="letter"] .cns-pane-title,
+html[data-concept="letter"] .cns-doc-label { font-family: var(--font-display); letter-spacing: .3em; }
+
+/* ============================================================
+   impeccable × high-end-visual-design 工艺层
+   双壳嵌套 / 按钮内嵌按钮 / 指数缓动 / 渐进披露交互
+   ============================================================ */
+
+:root { --ease-premium: cubic-bezier(0.32, 0.72, 0, 1); }
+
+/* 统一缓动:高级感的一半来自「所有东西用同一条曲线」 */
+.lgh-inputbar,
+.lgh-chip,
+.lgh-go,
+.cns-btn,
+.cns-mini,
+.cns-tab,
+.cns-stat,
+.cns-row,
+.cns-pane {
+  transition-timing-function: var(--ease-premium);
+}
+
+.lgh-inputbar,
+.lgh-portal .lg-slip,
+.lgh-portal .rg-console,
+.lgh-portal .at-logbook {
+  transition-duration: .5s;
+}
+
+/* 双壳嵌套:外壳 = 渐变发丝线;内核 = 独立面板 + 内高光,同心圆角 */
+.lgh-inputbar {
+  position: relative;
+  background:
+    linear-gradient(color-mix(in srgb, var(--surface-2) 72%, var(--surface)), color-mix(in srgb, var(--surface-2) 72%, var(--surface))) padding-box,
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--accent) 46%, var(--line-strong)),
+      var(--line) 34%,
+      color-mix(in srgb, var(--line-strong) 88%, transparent) 78%,
+      color-mix(in srgb, var(--accent) 22%, var(--line))) border-box;
+}
+
+.lgh-inputbar::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 55%, transparent),
+    0 1px 3px color-mix(in srgb, var(--ink) 7%, transparent);
+  pointer-events: none;
+}
+
+html[data-theme="dark"] .lgh-inputbar::after {
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent),
+    0 1px 3px rgba(0, 0, 0, .45);
+}
+
+.lgh-inputbar > * { position: relative; z-index: 1; }
+
+/* 按钮内嵌按钮:CTA 尾部圆形图标容器,hover 时前移 */
+.lgh-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 8px 8px 18px;
+  border-radius: 999px;
+}
+
+.lgh-go-t { letter-spacing: .04em; }
+
+.lgh-go-ic {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, #fff 26%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 34%, transparent);
+  font-size: 13px;
+  transition: transform .45s var(--ease-premium);
+}
+
+.lgh-inputbar:hover .lgh-go-ic { transform: translateX(3px); }
+
+/* 图章落印:压掉弹跳,保留重量感(impeccable 禁 bounce) */
+@keyframes stamp-in {
+  from { transform: rotate(-13deg) scale(1.5); opacity: 0; }
+  60% { transform: rotate(-13deg) scale(.96); opacity: .92; }
+  to { transform: rotate(-13deg) scale(1); opacity: .88; }
+}
+
+/* 工作台入场曲线同步 */
+.fx-stagger > *, .fx-fade > * {
+  animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* tilt 规则(0,3,0)会整体覆盖 transition 简写:在此合并主内容过渡 */
+[data-tilt][data-tilt][data-tilt] {
+  transition:
+    transform .2s ease-out,
+    border-color .5s var(--ease-premium),
+    box-shadow .5s var(--ease-premium),
+    background-color .5s var(--ease-premium);
+}
+
+/* ============================================================
+   字体环境 v2:去方正化
+   界面/正文 → LXGW WenKai Screen(手写系屏显体);口号 → 文楷粗体;
+   信笺水印 → 马善政毛笔;宋体只留品牌字与回信打印体;等宽只管数据。
+   ============================================================ */
+
+html[data-concept="letter"],
+html[data-concept="radio"],
+html[data-concept="atlas"] {
+  --font-hand: "LXGW WenKai Screen", "LXGW WenKai", "Kaiti SC", KaiTi, serif;
+  --font-display: "LXGW WenKai", "LXGW WenKai Screen", "Kaiti SC", KaiTi, serif;
+}
+
+/* 登录页文字全部人文化 */
+.lgh-portal { font-family: var(--font-hand); }
+
+.lgh-slogan {
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+html[data-concept="letter"] .lgh-slogan { letter-spacing: .1em; }
+html[data-concept="radio"] .lgh-slogan { letter-spacing: .12em; }
+html[data-concept="atlas"] .lgh-slogan { letter-spacing: .06em; }
+
+/* 信笺水印「屿」→ 毛笔楷书,实底低透明比描边更润 */
+html[data-concept="letter"] .lgh-portal::before {
+  font-family: "Ma Shan Zheng", "LXGW WenKai", "Kaiti SC", KaiTi, serif;
+  font-weight: 400;
+  color: color-mix(in srgb, var(--seal) 9%, transparent);
+  -webkit-text-stroke: 0;
+}
+
+/* 学生端对话文字人文化(电台/群岛;信笺本就是楷) */
+html[data-concept="radio"] .rg-entry .say,
+html[data-concept="radio"] .rg-standby,
+html[data-concept="atlas"] .at-entry .words,
+html[data-concept="atlas"] .at-horizon { font-family: var(--font-hand); }
+
+/* 工作台非数据文案人文化,数据格保持等宽 */
+.cns-empty,
+html[data-concept="letter"] .cns-doc-text,
+html[data-concept="letter"] .cns-mini-note { font-family: var(--font-hand); }

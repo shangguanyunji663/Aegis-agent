@@ -1,0 +1,278 @@
+/* ============================================================
+   fx 共享动效层:三概念通用的「会动」基建。
+   倾斜 / 聚光 / 磁吸 / 涟漪 / 进场编排 / 概念切换揭幕 / 环境生命。
+   全部只动 transform 与 opacity;reduced-motion 全量降级。
+   ============================================================ */
+
+/* ---------- 倾斜:面板跟随光标,--base-rot 保留各概念基础倾角 ----------
+   三连属性选择器压过概念层 html[data-concept] .x 的 transform(0,2,1) */
+[data-tilt][data-tilt][data-tilt] {
+  transform: perspective(900px)
+    rotate(var(--base-rot, 0deg))
+    rotateX(var(--rx, 0deg))
+    rotateY(var(--ry, 0deg));
+  transition: transform .2s ease-out;
+  will-change: transform;
+}
+
+[data-tilt][data-tilt][data-tilt]:hover { transition-duration: .06s; }
+
+/* 已有静态倾角的面板:把角度交给 --base-rot,倾斜时不再丢失 */
+html[data-concept="letter"] .lg-notice { --base-rot: -.6deg; }
+html[data-concept="letter"] .lg-slip { --base-rot: 1deg; }
+html[data-concept="letter"] .ls-sheet { --base-rot: -.35deg; }
+html[data-concept="atlas"] .at-chart-wall { --base-rot: -.5deg; }
+
+/* 聚光颜色随概念 */
+html[data-concept="letter"] { --spot-c: var(--seal); }
+html[data-concept="radio"] { --spot-c: var(--teal); }
+html[data-concept="atlas"] { --spot-c: var(--sea); }
+
+/* ---------- 聚光:光标位置的光斑,颜色由概念提供 --spot-c ---------- */
+
+[data-spot] { position: relative; }
+
+[data-spot]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .3s ease;
+  background: radial-gradient(
+    240px circle at var(--mx, 50%) var(--my, 50%),
+    color-mix(in srgb, var(--spot-c, var(--ink)) 9%, transparent),
+    transparent 72%
+  );
+}
+
+[data-spot]:hover::after { opacity: 1; }
+
+/* ---------- 磁吸:按钮向光标轻移 ---------- */
+
+[data-magnet] {
+  transform: translate(var(--tx, 0px), var(--ty, 0px)) rotate(var(--base-rot, 0deg));
+  transition: transform .16s ease-out;
+  will-change: transform;
+}
+
+[data-magnet]:active {
+  transform: translate(var(--tx, 0px), var(--ty, 0px)) rotate(var(--base-rot, 0deg)) scale(.94);
+  transition-duration: .08s;
+}
+
+/* ---------- 涟漪:点击点扩散 ---------- */
+
+[data-ripple] { position: relative; overflow: hidden; }
+
+[data-ripple]::before {
+  content: "";
+  position: absolute;
+  left: var(--px, 50%);
+  top: var(--py, 50%);
+  width: 12px;
+  height: 12px;
+  margin: -6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.fx-rippling::before {
+  animation: fx-ripple .6s ease-out;
+}
+
+@keyframes fx-ripple {
+  from { transform: scale(1); opacity: .28; }
+  to { transform: scale(24); opacity: 0; }
+}
+
+/* ---------- 进场编排:容器加 .fx-stagger,子项按序升起 ---------- */
+
+.fx-stagger > * {
+  animation: fx-rise .55s cubic-bezier(.16, 1, .3, 1) both;
+}
+
+.fx-stagger > :nth-child(1) { animation-delay: .03s; }
+.fx-stagger > :nth-child(2) { animation-delay: .08s; }
+.fx-stagger > :nth-child(3) { animation-delay: .13s; }
+.fx-stagger > :nth-child(4) { animation-delay: .18s; }
+.fx-stagger > :nth-child(5) { animation-delay: .23s; }
+.fx-stagger > :nth-child(6) { animation-delay: .28s; }
+.fx-stagger > :nth-child(7) { animation-delay: .33s; }
+.fx-stagger > :nth-child(8) { animation-delay: .38s; }
+.fx-stagger > :nth-child(9) { animation-delay: .43s; }
+.fx-stagger > :nth-child(10) { animation-delay: .48s; }
+.fx-stagger > :nth-child(n+11) { animation-delay: .53s; }
+
+@keyframes fx-rise {
+  from { opacity: 0; transform: translateY(14px) scale(.985); }
+  to { opacity: 1; }
+}
+
+/* 警告:.fx-stagger 子项若自身有 transform(微倾/旋转),会被 both 状态覆盖。
+   因此带倾角概念里 stagger 容器只用于无倾角列表;带倾角列表用 .fx-fade(纯透明度)。 */
+
+.fx-fade > * { animation: fx-fade-in .5s ease both; }
+.fx-fade > :nth-child(1) { animation-delay: .04s; }
+.fx-fade > :nth-child(2) { animation-delay: .1s; }
+.fx-fade > :nth-child(3) { animation-delay: .16s; }
+.fx-fade > :nth-child(4) { animation-delay: .22s; }
+.fx-fade > :nth-child(5) { animation-delay: .28s; }
+.fx-fade > :nth-child(6) { animation-delay: .34s; }
+.fx-fade > :nth-child(n+7) { animation-delay: .4s; }
+
+@keyframes fx-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* ---------- 概念切换揭幕:圆形遮罩扫过 ---------- */
+
+.fx-reveal {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  pointer-events: none;
+  background: var(--fx-reveal-c, #14181c);
+  animation: fx-reveal-out .62s cubic-bezier(.5, 0, .2, 1) both;
+}
+
+@keyframes fx-reveal-out {
+  from { clip-path: circle(0% at 92% 96%); opacity: 1; }
+  70% { opacity: 1; }
+  to { clip-path: circle(142% at 92% 96%); opacity: 0; }
+}
+
+/* ---------- 纸纹颗粒:全站材质底 ---------- */
+
+.fx-grain {
+  position: fixed;
+  inset: -40px;
+  z-index: 99;
+  pointer-events: none;
+  opacity: .05;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+  animation: fx-grain-drift 1.4s steps(3) infinite;
+}
+
+html[data-theme="dark"] .fx-grain {
+  mix-blend-mode: screen;
+  opacity: .035;
+}
+
+@keyframes fx-grain-drift {
+  0% { transform: translate(0, 0); }
+  33% { transform: translate(-14px, 9px); }
+  66% { transform: translate(11px, -13px); }
+  100% { transform: translate(0, 0); }
+}
+
+/* ---------- 环境生命:按概念的常驻微动效 ---------- */
+
+/* letter:邮戳缓慢摇晃 + 火漆呼吸 */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-concept="letter"] .ls-postmark {
+    animation: fx-sway 7s ease-in-out infinite;
+  }
+  html[data-concept="letter"] .lg-wax .seal-dot,
+  html[data-concept="letter"] .lz-brand .seal-mark {
+    animation: fx-breathe 4.5s ease-in-out infinite;
+  }
+}
+
+@keyframes fx-sway {
+  0%, 100% { transform: rotate(7deg); }
+  50% { transform: rotate(11deg) translateY(2px); }
+}
+
+@keyframes fx-breathe {
+  0%, 100% { box-shadow: inset 0 -4px 8px rgba(0, 0, 0, .18), 0 0 0 0 color-mix(in srgb, var(--seal) 24%, transparent); }
+  50% { box-shadow: inset 0 -4px 8px rgba(0, 0, 0, .18), 0 0 0 7px transparent; }
+}
+
+/* radio:LED 待机呼吸 + CRT 微闪 + 声波待机低幅律动 */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-concept="radio"] .rg-led::before {
+    animation: rg-idle-led 4.2s ease-in-out infinite;
+  }
+  html[data-concept="radio"] .rd-crt {
+    animation: rg-flicker 6s steps(24) infinite;
+  }
+  html[data-concept="radio"] .rg-wave i {
+    animation: rg-idle-wave 5.6s ease-in-out infinite;
+  }
+  html[data-concept="radio"] .rg-wave.live i {
+    animation: rg-dance 1.15s ease-in-out infinite;
+  }
+}
+
+@keyframes rg-idle-led {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .55; }
+}
+
+@keyframes rg-flicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .93; }
+}
+
+@keyframes rg-idle-wave {
+  0%, 100% { height: 22%; }
+  50% { height: 40%; }
+}
+
+/* atlas:灯塔罗盘光束扫掠 + 海面漂移 */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-concept="atlas"] .at-rose {
+    overflow: hidden;
+  }
+  html[data-concept="atlas"] .at-rose::after {
+    content: "";
+    position: absolute;
+    inset: -60%;
+    background: conic-gradient(
+      from 0deg,
+      transparent 0deg,
+      color-mix(in srgb, var(--sea) 30%, transparent) 18deg,
+      transparent 44deg,
+      transparent 360deg
+    );
+    animation: fx-beam 8s linear infinite;
+    pointer-events: none;
+  }
+  html[data-concept="atlas"] body {
+    animation: fx-sea-drift 26s linear infinite alternate;
+  }
+}
+
+@keyframes fx-beam {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes fx-sea-drift {
+  from { background-position: 0 0, 0 0, 0 0; }
+  to { background-position: -260px 0, 0 0, 120px 0; }
+}
+
+/* ---------- 概念揭幕底色随概念 ---------- */
+
+html[data-concept="letter"] { --fx-reveal-c: #2c2a20; }
+html[data-concept="radio"] { --fx-reveal-c: #05070a; }
+html[data-concept="atlas"] { --fx-reveal-c: #1c4a52; }
+
+/* ---------- reduced-motion:全部静默 ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  [data-tilt][data-tilt][data-tilt],
+  [data-magnet] {
+    transform: rotate(var(--base-rot, 0deg)) !important;
+  }
+  .fx-stagger > *,
+  .fx-fade > *,
+  .fx-reveal,
+  .fx-grain {
+    animation: none !important;
+  }
+  [data-spot]::after { display: none; }
+}

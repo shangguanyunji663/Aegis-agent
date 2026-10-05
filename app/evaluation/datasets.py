@@ -10,7 +10,7 @@
 
 数据集位置：`eval/fixtures/`
 - `representative_corpus.json`：150 条代表性消息（意图/风险双标注，含隐式高危与第三人称干扰项；每条另含 `layer`（base/stress）与 `source`（synthetic-representative/synthetic-boundary）字段，用于双层拆分）
-- `rag_queries.json`：50 条自然语言检索问句（基于真实知识库文档，非关键词堆砌）
+- `rag_queries.json`：77 条自然语言检索问句（基于 24 篇真实知识库文档，非关键词堆砌）
 - `multi_turn_corpus.json`：8 组多轮对话场景（含升级到中/高风险与第三人称转自身）
 """
 from __future__ import annotations

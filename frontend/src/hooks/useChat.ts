@@ -150,5 +150,5 @@ export function useChat() {
     loadSessions().catch(() => { /* 401 由 api 层统一处理 */ });
   }, [loadSessions]);
 
-  return { sessions, sessionId, turns, phase, error, send, openSession, newSession, reloadSessions: loadSessions };
+  return { sessions, sessionId, turns, phase, error, send, openSession, newSession };
 }

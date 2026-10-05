@@ -1,4 +1,4 @@
-/* 群群岛屿概念样式 — 由构建产物恢复(dist bundle 提取)。 */ .at-bar {
+/* 群岛图鉴概念样式 — 由构建产物恢复(dist bundle 提取)。 */ .at-bar {
   border-bottom:2px solid var(--sea-deep);
   background:color-mix(in srgb, var(--chart) 82%, transparent);
   align-items:center;

@@ -1,4 +1,4 @@
-/* 群群岛屿 · 公共顶栏。 */
+/* 群岛图鉴 · 公共顶栏。 */
 
 import { useAuth } from "../../lib/auth";
 import { greeting } from "../../lib/labels";

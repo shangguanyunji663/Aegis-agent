@@ -1,11 +1,15 @@
-"""管理端路由:报告/个案/工具任务/知识库/评测/审计等后台接口(全部要求 admin 角色)。"""
+"""管理端路由:报告/个案/工具任务/知识库/评测/审计等后台接口。
+
+权限:`require_staff` 放行教职角色(admin 与 teacher 均可),学生角色返回 403。
+注意路由前缀虽为 `/api/admin`,但并非只有 admin 可访问。
+"""
 from __future__ import annotations
 
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 
-from app.api.deps import audit, require_admin
+from app.api.deps import audit, require_staff
 from app.api.schemas import (
     CaseNoteRequest,
     CaseStatusUpdate,
@@ -43,12 +47,12 @@ def safe_knowledge_filename(filename: str) -> str:
 
 
 @router.get("/reports")
-def reports(request: Request, principal: AuthPrincipal = Depends(require_admin)) -> dict:
+def reports(request: Request, principal: AuthPrincipal = Depends(require_staff)) -> dict:
     return {"reports": request.app.state.store.list_reports(), "viewer": principal.username}
 
 
 @router.patch("/reports/{report_id}")
-def update_report(report_id: str, update: ReportUpdate, request: Request, principal: AuthPrincipal = Depends(require_admin)) -> dict:
+def update_report(report_id: str, update: ReportUpdate, request: Request, principal: AuthPrincipal = Depends(require_staff)) -> dict:
     store = request.app.state.store
     report = store.update_report(report_id, update.status)
     if report is None:
@@ -58,17 +62,17 @@ def update_report(report_id: str, update: ReportUpdate, request: Request, princi
 
 
 @router.get("/traces")
-def traces(request: Request, principal: AuthPrincipal = Depends(require_admin)) -> dict:
+def traces(request: Request, principal: AuthPrincipal = Depends(require_staff)) -> dict:
     return {"traces": request.app.state.store.list_traces(), "viewer": principal.username}
 
 
 @router.get("/cases")
-def cases(request: Request, principal: AuthPrincipal = Depends(require_admin)) -> dict:
+def cases(request: Request, principal: AuthPrincipal = Depends(require_staff)) -> dict:
     return {"cases": request.app.state.store.list_cases(), "viewer": principal.username}
 
 
 @router.post("/cases/{case_id}/notes")
-def add_case_note(case_id: str, body: CaseNoteRequest, request: Request, principal: AuthPrincipal = Depends(require_admin)) -> dict:
+def add_case_note(case_id: str, body: CaseNoteRequest, request: Request, principal: AuthPrincipal = Depends(require_staff)) -> dict:
     store = request.app.state.store
     note = body.note.strip()
     if not note:
@@ -81,7 +85,7 @@ def add_case_note(case_id: str, body: CaseNoteRequest, request: Request, princip
 
 
 @router.patch("/cases/{case_id}")
-def update_case(case_id: str, body: CaseStatusUpdate, request: Request, principal: AuthPrincipal = Depends(require_admin)) -> dict:
+def update_case(case_id: str, body: CaseStatusUpdate, request: Request, principal: AuthPrincipal = Depends(require_staff)) -> dict:
     store = request.app.state.store
     case = store.update_case_status(case_id, body.status)
     if case is None:
@@ -91,42 +95,42 @@ def update_case(case_id: str, body: CaseStatusUpdate, request: Request, principa
 
 
 @router.get("/tool-jobs")
-def tool_jobs(request: Request, principal: AuthPrincipal = Depends(require_admin)) -> dict:
+def tool_jobs(request: Request, principal: AuthPrincipal = Depends(require_staff)) -> dict:
     return {"jobs": request.app.state.store.list_tool_jobs(), "viewer": principal.username}
 
 
 @router.get("/tool-contracts")
-def tool_contracts(principal: AuthPrincipal = Depends(require_admin)) -> dict:
+def tool_contracts(principal: AuthPrincipal = Depends(require_staff)) -> dict:
     return {"contracts": list_tool_contracts(), "viewer": principal.username}
 
 
 @router.get("/tool-audits")
-def tool_audits(request: Request, principal: AuthPrincipal = Depends(require_admin)) -> dict:
+def tool_audits(request: Request, principal: AuthPrincipal = Depends(require_staff)) -> dict:
     return {"audits": request.app.state.store.list_tool_audits(), "viewer": principal.username}
 
 
 @router.get("/excel-records")
-def excel_records(request: Request, principal: AuthPrincipal = Depends(require_admin)) -> dict:
+def excel_records(request: Request, principal: AuthPrincipal = Depends(require_staff)) -> dict:
     return {"records": request.app.state.store.list_excel_records(), "viewer": principal.username}
 
 
 @router.get("/alert-records")
-def alert_records(request: Request, principal: AuthPrincipal = Depends(require_admin)) -> dict:
+def alert_records(request: Request, principal: AuthPrincipal = Depends(require_staff)) -> dict:
     return {"records": request.app.state.store.list_alert_records(), "viewer": principal.username}
 
 
 @router.get("/agent-models")
-def agent_models(request: Request, principal: AuthPrincipal = Depends(require_admin)) -> dict:
+def agent_models(request: Request, principal: AuthPrincipal = Depends(require_staff)) -> dict:
     return {"profiles": request.app.state.store.list_agent_model_profiles(), "viewer": principal.username}
 
 
 @router.get("/agent-memories")
-def agent_memories(agent: str, session_id: str, request: Request, principal: AuthPrincipal = Depends(require_admin)) -> dict:
+def agent_memories(agent: str, session_id: str, request: Request, principal: AuthPrincipal = Depends(require_staff)) -> dict:
     return {"memories": request.app.state.store.load_agent_private_memory(agent, session_id, 20), "viewer": principal.username}
 
 
 @router.post("/tool-jobs/run")
-def run_tool_jobs(request: Request, principal: AuthPrincipal = Depends(require_admin)) -> dict:
+def run_tool_jobs(request: Request, principal: AuthPrincipal = Depends(require_staff)) -> dict:
     state = request.app.state
     store = state.store
     with state.runtime.lock("tool-jobs-run", state.settings.redis_lock_timeout_seconds) as acquired:
@@ -138,7 +142,7 @@ def run_tool_jobs(request: Request, principal: AuthPrincipal = Depends(require_a
 
 
 @router.get("/tool-worker/status")
-def tool_worker_status(request: Request, principal: AuthPrincipal = Depends(require_admin)) -> dict:
+def tool_worker_status(request: Request, principal: AuthPrincipal = Depends(require_staff)) -> dict:
     settings = request.app.state.settings
     return {
         "enabled": settings.tool_queue_enabled,
@@ -151,7 +155,7 @@ def tool_worker_status(request: Request, principal: AuthPrincipal = Depends(requ
 
 
 @router.post("/tool-worker/run-once")
-def tool_worker_run_once(request: Request, principal: AuthPrincipal = Depends(require_admin)) -> dict:
+def tool_worker_run_once(request: Request, principal: AuthPrincipal = Depends(require_staff)) -> dict:
     state = request.app.state
     processed = state.tool_worker.run_once()
     audit(state.store, principal, "tool_worker_run_once", "tool_worker", "background", {"processed": processed})
@@ -159,7 +163,7 @@ def tool_worker_run_once(request: Request, principal: AuthPrincipal = Depends(re
 
 
 @router.post("/tool-jobs/{job_id}/retry")
-def retry_tool_job(job_id: str, request: Request, principal: AuthPrincipal = Depends(require_admin)) -> dict:
+def retry_tool_job(job_id: str, request: Request, principal: AuthPrincipal = Depends(require_staff)) -> dict:
     store = request.app.state.store
     job = store.retry_tool_job(job_id)
     if job is None:
@@ -169,12 +173,12 @@ def retry_tool_job(job_id: str, request: Request, principal: AuthPrincipal = Dep
 
 
 @router.get("/dead-letters")
-def dead_letters(request: Request, principal: AuthPrincipal = Depends(require_admin)) -> dict:
+def dead_letters(request: Request, principal: AuthPrincipal = Depends(require_staff)) -> dict:
     return {"jobs": request.app.state.store.list_dead_letters(), "viewer": principal.username}
 
 
 @router.get("/knowledge/status")
-def knowledge_status(request: Request, principal: AuthPrincipal = Depends(require_admin)) -> dict:
+def knowledge_status(request: Request, principal: AuthPrincipal = Depends(require_staff)) -> dict:
     return request.app.state.store.knowledge_status() | {"viewer": principal.username}
 
 
@@ -186,7 +190,7 @@ def search_knowledge(
     topic: str = "",
     risk_level: str = "",
     audience: str = "",
-    principal: AuthPrincipal = Depends(require_admin),
+    principal: AuthPrincipal = Depends(require_staff),
 ) -> dict:
     query = q.strip()
     if not query:
@@ -206,7 +210,7 @@ def search_knowledge(
 
 
 @router.post("/knowledge")
-def ingest_knowledge(body: KnowledgeIngestRequest, request: Request, principal: AuthPrincipal = Depends(require_admin)) -> dict:
+def ingest_knowledge(body: KnowledgeIngestRequest, request: Request, principal: AuthPrincipal = Depends(require_staff)) -> dict:
     store = request.app.state.store
     source = body.source.strip()
     content = body.content.strip()
@@ -218,7 +222,7 @@ def ingest_knowledge(body: KnowledgeIngestRequest, request: Request, principal: 
 
 
 @router.post("/knowledge/rebuild")
-def rebuild_knowledge(request: Request, principal: AuthPrincipal = Depends(require_admin)) -> dict:
+def rebuild_knowledge(request: Request, principal: AuthPrincipal = Depends(require_staff)) -> dict:
     state = request.app.state
     result = state.store.rebuild_knowledge_dir(state.knowledge_dir)
     audit(state.store, principal, "rebuild_knowledge", "knowledge_index", "primary", {"chunks": result["chunks"]})
@@ -226,7 +230,7 @@ def rebuild_knowledge(request: Request, principal: AuthPrincipal = Depends(requi
 
 
 @router.post("/knowledge/rebuild-vector")
-def rebuild_knowledge_vector(request: Request, principal: AuthPrincipal = Depends(require_admin)) -> dict:
+def rebuild_knowledge_vector(request: Request, principal: AuthPrincipal = Depends(require_staff)) -> dict:
     store = request.app.state.store
     result = store.rebuild_vector_index()
     audit(store, principal, "rebuild_vector_index", "knowledge_index", "vector", result)
@@ -234,7 +238,7 @@ def rebuild_knowledge_vector(request: Request, principal: AuthPrincipal = Depend
 
 
 @router.post("/knowledge/backup")
-def backup_knowledge(request: Request, principal: AuthPrincipal = Depends(require_admin)) -> dict:
+def backup_knowledge(request: Request, principal: AuthPrincipal = Depends(require_staff)) -> dict:
     store = request.app.state.store
     result = store.backup_knowledge_dir(KNOWLEDGE_BACKUP_DIR)
     audit(store, principal, "backup_knowledge", "knowledge_index", "primary", result)
@@ -242,7 +246,7 @@ def backup_knowledge(request: Request, principal: AuthPrincipal = Depends(requir
 
 
 @router.post("/knowledge/upload")
-def upload_knowledge(body: KnowledgeUploadRequest, request: Request, principal: AuthPrincipal = Depends(require_admin)) -> dict:
+def upload_knowledge(body: KnowledgeUploadRequest, request: Request, principal: AuthPrincipal = Depends(require_staff)) -> dict:
     state = request.app.state
     store = state.store
     settings = state.settings
@@ -263,7 +267,7 @@ def upload_knowledge(body: KnowledgeUploadRequest, request: Request, principal: 
 
 
 @router.post("/knowledge/file")
-async def upload_knowledge_file(request: Request, file: UploadFile = File(...), principal: AuthPrincipal = Depends(require_admin)) -> dict:
+async def upload_knowledge_file(request: Request, file: UploadFile = File(...), principal: AuthPrincipal = Depends(require_staff)) -> dict:
     state = request.app.state
     store = state.store
     settings = state.settings
@@ -298,12 +302,12 @@ async def upload_knowledge_file(request: Request, file: UploadFile = File(...), 
 
 
 @router.get("/eval-results")
-def eval_results(principal: AuthPrincipal = Depends(require_admin)) -> dict:
+def eval_results(principal: AuthPrincipal = Depends(require_staff)) -> dict:
     return latest_evaluation(EVAL_OUTPUT_DIR) | {"viewer": principal.username}
 
 
 @router.post("/eval-results/run")
-def run_eval_results(request: Request, principal: AuthPrincipal = Depends(require_admin)) -> dict:
+def run_eval_results(request: Request, principal: AuthPrincipal = Depends(require_staff)) -> dict:
     state = request.app.state
     result = run_evaluation(state.orchestrator, state.store, EVAL_FIXTURES_DIR, EVAL_OUTPUT_DIR)
     audit(state.store, principal, "run_eval", "evaluation", "latest", {"summary": result.get("summary", {})})
@@ -311,5 +315,5 @@ def run_eval_results(request: Request, principal: AuthPrincipal = Depends(requir
 
 
 @router.get("/audit-logs")
-def audit_logs(request: Request, principal: AuthPrincipal = Depends(require_admin)) -> dict:
+def audit_logs(request: Request, principal: AuthPrincipal = Depends(require_staff)) -> dict:
     return {"logs": request.app.state.store.list_audit_logs(), "viewer": principal.username}

@@ -1,4 +1,8 @@
-"""认证与权限依赖:从应用 state 取仓储,Cookie 会话解析为 AuthPrincipal。"""
+"""认证与权限依赖:从应用 state 取仓储,Cookie 会话解析为 AuthPrincipal。
+
+命名说明:管理端工作台用 `require_staff`（教职角色 = admin + teacher）,
+而非 `require_admin` —— 早期函数名只反映 admin,实际语义自始包含 teacher。
+"""
 from __future__ import annotations
 
 from fastapi import Depends, HTTPException, Request, status
@@ -33,10 +37,10 @@ def current_principal(request: Request) -> AuthPrincipal:
 STAFF_ROLES = {UserRole.ADMIN.value, UserRole.TEACHER.value}
 
 
-def require_admin(principal: AuthPrincipal = Depends(current_principal)) -> AuthPrincipal:
-    # 管理端工作台:超管(admin)与教师(teacher)均可访问
+def require_staff(principal: AuthPrincipal = Depends(current_principal)) -> AuthPrincipal:
+    # 管理端工作台:超管(admin)与教师(teacher)均可访问,学生角色 403
     if principal.role not in STAFF_ROLES:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="admin access required")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="staff access required")
     return principal
 
 

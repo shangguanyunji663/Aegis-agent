@@ -82,7 +82,7 @@ def test_student_session_ownership_is_enforced(tmp_path: Path):
     assert chat.json()["response_plan"]["mode"] in {"support", "research_support", "safety_template"}
 
 
-def test_admin_endpoints_require_admin_role(tmp_path: Path):
+def test_admin_endpoints_require_staff_role(tmp_path: Path):
     student_client = build_client(tmp_path)
     login(student_client, "student", "student123!")
     forbidden = student_client.get("/api/admin/reports")

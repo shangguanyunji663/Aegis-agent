@@ -1,4 +1,4 @@
-/* 群群岛屿 · 管理端壳:概念顶栏 + 共享工作台(三段式)。 */
+/* 群岛图鉴 · 管理端壳:概念顶栏 + 共享工作台(三段式)。 */
 
 import { useEffect } from "react";
 import { useAuth } from "../../lib/auth";

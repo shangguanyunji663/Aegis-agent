@@ -2,9 +2,15 @@
 
 /, /student, /admin 三个入口都返回同一个 SPA 入口页,页内跳转由 React Router
 承接;/assets 与 /favicon.svg 等静态资源由 main.py 挂载的 dist 静态目录提供。
-为避免主题切换后的"首屏闪烁",在此读取当前登录用户已保存的主题档位
-(light/dark),在 <head> 最前注入内联脚本设置 html[data-theme]——该脚本先于
-CSS 解析执行。未登录或无偏好记录时回退 DEFAULT_THEME。
+为避免"首屏闪烁",在此读取当前登录用户已保存的主题档位,在 <head> 最前注入
+内联脚本设置 html[data-theme]——该脚本先于 CSS 解析执行。未登录或无偏好记录
+时回退 DEFAULT_THEME。
+
+主题档位说明:亮暗双模式与四套配色主题已在第二十轮按需求移除,
+`THEME_CHOICES` 收敛为仅 ("light",)。视觉形态由前端三概念
+(letter / radio / atlas)经 html[data-concept] 承担,记忆在 localStorage,
+不落库、不跨设备同步。因此本模块注入的 data-theme 恒为 light,
+`PUT /api/auth/me/theme` 作为遗留接口保留。
 
 dist 尚未构建时返回可执行的构建指引,而不是 500。
 """

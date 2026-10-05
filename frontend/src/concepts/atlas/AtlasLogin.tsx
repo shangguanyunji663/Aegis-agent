@@ -1,4 +1,4 @@
-/* 群群岛屿 · 登录页:输入框即入口 → 渐进披露签到簿。 */
+/* 群岛图鉴 · 登录页:输入框即入口 → 渐进披露签到簿。 */
 
 import { useEffect, useState } from "react";
 import type { CSSProperties, FormEvent } from "react";

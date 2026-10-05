@@ -1,20 +1,13 @@
-/* 鉴权与亮暗模式上下文。
-   模式(html[data-theme]=light|dark)首屏由 pages.py 服务端注入避免闪烁,
-   登录后切档会 PUT /api/auth/me/theme 按用户持久化;未登录只记 localStorage。 */
+/* 鉴权上下文。亮暗双模式已按需求移除,首屏主题由 pages.py 注入 data-theme="light"。 */
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { api } from "./api";
 import type { User } from "./types";
 
-export type Mode = "light" | "dark";
-const MODE_KEY = "aegis:mode";
-
 interface AuthValue {
   user: User | null;
   loading: boolean;
-  mode: Mode;
-  setMode: (m: Mode) => void;
   refresh: () => Promise<User | null>;
   login: (username: string, password: string) => Promise<User>;
   register: (payload: { username: string; password: string; role: string; invite_code: string }) => Promise<User>;
@@ -23,29 +16,9 @@ interface AuthValue {
 
 const AuthContext = createContext<AuthValue | null>(null);
 
-function initialMode(): Mode {
-  const attr = document.documentElement.dataset.theme;
-  if (attr === "dark" || attr === "light") return attr;
-  return localStorage.getItem(MODE_KEY) === "dark" ? "dark" : "light";
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [mode, setModeState] = useState<Mode>(initialMode);
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = mode;
-    localStorage.setItem(MODE_KEY, mode);
-  }, [mode]);
-
-  const setMode = useCallback(
-    (next: Mode) => {
-      setModeState(next);
-      if (user) api.saveTheme(next).catch(() => { /* 已应用,持久化失败不阻断 */ });
-    },
-    [user],
-  );
 
   const refresh = useCallback(async () => {
     try {
@@ -86,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, mode, setMode, refresh, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, refresh, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

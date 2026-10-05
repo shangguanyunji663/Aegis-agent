@@ -173,11 +173,13 @@
 .rg-field {
   margin-bottom:15px
 }
+/* 标签去 AI 味:原为 mono + .26em 宽字距(仪表盘/控制台腔调),
+   改为手写体正常字距 + 小字,保留"电台"语气但像人写的标签。 */
 .rg-field label {
-  font:500 10.5px var(--mono);
-  letter-spacing:.26em;
-  color:var(--muted);
-  margin-bottom:6px;
+  font:500 12.5px/1.6 var(--font-hand);
+  letter-spacing:.04em;
+  color:color-mix(in srgb, var(--ink) 72%, var(--muted));
+  margin-bottom:7px;
   display:block
 }
 .rg-field input,.rg-field select,.rg-field textarea {
@@ -972,10 +974,10 @@ html[data-concept=radio] .rg-boot:before {
   place-self:center start
 }
 html[data-concept=radio] .rg-console {
-  border:1px solid var(--line-strong);
-  border-top:3px solid var(--amber);
-  border-radius:0;
-  box-shadow:14px 14px #000
+  border:1px solid color-mix(in srgb, var(--glass-edge, #ffd79a) 22%, var(--line-strong));
+  border-top:2px solid color-mix(in srgb, var(--amber) 72%, transparent);
+  border-radius:14px;
+  box-shadow:0 26px 64px rgba(0, 0, 0, .52)
 }
 html[data-concept=radio] .rd-item:focus-visible,html[data-concept=radio] .rd-tab:focus-visible {
   z-index:6;
@@ -1031,4 +1033,25 @@ html[data-concept=radio] .rg-entry .say,html[data-concept=radio] .rg-standby,htm
   html[data-concept=radio] .rg-wave.live i {
     animation:1.15s ease-in-out infinite rg-dance
   }
+}
+
+/* ---------- 令牌定义(恢复补回) ---------- */
+html[data-concept="radio"] {
+  /* 暖调夜色:原令牌偏冷蓝(灰蓝黑纯色),压在与暖调夜港灯火视频上时割裂。
+     抬红绿、压蓝,让面板反射灯火而非冷光,与 --amber/#3fe0c4 同处一个色温世界。 */
+  --bg: #100d0d;
+  --panel: #191512;
+  --panel-2: #221c17;
+  --ink: #ece0cf;
+  --muted: #9c8a76;
+  --line: #2e2620;
+  --line-strong: #463a2e;
+  --amber: #e8a44a;
+  --amber-dim: #6e5228;
+  --teal: #3fe0c4;
+  --red: #ff6b57;
+  --focus: var(--amber);
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --sans: "Noto Sans SC", -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --shadow: 0 2px 6px rgba(0, 0, 0, .5), 0 16px 40px rgba(0, 0, 0, .45);
 }

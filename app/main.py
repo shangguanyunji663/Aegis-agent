@@ -13,6 +13,15 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+
+class NoCacheStaticFiles(StaticFiles):
+    """带 Cache-Control: no-cache 的静态文件:保留 ETag 协商缓存,杜绝陈旧缓存。"""
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
 from app.agents.harness import AegisAgentHarness
 from app.agents.orchestrator import PsychOrchestrator
 from app.api import admin, auth_routes, chat, pages, system
@@ -82,8 +91,9 @@ def create_app(runtime_settings: Settings | None = None) -> FastAPI:
 
     # SPA 静态资源:/assets/*、/favicon.svg 等直接取自 dist;
     # 挂在页面路由之后,使 / /student /admin 优先走带主题注入的 pages 路由。
+    # no-cache:带 ETag 协商缓存,开发迭代时杜绝陈旧 CSS/JS。
     if DIST_DIR.exists():
-        app.mount("/", StaticFiles(directory=DIST_DIR, html=True), name="spa")
+        app.mount("/", NoCacheStaticFiles(directory=DIST_DIR, html=True), name="spa")
     return app
 
 

@@ -1079,3 +1079,23 @@ html[data-concept=atlas] .at-chart-wall {
     inset:-60%
   }
 }
+
+/* ---------- 令牌定义(恢复补回) ---------- */
+html[data-concept="atlas"] {
+  --fog: #edf2ee;
+  --chart: #f9fcf8;
+  --chart-2: #eef4ee;
+  --ink: #1c3238;
+  --muted: #5f7a80;
+  --line: #cfdeda;
+  --line-strong: #a9c2ba;
+  --sea: #2e6e75;
+  --sea-deep: #1c4a52;
+  --foam: #e3efe9;
+  --coral: #c25b4e;
+  --brass: #a8823c;
+  --focus: var(--sea);
+  --song: "Noto Serif SC", "Songti SC", "SimSun", serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --shadow: 0 1px 2px rgba(28, 74, 82, .07), 0 12px 30px rgba(28, 74, 82, .1);
+}

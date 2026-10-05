@@ -1210,3 +1210,25 @@ html[data-concept=letter] .ls-sheet {
     animation:none
   }
 }
+
+/* ---------- 令牌定义(恢复补回) ---------- */
+html[data-concept="letter"] {
+  --paper: #f2efe6;
+  --paper-2: #eae6d8;
+  --sheet: #fbf9f1;
+  --sheet-2: #f4f1e6;
+  --ink: #2c2a20;
+  --muted: #7c7663;
+  --line: #d9d3bf;
+  --line-strong: #beb79d;
+  --seal: #b5442e;
+  --seal-soft: #f3e3dc;
+  --pine: #3f6b52;
+  --pine-soft: #e4ece4;
+  --amber: #a8742f;
+  --focus: var(--pine);
+  --kai: "LXGW WenKai", "Kaiti SC", "STKaiti", KaiTi, serif;
+  --song: "Noto Serif SC", "Songti SC", "SimSun", serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --shadow: 0 1px 2px rgba(60, 52, 30, .06), 0 10px 26px rgba(60, 52, 30, .08);
+}

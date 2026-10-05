@@ -77,9 +77,6 @@ export const api = {
     window.location.assign("/");
   },
 
-  saveTheme: (theme: "light" | "dark") =>
-    request<unknown>("/api/auth/me/theme", json("PUT", { theme })),
-
   sessions: () => request<{ sessions: SessionSummary[] }>("/api/sessions"),
 
   session: (id: string) =>

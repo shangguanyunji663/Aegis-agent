@@ -19,10 +19,6 @@ html[data-concept="letter"] .lgh-portal {
     radial-gradient(1000px 560px at 10% -12%, color-mix(in srgb, var(--pine) 15%, transparent), transparent 62%),
     radial-gradient(760px 500px at 98% 112%, color-mix(in srgb, var(--seal) 11%, transparent), transparent 62%),
     radial-gradient(closest-side at 50% 118%, color-mix(in srgb, var(--amber) 7%, transparent), transparent 70%),
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--paper) 46%, transparent) 0%,
-      color-mix(in srgb, var(--paper) 82%, transparent) 52%,
-      var(--paper) 92%),
     var(--paper);
 }
 
@@ -30,10 +26,6 @@ html[data-concept="radio"] .lgh-portal {
   background:
     radial-gradient(1100px 520px at 18% 4%, color-mix(in srgb, var(--teal) 9%, transparent), transparent 60%),
     radial-gradient(900px 480px at 84% 96%, color-mix(in srgb, var(--amber) 8%, transparent), transparent 60%),
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--bg) 30%, transparent) 0%,
-      color-mix(in srgb, var(--bg) 74%, transparent) 55%,
-      color-mix(in srgb, var(--bg) 92%, transparent) 100%),
     var(--bg);
 }
 
@@ -41,10 +33,6 @@ html[data-concept="atlas"] .lgh-portal {
   background:
     radial-gradient(940px 520px at 88% -14%, color-mix(in srgb, var(--sea) 13%, transparent), transparent 62%),
     radial-gradient(closest-side at 50% 120%, color-mix(in srgb, var(--brass) 6%, transparent), transparent 70%),
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--fog) 44%, transparent) 0%,
-      color-mix(in srgb, var(--fog) 80%, transparent) 52%,
-      var(--fog) 92%),
     var(--fog);
 }
 
@@ -65,7 +53,6 @@ html[data-concept="atlas"] .lgh-portal {
   inset: -4%;
   background: var(--lgh-photo) center / cover no-repeat;
   animation: premium-kenburns 44s var(--ease-premium) infinite alternate;
-  will-change: transform;
 }
 
 html[data-concept="letter"] .lgh-portal > .lgh-photo::before { --lgh-photo: url("../assets/hero-letter.jpg"); }
@@ -186,6 +173,30 @@ html[data-concept="atlas"] .lgh-portal > .lgh-photo::before { --lgh-photo: url("
   .lgh-go::after { animation: none; }
 }
 
+/* 群岛字体随浪起伏:与浪花同周期 14s,相位错开=整页在同一片海里飘 */
+html[data-concept="atlas"] .lgh-slogan {
+  animation: at-bob 14s ease-in-out infinite;
+}
+html[data-concept="atlas"] .lgh-chips {
+  animation: at-bob 14s ease-in-out infinite;
+  animation-delay: -4.6s;
+}
+html[data-concept="atlas"] .lgh-inputbar {
+  animation: at-bob 14s ease-in-out infinite;
+  animation-delay: -9.3s;
+}
+
+@keyframes at-bob {
+  0%, 100% { translate: 0 -5px; }
+  50% { translate: 0 6px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-concept="atlas"] .lgh-slogan,
+  html[data-concept="atlas"] .lgh-chips,
+  html[data-concept="atlas"] .lgh-inputbar { animation: none; }
+}
+
 /* 水印字反向视差:与照片形成景深 */
 html[data-concept="letter"] .lgh-portal::before,
 html[data-concept="radio"] .lgh-portal::before,
@@ -252,6 +263,42 @@ html[data-concept="letter"] .lgh-portal { --wm-font: "LXGW WenKai", "Kaiti SC", 
 
 .lgh-portal > * { position: relative; z-index: 1; }
 
+/* ---------- 3.5 认证卡展开后的紧凑态 ----------
+   此前点击后卡片只是被追加在 Hero 之下:900px 高的视口里卡片底边直接被裁掉,
+   "领取信匣"按钮看不见。展开时收紧 Hero,让卡片整体落在视口内。 */
+.lgh-portal.is-auth {
+  gap: 13px;
+  padding-top: 74px;
+  padding-bottom: 20px;
+}
+
+/* 信笺卡内含"演示信匣"便签,是三主题里最高的一张,单独再收一点 */
+html[data-concept="letter"] .lgh-portal.is-auth .lg-memo {
+  margin-top: 12px;
+  padding: 9px 12px;
+  font-size: 12px;
+  transform: rotate(-.6deg);
+}
+html[data-concept="letter"] .lgh-portal.is-auth .lg-slip {
+  padding: 24px 30px 20px;
+}
+
+.lgh-portal.is-auth .lgh-slogan {
+  font-size: clamp(19px, 2.3vw, 27px);
+  margin-bottom: 14px;
+}
+
+.lgh-portal.is-auth .lgh-slogan::before { margin-bottom: 10px; }
+.lgh-portal.is-auth .lgh-chips { margin-top: 11px; }
+.lgh-portal.is-auth .lgh-chip { padding: 5px 12px; font-size: 12px; }
+.lgh-portal.is-auth .lgh-inputbar { padding: 12px 15px; }
+.lgh-portal.is-auth .lgh-foot { font-size: 11px; line-height: 1.7; }
+
+/* 矮视口下 chips 让位给卡片,保证主按钮始终可见 */
+@media (max-height: 800px) {
+  .lgh-portal.is-auth .lgh-chips { display: none; }
+}
+
 /* ---------- 4. 排版精修:kicker + 口号 ---------- */
 
 .lgh-slogan {
@@ -292,16 +339,6 @@ html[data-concept="atlas"] .lgh-slogan::before { content: "CAMPUS SUPPORT ATLAS"
     inset 0 1px 0 color-mix(in srgb, #fff 52%, transparent),
     0 1px 2px color-mix(in srgb, var(--ink) 6%, transparent),
     0 14px 40px color-mix(in srgb, var(--accent) 10%, rgba(0, 0, 0, .09));
-}
-
-html[data-theme="dark"] .lgh-inputbar,
-html[data-theme="dark"] .lgh-portal .lg-slip,
-html[data-theme="dark"] .lgh-portal .rg-console,
-html[data-theme="dark"] .lgh-portal .at-logbook {
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, #fff 9%, transparent),
-    0 1px 2px rgba(0, 0, 0, .4),
-    0 16px 44px color-mix(in srgb, var(--accent) 9%, rgba(0, 0, 0, .42));
 }
 
 .lgh-inputbar {
@@ -367,24 +404,10 @@ html[data-theme="dark"] .lgh-portal .at-logbook {
     0 10px 30px color-mix(in srgb, var(--ink) 6%, transparent);
 }
 
-html[data-theme="dark"] .cns-pane {
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, #fff 7%, transparent),
-    0 10px 30px rgba(0, 0, 0, .38);
-}
-
 .cns-btn.primary {
   background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, #fff), var(--accent));
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 38%, transparent);
 }
-
-/* ---------- 暗色下水印与光斑微调 ---------- */
-
-html[data-theme="dark"] .lgh-portal::before {
-  -webkit-text-stroke-color: color-mix(in srgb, var(--accent) 16%, transparent);
-}
-
-html[data-theme="dark"] .lgh-portal::after { opacity: .55; }
 
 /* ============================================================
    字体环境系统:每个概念的字体与它的场景同频。
@@ -475,6 +498,136 @@ html[data-concept="letter"] .cns-doc-label { font-family: var(--font-display); l
   transition-duration: .5s;
 }
 
+/* ============================================================
+   玻璃化层:认证卡/输入条/chips 半透明,颜色受背景影响
+   ============================================================ */
+
+/* 每概念的"环境色"——描边与高光取自该主题背景本身,卡片因此随背景变色。
+   信笺=晨光暖白;电台=夜港琥珀灯火;群岛=海面青白。 */
+html[data-concept="letter"] { --glass-edge: #fff8e8; --glass-tint: #d9c9a4; --scrim: var(--paper); }
+html[data-concept="radio"]  { --glass-edge: #ffd79a; --glass-tint: #6b4a22; --scrim: var(--bg); }
+html[data-concept="atlas"]  { --glass-edge: #eaf6f2; --glass-tint: #86ada4; --scrim: var(--fog); }
+
+/* ============================================================
+   场景色:整页配色由背景实时决定
+   ------------------------------------------------------------
+   此前电台的 --amber(#e8a44a) 是写死的常量:视频从深夜转到黎明、
+   画面由黑转黄,页面却从头到尾一身琥珀 —— 卡片像一张贴在画面上的
+   暖色纸片,而不是"这块玻璃"本身。
+   现在由 src/lib/scene.ts 每 90ms 采样背景像素写入 --scene-*,
+   玻璃卡、描边高光、洗色层、强调色与文字明度全部改吃这些值。
+   ============================================================ */
+
+.lgh-portal {
+  /* 全画面情绪色 / 卡片区色(原始数值由 scene.ts 写在 :root,这里只做派生) */
+  --scene-color: rgb(var(--scene-r, 24) var(--scene-g, 22) var(--scene-b, 20));
+  --scene-card: rgb(var(--scene-card-r, 24) var(--scene-card-g, 22) var(--scene-card-b, 20));
+  /* 玻璃的"厚度"来源:场景色提亮 → 描边与内高光随背景变 */
+  --scene-edge: color-mix(in srgb, var(--scene-color) 58%, #fff 42%);
+  --scene-glow: color-mix(in srgb, var(--scene-color) 62%, transparent);
+  /* 卡内光晕取卡片区(下中部)的色,而不是全画面 —— 卡片后面是什么,
+     玻璃里面就该是什么色。 */
+  --scene-halo: color-mix(in srgb, var(--scene-card) 15%, transparent);
+  /* 文字与幕布只跟【色相】走,明度保持夜间该有的样子。
+     ⚠️ 上一版把幕布和文字算到了同一侧(冷色时浅字 + 浅幕),
+     30%–62% 的奶油色幕布把整片夜色洗成了白昼,浅字直接糊掉。
+     现在:字偏冷白→暖白,幕偏深蓝→深暖,两者始终互为反色。
+     实测本片两段(蓝调黄昏 / 星夜)亮度都在 0.14–0.16,都属于暗场,
+     所以不做明暗反转 —— 反了会变成黑字压黑底。 */
+  --scene-ink: color-mix(in srgb, #f6f0e4 74%, var(--scene-edge) 26%);
+  --scene-veil: color-mix(in srgb, #0a0c10 76%, var(--scene-color) 24%);
+  /* 安全阀:只有背景真的亮到 0.42 以上才反色(换更亮的素材时才生效)。
+     ⚠️ 这里必须是无单位数值:若写成百分比,下游
+     `calc(100% - var(--scene-bright) * 100%)` 就成了"百分比 × 百分比",
+     CSS 非法 → 整条声明在计算值阶段失效,文字全变黑、投影全消失。 */
+  --scene-bright: clamp(0, (var(--scene-lum, .15) - .42) * 400, 1);
+  --scene-ink-lit: color-mix(in srgb, var(--scene-ink) calc(100% - var(--scene-bright) * 100%), #241f18);
+  --scene-veil-lit: color-mix(in srgb, var(--scene-veil) calc(100% - var(--scene-bright) * 100%), #f7f0e0);
+}
+
+/* 电台令牌改写:把写死的暖色换成"场景色 × 主题色"。
+   premium.css 在 radio.css 之后注入,在这里重定义即可让全部电台规则
+   (品牌/chips/页脚/卡片/按钮/输入框)自动跟随,不必逐条改。
+   ⚠️ 概念层在 html 上就把 --accent/--surface 这类别名一次性解完了
+   (console.css 的 `--accent: var(--amber)`),必须在这里重新指向新基色,
+   否则覆盖了 --amber 也没用。 */
+html[data-concept="radio"] .lgh-portal {
+  --amber: color-mix(in srgb, var(--scene-edge) 54%, #e8a44a);
+  --amber-cta: color-mix(in srgb, var(--scene-color) 34%, #e8a44a);
+  --ink: var(--scene-ink-lit);
+  --muted: color-mix(in srgb, var(--scene-ink-lit) 62%, var(--scene-color));
+  --bg: color-mix(in srgb, #090b0f 84%, var(--scene-color));
+  --panel: color-mix(in srgb, #17130f 80%, var(--scene-color));
+  --panel-2: color-mix(in srgb, #221c16 80%, var(--scene-color));
+  --line: color-mix(in srgb, #2b2620 76%, var(--scene-color));
+  --line-strong: color-mix(in srgb, #453a2f 76%, var(--scene-color));
+  --accent: var(--amber);
+  --surface: var(--panel);
+  --surface-2: var(--panel-2);
+}
+
+/* 洗色层调淡后,页脚与次要文案直接压在照片上,对比度不足。
+   用环境色柔光托底:暗主题托暗、亮主题托亮,不引入新的色相。 */
+.lgh-portal .lgh-foot,
+.lgh-portal .lgh-alt {
+  color: color-mix(in srgb, var(--ink) 62%, var(--muted));
+  text-shadow: 0 1px 14px color-mix(in srgb, var(--scrim, transparent) 92%, transparent);
+}
+
+.lgh-portal .lg-slip,
+.lgh-portal .rg-console,
+.lgh-portal .at-logbook,
+.lgh-inputbar {
+  /* 底色再压一档(10%→20%):透明感来自"底色薄 + 背景被模糊",
+     不再靠给卡片刷一层有色面来假装玻璃。 */
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--surface) 10%, transparent),
+      color-mix(in srgb, var(--surface) 20%, transparent)
+    ) padding-box,
+    /* 玻璃的颜色全部来自背景:迎光描边 = 场景色提亮,暗部 = 场景色 */
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--scene-edge) 62%, transparent),
+      color-mix(in srgb, var(--scene-edge) 16%, transparent) 34%,
+      var(--scene-halo) 72%,
+      color-mix(in srgb, var(--scene-edge) 44%, transparent)) border-box;
+  /* 属性顺序:前缀在前、标准在后。构建压缩器会按"同属性"去重并只保留最后一条,
+     若标准声明在前,会被连前缀版一起折成只剩 -webkit-,而 Chrome 不认该前缀
+     —— 整个玻璃层会静默失效(这正是此前"卡片不透明"的根因)。 */
+  -webkit-backdrop-filter: blur(30px) saturate(1.85) brightness(1.05);
+  backdrop-filter: blur(30px) saturate(1.85) brightness(1.05);
+  /* 厚度:内高光 + 内暗边 + 外部环境色投影,玻璃感来自这三层而非模糊本身 */
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--scene-edge) 66%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--ink) 10%, transparent),
+    inset 0 0 42px var(--scene-halo),
+    0 26px 64px var(--scene-glow);
+}
+
+/* 卡内控件同步半透明(此前漏了信笺的 .lg-field,导致三主题里只有信笺卡内是实色) */
+.lgh-portal .rg-field input,
+.lgh-portal .rg-field select,
+.lgh-portal .at-field input,
+.lgh-portal .at-field select,
+.lgh-portal .lg-field input,
+.lgh-portal .lg-field select,
+.lgh-portal .lg-field textarea,
+.lgh-portal .rg-dial {
+  background: color-mix(in srgb, var(--surface-2) 26%, transparent);
+  border-color: color-mix(in srgb, var(--scene-edge) 26%, var(--line-strong));
+  -webkit-backdrop-filter: blur(11px);
+  backdrop-filter: blur(11px);
+}
+
+html[data-concept="letter"] .lg-slip::before { display: none; }
+
+.lgh-chip {
+  background: color-mix(in srgb, var(--surface) 16%, transparent);
+  border-color: color-mix(in srgb, var(--scene-edge) 40%, var(--line-strong) 60%);
+  -webkit-backdrop-filter: blur(13px) saturate(1.5);
+  backdrop-filter: blur(13px) saturate(1.5);
+}
+
 /* 双壳嵌套:外壳 = 渐变发丝线;内核 = 独立面板 + 内高光,同心圆角 */
 .lgh-inputbar {
   position: relative;
@@ -492,17 +645,13 @@ html[data-concept="letter"] .cns-doc-label { font-family: var(--font-display); l
   position: absolute;
   inset: 4px;
   border-radius: 12px;
-  background: var(--surface);
+  background: color-mix(in srgb, var(--surface) 58%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, #fff 55%, transparent),
     0 1px 3px color-mix(in srgb, var(--ink) 7%, transparent);
   pointer-events: none;
-}
-
-html[data-theme="dark"] .lgh-inputbar::after {
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent),
-    0 1px 3px rgba(0, 0, 0, .45);
 }
 
 .lgh-inputbar > * { position: relative; z-index: 1; }
@@ -596,3 +745,562 @@ html[data-concept="atlas"] .at-horizon { font-family: var(--font-hand); }
 .cns-empty,
 html[data-concept="letter"] .cns-doc-text,
 html[data-concept="letter"] .cns-mini-note { font-family: var(--font-hand); }
+
+/* ============================================================
+   背景动效 v2:洗色层独立(.lgh-wash,盖在照片/视频上) + 信笺雾层
+   + 电台视频 + 群岛液态位移(滤镜在 AtlasLogin 内联 SVG)
+   ============================================================ */
+
+.lgh-wash {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+html[data-concept="letter"] .lgh-wash {
+  /* 洗色层原为 46%/82%/92%,把"日出云海"压成一片惨白:底图失去层次,
+     漂在上面的雾也就没有可对比的参照,"流动性"自然看不出来。
+     降到 28%/52%/86%:上部露出真实天空与云海,底部仍压厚以保证页脚可读。 */
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--paper) 28%, transparent) 0%,
+    color-mix(in srgb, var(--paper) 52%, transparent) 52%,
+    color-mix(in srgb, var(--paper) 86%, transparent) 100%);
+}
+
+html[data-concept="radio"] .lgh-wash {
+  /* 幕布随场景色相走(深蓝→深暖),但保持"压暗"的职责:
+     电台是夜景,幕布的任务是托住浅色文字,不是把画面提亮。 */
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--scene-veil-lit) 34%, transparent) 0%,
+    color-mix(in srgb, var(--scene-veil-lit) 54%, transparent) 55%,
+    color-mix(in srgb, var(--scene-veil-lit) 68%, transparent) 100%);
+}
+
+html[data-concept="atlas"] .lgh-wash {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--fog) 44%, transparent) 0%,
+    color-mix(in srgb, var(--fog) 80%, transparent) 52%,
+    var(--fog) 92%);
+}
+
+/* 电台视频背景:星空延时,带视差与极缓呼吸缩放 */
+.lgh-video {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: translate(calc(var(--mx-n, 0) * -10px), calc(var(--my-n, 0) * -8px)) scale(1.05);
+  transition: transform .9s var(--ease-premium);
+  /* 交叉淡化时两个实例叠在同一位置,不透明度由 JS 每帧线性插值;
+     提前提升为合成层,让渐变不触发重绘。 */
+  will-change: opacity, transform;
+}
+
+.lgh-video--a { opacity: 1; }
+.lgh-video--b { opacity: 0; }
+
+html[data-concept="radio"] .lgh-video {
+  animation: radio-video-breathe 30s ease-in-out infinite alternate;
+}
+
+@keyframes radio-video-breathe {
+  from { filter: brightness(1); }
+  to { filter: brightness(1.14); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lgh-video { display: none; }
+  html[data-concept="radio"] .lgh-video { animation: none; }
+}
+
+/* 信笺雾层 v3:有形态亮雾(暗底边塑形)+提速+鼠标反向剪切。
+   容器吃 --mx-n 视差(18px),照片 -14px,水印 +9px → 三层景深,动鼠标即见 */
+.lgh-mist {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transform: translate(calc(var(--mx-n, 0) * 18px), calc(var(--my-n, 0) * 9px));
+  transition: transform .9s var(--ease-premium);
+}
+
+.lgh-mist i {
+  position: absolute;
+  left: 0;
+  width: 240%;
+  border-radius: 50%;
+  filter: blur(17px);
+  will-change: transform;
+}
+
+/* 雾带 v5:上一版用 mix-blend-mode:screen + 近白渐变。底图是"日出云海",
+   取景处恰好是最亮的天空 —— screen 模式在白底上等于什么都不加,雾是隐形的,
+   所以"看不出流动"。改为 normal 叠加,并引入【冷灰蓝暗雾】承担可见形态
+   (亮天空上压出雾影)、【暖白亮雾】只在雾顶加受光,两者错位漂移即为流动。
+   同时给 keyframes 加 scaleY,让雾在平移之外还有"翻卷呼吸",不再像整体平移。 */
+.lgh-mist i:nth-child(1) {
+  height: 32vh;
+  top: 20%;
+  opacity: .92;
+  background:
+    /* 沿 X 的亮暗交替:横移时形成明确的"有东西飘过去" */
+    linear-gradient(90deg,
+      rgba(84,108,128,.00) 0%,
+      rgba(84,108,128,.36) 7%,
+      rgba(84,108,128,.00) 17%,
+      rgba(255,252,244,.62) 28%,
+      rgba(84,108,128,.00) 39%,
+      rgba(88,112,132,.34) 50%,
+      rgba(88,112,132,.00) 61%,
+      rgba(255,251,243,.56) 72%,
+      rgba(88,112,132,.00) 83%,
+      rgba(88,112,132,.28) 93%,
+      rgba(88,112,132,.00) 100%),
+    radial-gradient(30vw 12vh at 6% 60%, rgba(90, 114, 134, .48), transparent 70%),
+    radial-gradient(26vw 10vh at 30% 40%, rgba(80, 104, 124, .38), transparent 72%),
+    radial-gradient(32vw 13vh at 55% 64%, rgba(94, 118, 138, .44), transparent 70%),
+    radial-gradient(24vw 9vh at 78% 42%, rgba(84, 108, 128, .32), transparent 74%),
+    radial-gradient(20vw 7vh at 18% 30%, rgba(255,252,244,.92), transparent 70%),
+    radial-gradient(24vw 8vh at 44% 26%, rgba(255,250,240,.78), transparent 72%),
+    radial-gradient(22vw 7vh at 70% 32%, rgba(255,251,243,.86), transparent 72%);
+  animation: mist-flow-a 17s ease-in-out infinite alternate;
+}
+
+.lgh-mist i:nth-child(2) {
+  height: 27vh;
+  top: 44%;
+  opacity: .84;
+  background:
+    linear-gradient(90deg,
+      rgba(255,252,246,.00) 0%,
+      rgba(255,252,246,.58) 11%,
+      rgba(255,252,246,.00) 23%,
+      rgba(92,116,136,.34) 34%,
+      rgba(92,116,136,.00) 46%,
+      rgba(255,251,244,.52) 58%,
+      rgba(255,251,244,.00) 70%,
+      rgba(96,120,140,.30) 82%,
+      rgba(96,120,140,.00) 94%),
+    radial-gradient(28vw 11vh at 12% 52%, rgba(82, 106, 126, .44), transparent 70%),
+    radial-gradient(32vw 12vh at 38% 66%, rgba(98, 122, 142, .38), transparent 70%),
+    radial-gradient(24vw 9vh at 62% 44%, rgba(86, 110, 130, .32), transparent 74%),
+    radial-gradient(28vw 10vh at 86% 58%, rgba(92, 116, 136, .40), transparent 70%),
+    radial-gradient(22vw 7vh at 26% 36%, rgba(255,251,244,.82), transparent 72%),
+    radial-gradient(20vw 7vh at 56% 34%, rgba(255,252,246,.74), transparent 72%),
+    radial-gradient(24vw 8vh at 80% 40%, rgba(255,250,242,.80), transparent 72%);
+  animation: mist-flow-b 13s ease-in-out infinite alternate;
+}
+
+.lgh-mist i:nth-child(3) {
+  height: 22vh;
+  top: 8%;
+  opacity: .62;
+  background:
+    linear-gradient(90deg,
+      rgba(104,126,146,.00) 0%,
+      rgba(104,126,146,.28) 14%,
+      rgba(104,126,146,.00) 30%,
+      rgba(255,252,246,.46) 45%,
+      rgba(104,126,146,.00) 62%,
+      rgba(104,126,146,.24) 80%,
+      rgba(104,126,146,.00) 96%),
+    radial-gradient(26vw 9vh at 16% 50%, rgba(108, 130, 148, .34), transparent 70%),
+    radial-gradient(24vw 8vh at 46% 42%, rgba(116, 138, 156, .28), transparent 72%),
+    radial-gradient(26vw 9vh at 76% 54%, rgba(104, 126, 144, .30), transparent 72%),
+    radial-gradient(20vw 6vh at 34% 28%, rgba(255,252,246,.72), transparent 72%),
+    radial-gradient(18vw 6vh at 64% 30%, rgba(255,253,247,.64), transparent 74%);
+  animation: mist-flow-a 26s ease-in-out infinite alternate-reverse;
+}
+
+@keyframes mist-flow-a {
+  from { transform: translateX(-20vw) scaleY(.92); }
+  to { transform: translateX(22vw) scaleY(1.1); }
+}
+
+@keyframes mist-flow-b {
+  from { transform: translateX(21vw) scaleY(1.08); }
+  to { transform: translateX(-21vw) scaleY(.9); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lgh-mist i { animation: none; }
+  .lgh-mist { transform: none; }
+}
+
+/* 日晕呼吸:光斑精确贴到照片太阳位置(约 76%,42%),脉动更明显 */
+html[data-concept="letter"] .lgh-portal::after {
+  right: 6%;
+  top: 16%;
+  width: min(30vw, 380px);
+  background: radial-gradient(circle,
+    color-mix(in srgb, #ffd9a0 34%, transparent),
+    color-mix(in srgb, var(--seal) 10%, transparent) 46%,
+    transparent 68%);
+  animation: premium-sun-breathe 9s ease-in-out infinite;
+}
+
+@keyframes premium-sun-breathe {
+  0%, 100% { transform: scale(1); opacity: .55; }
+  50% { transform: scale(1.22); opacity: 1; }
+}
+
+/* 群岛液态位移:滤镜由 AtlasLogin 内联 SVG 提供 */
+html[data-concept="atlas"] .lgh-photo--water {
+  filter: url(#atlas-water);
+}
+
+/* 热层:光标位置的径向遮罩强位移副本——鼠标划过哪里,哪里的浪更大 */
+html[data-concept="atlas"] .lgh-photo--hot {
+  filter: url(#atlas-hot);
+  /* 视差改用跟随器输出的 --hx-n/--hy-n,而不是 .lgh-photo 的 --mx-n/--my-n。
+     两者同源于同一次弹簧积分,遮罩与内容完全同步,不会互相滑开。 */
+  transform: translate(calc(var(--hx-n, 0) * -14px), calc(var(--hy-n, 0) * -10px));
+  /* 关键:这层原本继承 .lgh-photo 的 transform .9s 过渡,而遮罩是每帧跟随光标的
+     —— 内容 0.9 秒才追上,扭曲斑块就在罩子里打滑,这是上一轮"不跟手"的主因。 */
+  transition: none;
+  -webkit-mask-image: radial-gradient(circle 210px at var(--cx, 50%) var(--cy, 40%), #000 26%, transparent 74%);
+  mask-image: radial-gradient(circle 210px at var(--cx, 50%) var(--cy, 40%), #000 26%, transparent 74%);
+}
+
+/* 浪花带:沿岸两条白色涌动亮线,模拟浪涌拍岸 */
+html[data-concept="atlas"] .lgh-photo::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 18% 0;
+  height: 26%;
+  mix-blend-mode: screen;
+  opacity: .75;
+  pointer-events: none;
+  background:
+    radial-gradient(60vw 3vh at 22% 58%, rgba(240,250,248,.85), transparent 72%),
+    radial-gradient(48vw 2.4vh at 66% 34%, rgba(240,250,248,.65), transparent 72%),
+    radial-gradient(70vw 3.6vh at 40% 84%, rgba(240,250,248,.55), transparent 74%);
+  animation: atlas-foam 14s ease-in-out infinite alternate;
+}
+
+@keyframes atlas-foam {
+  from { transform: translateX(-4%) translateY(calc(-6% + var(--my-n, 0) * 14px)) scaleY(.86); opacity: .5; }
+  to { transform: translateX(5%) translateY(calc(4% + var(--my-n, 0) * 14px)) scaleY(1.12); opacity: .85; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-concept="atlas"] .lgh-photo::after { animation: none; }
+}
+
+/* ============================================================
+   文字 × 背景联动层:三个概念的字色/形态由各自背景驱动
+   ============================================================ */
+
+/* 信笺:字色随雾周期(15s,与雾带 i1 同周期)被雾隐;并随鼠标视差微移 */
+html[data-concept="letter"] .lgh-slogan {
+  animation: letter-ink 15s ease-in-out infinite;
+  translate: calc(var(--mx-n, 0) * 7px) calc(var(--my-n, 0) * 5px);
+  transition: translate .9s var(--ease-premium);
+}
+
+@keyframes letter-ink {
+  0%, 100% { color: var(--ink); filter: blur(0); }
+  50% { color: color-mix(in srgb, var(--ink) 84%, #5f7a6c 16%); filter: blur(.4px); }
+}
+
+/* 电台:字色温随视频真实播放时间变化(--vid-warm 由 RadioLogin 按 currentTime 驱动) */
+html {
+  --vid-warm: 0;
+}
+
+html[data-concept="radio"] .rg-brand .callword,
+html[data-concept="radio"] .rg-main-head .freq,
+html[data-concept="radio"] .rg-logline b {
+  color: color-mix(in srgb, var(--ink) calc(100% - var(--vid-warm, 0) * 26%), var(--amber));
+}
+
+/* 群岛:文字每 7.5s 被浪扫一遍(位移=放大镜式波动),色相同步偏移 */
+html[data-concept="atlas"] .lgh-chips,
+html[data-concept="atlas"] .lgh-inputbar {
+  filter: url(#atlas-textwave);
+}
+
+/* 鼠标移到口号上,字也随水面一起被扰动(chips 与输入条是常驻受影响,
+   口号原本只有逐字骑浪,没有位移滤镜)。纯 CSS:hover,不额外监听指针。 */
+html[data-concept="atlas"] .lgh-slogan:hover {
+  filter: url(#atlas-textwave);
+}
+
+html[data-concept="atlas"] .lgh-slogan:hover .at-ch {
+  animation: at-char-hot .9s ease-in-out infinite alternate;
+}
+
+@keyframes at-char-hot {
+  from { transform: translateY(0) skewX(0deg) scale(1, 1); }
+  to   { transform: translateY(-4px) skewX(-3.5deg) scale(1.08, .94); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-concept="atlas"] .lgh-slogan:hover .at-ch { animation: none; }
+}
+
+html[data-concept="atlas"] .lgh-slogan {
+  animation: at-bob 14s ease-in-out infinite;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 浪的光带:与逐字浪同周期扫过口号 */
+html[data-concept="atlas"] .lgh-slogan::after {
+  content: "";
+  position: absolute;
+  top: -12%;
+  bottom: -12%;
+  width: 34%;
+  left: -40%;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent, color-mix(in srgb, #eaf6f1 34%, transparent) 50%, transparent);
+  transform: skewX(-16deg);
+  animation: at-sheen 7.5s ease-in-out infinite;
+  mix-blend-mode: soft-light;
+}
+
+@keyframes at-sheen {
+  0% { left: -40%; }
+  55%, 100% { left: 118%; }
+}
+
+@keyframes at-tint {
+  0%, 100% { color: var(--ink); }
+  50% { color: color-mix(in srgb, var(--ink) 88%, var(--sea) 12%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-concept="letter"] .lgh-slogan { animation: none; translate: none; }
+  html[data-concept="atlas"] .lgh-slogan,
+  html[data-concept="atlas"] .lgh-chips,
+  html[data-concept="atlas"] .lgh-inputbar { filter: none; animation: none; }
+}
+
+/* ============================================================
+   群岛口号逐字骑浪:每字带 --d 相位延迟,浪扫过时
+   上浮+微旋+放大+染海色再落回(形态变化,参考模板站逐字波浪)
+   ============================================================ */
+html[data-concept="atlas"] .lgh-slogan .at-ch {
+  display: inline-block;
+  animation: at-char-wave 7.5s ease-in-out infinite;
+  animation-delay: var(--d, 0ms);
+}
+
+html[data-concept="atlas"] .lgh-slogan .at-ch { --dip-c: var(--sea); }
+html[data-concept="atlas"] .lgh-slogan .at-ch-em { --dip-c: var(--coral); }
+
+@keyframes at-char-wave {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg) scale(1, 1) skewX(0deg);
+    color: inherit;
+    filter: blur(0) brightness(1) saturate(1);
+    text-shadow: none;
+  }
+  16% {
+    transform: translateY(-12px) rotate(-6.5deg) scale(1.32, 1.14) skewX(-8deg);
+    color: color-mix(in srgb, var(--ink) 38%, var(--dip-c, var(--sea)) 62%);
+    filter: blur(.6px) brightness(1.22) saturate(1.5);
+    text-shadow: 0 0 16px color-mix(in srgb, var(--dip-c, var(--sea)) 40%, transparent), 0 1px 0 rgba(255, 255, 255, .55);
+  }
+  30% {
+    transform: translateY(2px) rotate(1.5deg) scale(.98, 1.06) skewX(2deg);
+  }
+  44% {
+    transform: translateY(5px) rotate(3.5deg) scale(.92, 1.04) skewX(5deg);
+    filter: blur(.4px) brightness(.94);
+  }
+  62% {
+    transform: translateY(-5px) rotate(-2.5deg) scale(1.08, .97) skewX(-3deg);
+    color: color-mix(in srgb, var(--ink) 68%, var(--dip-c, var(--sea)) 32%);
+  }
+  82% {
+    transform: translateY(1px) rotate(1deg) scale(1, 1) skewX(0deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-concept="atlas"] .lgh-slogan .at-ch { animation: none; }
+}
+
+/* 照片资源令牌提升到 html 作用域:照片层与放大镜共用 */
+html[data-concept="letter"] { --lgh-photo: url("../assets/hero-letter.jpg"); }
+html[data-concept="radio"] { --lgh-photo: url("../assets/hero-radio.jpg"); }
+html[data-concept="atlas"] { --lgh-photo: url("../assets/hero-atlas.jpg"); }
+
+html[data-concept="letter"] .lgh-slogan .at-ch {
+  display: inline-block;
+  animation: letter-char-mist 15s ease-in-out infinite;
+  animation-delay: var(--d, 0ms);
+}
+
+@keyframes letter-char-mist {
+  0%, 100% {
+    transform: translateY(0) scale(1) skewX(0deg);
+    color: inherit;
+    filter: blur(0) brightness(1);
+  }
+  12% {
+    transform: translateY(-3px) scale(1.1, 1.02) skewX(-2deg);
+    color: color-mix(in srgb, var(--ink) 72%, #5f7a6c 28%);
+    filter: blur(.5px) brightness(1.05);
+  }
+  30% {
+    transform: translateY(1px) scale(.99, 1.01);
+    filter: blur(.7px) brightness(.97);
+  }
+  48% {
+    transform: translateY(0) scale(1) skewX(0deg);
+    filter: blur(.2px);
+  }
+}
+
+/* ============================================================
+   背景动效 v3:信笺流动雾(SVG 湍流位移)+ 电台全界面随视频联动
+   ============================================================ */
+
+/* 信笺雾带 v4:湍流位移让雾真实翻卷,提速提亮,置于天空区 */
+html[data-concept="letter"] .lgh-mist {
+  filter: url(#letter-mist-flow);
+}
+
+/* 不再用 screen:该模式下暗雾会被"只加不减"抹平,而暗雾才是形态本体。
+   blur 必须显式写回 9px —— 本规则一旦省略 filter,会回落到更早的 17px 规则,雾被糊平。 */
+.lgh-mist i {
+  filter: blur(9px);
+  mix-blend-mode: normal;
+}
+
+/* 三层周期彻底错开(17/13/26s)+ 相位预偏 → 互相穿插,不是整体平移 */
+.lgh-mist i:nth-child(2) { animation-delay: -6s; }
+.lgh-mist i:nth-child(3) { animation-delay: -15s; }
+
+/* 字符浸雾与雾带同周期(15s),字随浪起伏而非各跳各的 */
+html[data-concept="letter"] .lgh-slogan .at-ch {
+  animation-duration: 15s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-concept="letter"] .lgh-mist { filter: none; }
+}
+
+/* 电台:整个界面的字色随视频昼夜联动(--vid-warm 由 currentTime 驱动) */
+html[data-concept="radio"] .lgh-slogan {
+  /* --ink/--amber 已由场景令牌接管:字色带背景色相,投影用互补的幕色,
+     任何一帧都读得清。 */
+  color: color-mix(in srgb, var(--ink) 86%, var(--amber));
+  text-shadow: 0 2px 30px color-mix(in srgb, var(--scene-veil-lit) 78%, transparent);
+}
+
+html[data-concept="radio"] .lgh-slogan em {
+  color: color-mix(in srgb, var(--amber) calc(86% - var(--vid-warm, 0) * 40%), #ffdf9e calc(var(--vid-warm, 0) * 100%));
+}
+
+html[data-concept="radio"] .lgh-chip {
+  color: color-mix(in srgb, var(--muted) calc(100% - var(--vid-warm, 0) * 40%), var(--amber));
+  border-color: color-mix(in srgb, var(--line-strong) calc(100% - var(--vid-warm, 0) * 55%), color-mix(in srgb, var(--amber) 44%, transparent));
+}
+
+html[data-concept="radio"] .lgh-kicker,
+html[data-concept="radio"] .lgh-slogan::before {
+  color: color-mix(in srgb, var(--muted) calc(100% - var(--vid-warm, 0) * 55%), var(--amber));
+}
+
+/* ---- 全页联动补齐:此前只有口号/chips/kicker 接了 --vid-warm,
+   品牌、状态、提示、页脚、认证卡都成了"静止图层",与视频脱节。 ---- */
+
+/* 品牌名与副标:随夜色转暖 */
+html[data-concept="radio"] .rg-brand .callword {
+  color: color-mix(in srgb, var(--ink) calc(100% - var(--vid-warm, 0) * 30%), #ffe0ae);
+}
+html[data-concept="radio"] .rg-brand small {
+  color: color-mix(in srgb, var(--muted) calc(100% - var(--vid-warm, 0) * 42%), var(--amber));
+}
+
+/* ON AIR / SIGNAL 状态标签 */
+html[data-concept="radio"] .rg-onair,
+html[data-concept="radio"] .rg-led {
+  color: color-mix(in srgb, var(--muted) calc(100% - var(--vid-warm, 0) * 46%), var(--amber));
+  border-color: color-mix(in srgb, var(--line-strong) calc(100% - var(--vid-warm, 0) * 50%), color-mix(in srgb, var(--amber) 40%, transparent));
+}
+html[data-concept="radio"] .rg-onair.live { color: var(--red); }
+
+/* 热线提示、页脚、话题回显 */
+html[data-concept="radio"] .lgh-alt,
+html[data-concept="radio"] .lgh-alt button,
+html[data-concept="radio"] .lgh-foot,
+html[data-concept="radio"] .lgh-topic {
+  color: color-mix(in srgb, var(--muted) calc(100% - var(--vid-warm, 0) * 38%), color-mix(in srgb, var(--amber) 70%, #ffe0ae));
+}
+html[data-concept="radio"] .lgh-foot {
+  border-top-color: color-mix(in srgb, var(--line) calc(100% - var(--vid-warm, 0) * 45%), color-mix(in srgb, var(--amber) 30%, transparent));
+}
+
+/* 认证卡内文字:玻璃卡本体已随背景变,文字同步才不脱节 */
+html[data-concept="radio"] .rg-console label,
+html[data-concept="radio"] .rg-boot-foot {
+  color: color-mix(in srgb, var(--ink) 74%, color-mix(in srgb, var(--amber) 62%, var(--muted)) calc(var(--vid-warm, 0) * 100%));
+}
+html[data-concept="radio"] .rg-console input,
+html[data-concept="radio"] .rg-console select {
+  color: color-mix(in srgb, var(--ink) calc(100% - var(--vid-warm, 0) * 22%), #fff3df);
+}
+html[data-concept="radio"] .rg-dial {
+  border-color: color-mix(in srgb, var(--glass-edge) calc(var(--vid-warm, 0) * 34%), var(--line-strong));
+}
+
+/* 视频自身的色温也由 --vid-warm 轻轻推动,文字与背景同源变化,不是两套动画 */
+html[data-concept="radio"] .lgh-video {
+  filter: brightness(calc(1 + var(--vid-warm, 0) * .1)) saturate(calc(1 + var(--vid-warm, 0) * .16));
+}
+
+/* ---- 认证卡与输入条:从"固定色卡片"改为"映背景的玻璃" ----
+   原实现是 --panel(#191512) 不透明底 + 14px 硬黑投影 + 直角,
+   压在冷蓝夜湖视频上像贴了一张暖棕卡纸,这就是"配色和背景风格不一致"。
+   这里用 0,3,1 特异性盖掉概念层的 .rg-console 硬投影,让卡面透出夜色,
+   再由 --vid-warm 驱动暖度 —— 与视频同一时间轴。 */
+html[data-concept="radio"] .lgh-portal .rg-console {
+  /* 顶边不再是固定琥珀:它是"这块玻璃"迎着背景的那条高光 ——
+     背景是黑的就冷白,画面转黄它才转黄。 */
+  border: 1px solid color-mix(in srgb, var(--scene-edge) 20%, var(--line-strong));
+  border-top-width: 2px;
+  border-top-color: color-mix(in srgb, var(--scene-edge) 58%, transparent);
+  border-radius: 14px;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--scene-edge) 52%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--ink) 12%, transparent),
+    inset 0 0 46px var(--scene-halo),
+    0 26px 64px var(--scene-glow);
+}
+
+/* 主按钮:平涂琥珀 + 4px 直角 → 渐变 + 内高光圆角,并随夜色转暖 */
+html[data-concept="radio"] .lgh-portal .rg-power {
+  border-radius: 11px;
+  letter-spacing: .2em;
+  /* 主按钮保留品牌暖调(它是 CTA,不该跟着场景褪成灰),
+     但底色由场景色推动:背景转黄它就更暖更亮。 */
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--amber-cta) 82%, #fff8ec),
+    color-mix(in srgb, var(--amber-cta) 88%, #6d4514));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 44%, transparent),
+    0 6px 20px color-mix(in srgb, var(--amber-cta) 30%, transparent);
+}
+
+html[data-concept="radio"] .lgh-portal .rg-dial {
+  border-radius: 7px;
+  background:
+    repeating-linear-gradient(90deg,
+      color-mix(in srgb, var(--glass-edge) 26%, transparent) 0 1px,
+      transparent 1px 12px) 4px 0 / calc(100% - 8px) 60% no-repeat,
+    color-mix(in srgb, var(--surface-2) 26%, transparent);
+}
+
+/* 输入条内壳在电台下也保持通透,避免又变成一张实色卡 */
+html[data-concept="radio"] .lgh-portal .lgh-inputbar::after {
+  background: color-mix(in srgb, var(--surface-2) 46%, transparent);
+}

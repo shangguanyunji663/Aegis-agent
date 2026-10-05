@@ -1,10 +1,11 @@
 /* 夜航电台 · 登录页:输入框即入口 → 渐进披露开机面板。 */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useAuth } from "../../lib/auth";
 import { useSystemStatus } from "../../hooks/useSystemStatus";
 import { LoginHero } from "../../shared/LoginHero";
+import { createSceneSampler } from "../../lib/scene";
 import "./radio.css";
 
 const CHIPS = [
@@ -14,6 +15,16 @@ const CHIPS = [
   { label: "关系困扰", text: "我想聊聊最近和家人的矛盾。" },
   { label: "随便聊聊", text: "随便聊聊吧,我今天有点烦。" },
 ];
+
+/* 交叉淡化时长。量测:循环点末帧 rgb(38,35,39) → 首帧 rgb(19,46,74),
+   RGB 距离 41(0–255),而片内相邻采样点正常变化只有 0–5 —— 硬切非常显眼。
+   2s 线性溶解实测每 0.4s 仍有 10–15 的色阶变化,是常态中位数的 5 倍。
+   改成 2.6s + smoothstep 曲线:两端多停在"接近单画面"的状态,
+   50% 重影区间被快速掠过,观感更干净。 */
+const FADE_SECONDS = 2.6;
+
+/* smoothstep:两端速度趋 0、中段最快,让"双影最重"的 50% 只停留很短一瞬 */
+const easeFade = (t: number) => t * t * (3 - 2 * t);
 
 export function RadioLogin() {
   const { login, register } = useAuth();
@@ -29,6 +40,93 @@ export function RadioLogin() {
   const [invite, setInvite] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const videoARef = useRef<HTMLVideoElement>(null);
+  const videoBRef = useRef<HTMLVideoElement>(null);
+
+  /* 无缝循环 + 场景联动。
+     1) 循环:单个 video 直接 loop 会在末帧(暖灰夜色)硬切回首帧(冷蓝黄昏),
+        实测 RGB 距离 41。这里用两个同源 video 交叉淡化 —— A 快播完时
+        把 B 从 0 起播,A/B 不透明度线性互换,硬切就变成了溶解。
+        B 起播失败(自动播放策略/解码问题)时自动退回 A.loop,不会黑屏。
+     2) 联动:scene.ts 对"当前前景"取色,换前景时传 reset=false 保留滑动窗口,
+        否则每 14 秒就要重新攒满一整轮,期间归一化会失真。 */
+  useEffect(() => {
+    const a = videoARef.current;
+    const b = videoBRef.current;
+    if (!a || !b) return;
+
+    /* 降级动效偏好下视频本来就被 CSS 隐藏,没必要再跑调度器 */
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      a.loop = true;
+      return;
+    }
+
+    const sampler = createSceneSampler();
+    sampler.setSource(a);
+    let front: HTMLVideoElement = a;
+    let fading = false;
+    let raf = 0;
+
+    const other = () => (front === a ? b : a);
+
+    /* 兜底:第二个视频不可用时退回原生 loop */
+    const fallbackToLoop = () => {
+      fading = false;
+      front.loop = true;
+      other().loop = true;
+      other().pause();
+      other().style.opacity = "0";
+      front.style.opacity = "1";
+    };
+
+    const tick = () => {
+      const dur = Number.isFinite(front.duration) ? front.duration : 0;
+      if (dur > FADE_SECONDS) {
+        const back = other();
+        if (!fading && front.currentTime >= dur - FADE_SECONDS) {
+          if (back.readyState >= 2) {
+            fading = true;
+            back.currentTime = 0;
+            back.style.opacity = "0";
+            const p = back.play();
+            if (p && typeof p.catch === "function") p.catch(fallbackToLoop);
+          } else {
+            fallbackToLoop();
+          }
+        }
+        if (fading) {
+          const raw = Math.min(1, Math.max(0, (front.currentTime - (dur - FADE_SECONDS)) / FADE_SECONDS));
+          const t = easeFade(raw);
+          front.style.opacity = String(1 - t);
+          back.style.opacity = String(t);
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+
+    const onEnded = (event: Event) => {
+      const ended = event.currentTarget as HTMLVideoElement;
+      const next = other();
+      ended.style.opacity = "0";
+      ended.pause();
+      next.style.opacity = "1";
+      front = next;
+      sampler.setSource(next, false);
+      fading = false;
+    };
+
+    a.addEventListener("ended", onEnded);
+    b.addEventListener("ended", onEnded);
+    b.style.opacity = "0";
+    raf = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      a.removeEventListener("ended", onEnded);
+      b.removeEventListener("ended", onEnded);
+      sampler.stop();
+    };
+  }, []);
 
   async function submitLogin(event: FormEvent) {
     event.preventDefault();
@@ -62,8 +160,30 @@ export function RadioLogin() {
   }
 
   return (
-    <div className="lgh-portal">
+    <div className={`lgh-portal${showAuth ? " is-auth" : ""}`}>
       <div className="lgh-photo" aria-hidden="true" />
+      {/* 两份同源视频交叉淡化:末帧硬切回首帧会被"溶解"掉。
+          B 默认不自动播放、初始全透明,由上面的调度器在 A 播完前 2s 拉起来。 */}
+      <video
+        ref={videoARef}
+        className="lgh-video lgh-video--a"
+        autoPlay
+        muted
+        playsInline
+        preload="auto"
+        src="/media/night-lake.mp4"
+        aria-hidden="true"
+      />
+      <video
+        ref={videoBRef}
+        className="lgh-video lgh-video--b"
+        muted
+        playsInline
+        preload="auto"
+        src="/media/night-lake.mp4"
+        aria-hidden="true"
+      />
+      <div className="lgh-wash" aria-hidden="true" />
       <div className="lgh-top">
         <div className="rg-brand">
           <div>

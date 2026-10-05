@@ -53,9 +53,9 @@ from app.services.tool_queue import ToolQueueService
 from app.services.tool_records import ToolRecordService
 from app.tools.contracts import governed_payload, normalize_tool_kind
 
-# 主题档位:亮/暗两档。旧值(warm/ocean/forest/playful)读取时自动回退 DEFAULT_THEME,
-# 无需迁移;前端以 html[data-theme] 接收首屏注入。
-THEME_CHOICES: tuple[str, ...] = ("light", "dark")
+# 主题档位:仅亮色一套(亮暗双模式已按需求移除)。保留 light 单键以兼容
+# 首屏注入与旧数据读取(历史 dark/warm 等值读取时自动回退 DEFAULT_THEME)。
+THEME_CHOICES: tuple[str, ...] = ("light",)
 DEFAULT_THEME: str = "light"
 
 

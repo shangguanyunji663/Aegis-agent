@@ -1,10 +1,12 @@
 /* 信笺概念 · 登录页:输入框即入口(Master 范式) → 渐进披露领取单。 */
 
-import { useState } from "react";
-import type { FormEvent } from "react";
+import { useEffect, useState } from "react";
+import type { CSSProperties, FormEvent } from "react";
 import { useAuth } from "../../lib/auth";
 import { useSystemStatus } from "../../hooks/useSystemStatus";
 import { LoginHero } from "../../shared/LoginHero";
+import { createSceneSampler } from "../../lib/scene";
+import heroLetter from "../../assets/hero-letter.jpg";
 import "./letter.css";
 
 const CHIPS = [
@@ -14,6 +16,19 @@ const CHIPS = [
   { label: "关系困扰", text: "我想聊聊最近和家人的矛盾。" },
   { label: "随便聊聊", text: "随便聊聊吧,我今天有点烦。" },
 ];
+
+/* 口号逐字拆分:雾带扫过时逐字"浸雾"形变(15s,与雾带同周期) */
+function dipChars(text: string, em: boolean, start: number) {
+  return [...text].map((ch, i) => (
+    <span
+      key={`${start}-${i}`}
+      className={`at-ch${em ? " at-ch-em" : ""}`}
+      style={{ "--d": `${(start + i) * 110}ms` } as CSSProperties}
+    >
+      {ch}
+    </span>
+  ));
+}
 
 export function LetterLogin() {
   const { login, register } = useAuth();
@@ -29,6 +44,19 @@ export function LetterLogin() {
   const [invite, setInvite] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const waterOk = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* 场景联动:信笺底图是静态照片,取一次色即可 ——
+     卡片描边与内高光因此由这张"日出云海"本身决定,而不是写死一个暖白色。 */
+  useEffect(() => {
+    const img = new Image();
+    img.src = heroLetter;
+    const sampler = createSceneSampler();
+    const onLoad = () => sampler.setSource(img);
+    if (img.complete && img.naturalWidth) onLoad();
+    else img.addEventListener("load", onLoad, { once: true });
+    return () => sampler.stop();
+  }, []);
 
   async function submitLogin(event: FormEvent) {
     event.preventDefault();
@@ -62,8 +90,33 @@ export function LetterLogin() {
   }
 
   return (
-    <div className="lgh-portal">
+    <div className={`lgh-portal${showAuth ? " is-auth" : ""}`}>
       <div className="lgh-photo" aria-hidden="true" />
+      <div className="lgh-wash" aria-hidden="true" />
+      <div className="lgh-mist" aria-hidden="true"><i /><i /><i /></div>
+      {waterOk && (
+        <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden="true" focusable="false">
+          {/* 流动雾滤镜:粗尺度造云团轮廓,细尺度加丝缕纹理。
+              两级 feDisplacementMap 串联,只靠单层低频湍流位移肉眼看不出"在动"。
+              color-interpolation-filters=sRGB 避免线性光空间把亮度压平。
+              (两段 feTurbulence 内的 <animate> 是有意保留的:它让位移图案缓慢 morphing,
+               代价是每帧重算分形噪声 —— 用户选择观感优先。) */}
+          <filter id="letter-mist-flow" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB">
+            <feTurbulence type="fractalNoise" baseFrequency="0.0055 0.013" numOctaves="3" seed="5" result="coarse">
+              <animate attributeName="baseFrequency" dur="19s"
+                values="0.0055 0.013;0.0085 0.019;0.0042 0.010;0.0055 0.013" repeatCount="indefinite" />
+            </feTurbulence>
+            <feTurbulence type="turbulence" baseFrequency="0.021 0.048" numOctaves="2" seed="17" result="fine">
+              <animate attributeName="baseFrequency" dur="7.5s"
+                values="0.021 0.048;0.030 0.062;0.017 0.040;0.021 0.048" repeatCount="indefinite" />
+            </feTurbulence>
+            <feDisplacementMap in="SourceGraphic" in2="coarse" scale="120"
+              xChannelSelector="R" yChannelSelector="G" result="warped" />
+            <feDisplacementMap in="warped" in2="fine" scale="34"
+              xChannelSelector="R" yChannelSelector="G" />
+          </filter>
+        </svg>
+      )}
       <div className="lgh-top">
         <div className="lz-brand">
           <span className="seal-mark" aria-hidden="true">屿</span>
@@ -78,7 +131,7 @@ export function LetterLogin() {
       </div>
 
       <LoginHero
-        slogan={<>每一句倾诉,都有人<em>认真对待</em>。</>}
+        slogan={<>{dipChars("每一句倾诉,都有人", false, 0)}{dipChars("认真对待", true, 9)}{dipChars("。", false, 13)}</>}
         placeholder="今天,想聊点什么?"
         chips={CHIPS}
         actionLabel="开始倾诉"

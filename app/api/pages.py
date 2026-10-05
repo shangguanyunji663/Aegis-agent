@@ -56,16 +56,23 @@ def _render(request: Request) -> str:
     return html.replace("<head>", "<head>" + inject, 1)
 
 
+class NoCacheHTMLResponse(HTMLResponse):
+    """登录/工作台入口页禁用缓存:前端迭代时 index.html 必须取最新(引用新 hash 资源)。"""
+
+    def __init__(self, content: str, **kwargs):
+        super().__init__(content=content, headers={"Cache-Control": "no-cache"}, **kwargs)
+
+
 @router.get("/", response_class=HTMLResponse)
-def index(request: Request) -> str:
-    return _render(request)
+def index(request: Request) -> NoCacheHTMLResponse:
+    return NoCacheHTMLResponse(_render(request))
 
 
 @router.get("/student", response_class=HTMLResponse)
-def student_page(request: Request) -> str:
-    return _render(request)
+def student_page(request: Request) -> NoCacheHTMLResponse:
+    return NoCacheHTMLResponse(_render(request))
 
 
 @router.get("/admin", response_class=HTMLResponse)
-def admin_page(request: Request) -> str:
-    return _render(request)
+def admin_page(request: Request) -> NoCacheHTMLResponse:
+    return NoCacheHTMLResponse(_render(request))

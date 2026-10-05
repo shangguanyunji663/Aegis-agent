@@ -282,7 +282,7 @@ RISK_QLORA_TIMEOUT_SECONDS=8
 │                                #                migrate_sqlite_to_mysql | eval_risk_dual_path | run_benchmark | analyze_layers
 │                                #                eval_minilm_ablation_tmp | eval_ce_tmp（第十九轮 RAG 对照评测）
 ├── docs/                        # 架构、安全、演示、教师手册与前端学习文档
-│   └── records/                 # 迭代记录（第 1 ~ 19 轮）
+│   └── records/                 # 迭代记录（第 1 ~ 20 轮）
 ├── Dockerfile
 ├── docker-compose.yml
 └── requirements.txt
@@ -560,7 +560,7 @@ python -m app.mcp.server --list
 - [逐文件学习指南](Aegis项目逐文件学习指南.md)
 
 <details>
-<summary><b>展开：迭代记录（第 1 ~ 19 轮）</b></summary>
+<summary><b>展开：迭代记录（第 1 ~ 20 轮）</b></summary>
 
 | 轮次 | 主题 | 文档 |
 | :--- | :--- | :--- |
@@ -582,6 +582,7 @@ python -m app.mcp.server --list
 | 第十七轮 | 前端整体改造（页签化 / 固定一屏 / 全中文） | [ROUND-17-FRONTEND-OVERHAUL.md](docs/records/ROUND-17-FRONTEND-OVERHAUL.md) |
 | 第十八轮 | 前端多主题切换与零闪烁注入 | [ROUND-18-THEME-SWITCHER.md](docs/records/ROUND-18-THEME-SWITCHER.md) |
 | 第十九轮 | RAG 语义重排引擎（Cross-Encoder）与真 MiniLM 实测 | [ROUND-19-RAG-SEMANTIC-RERANK.md](docs/records/ROUND-19-RAG-SEMANTIC-RERANK.md) |
+| 第二十轮 | 前端三概念主题系统（Vite + React + TS）与浏览器取色驱动的主题化 | [ROUND-20-FRONTEND-SCENE-DRIVEN.md](docs/records/ROUND-20-FRONTEND-SCENE-DRIVEN.md) |
 
 </details>
 

@@ -156,11 +156,6 @@ html[data-concept="atlas"] { --spot-c: var(--sea); }
   animation: fx-grain-drift 1.4s steps(3) infinite;
 }
 
-html[data-theme="dark"] .fx-grain {
-  mix-blend-mode: screen;
-  opacity: .035;
-}
-
 @keyframes fx-grain-drift {
   0% { transform: translate(0, 0); }
   33% { transform: translate(-14px, 9px); }

@@ -309,13 +309,13 @@ flowchart LR
 | `app/agents/langgraph_runtime.py`                        | LangGraph StateGraph 运行时 + 检查点                                                                       | `LangGraphRuntime`                                                                               | langgraph          |
 | `app/autonomous/`                                        | 自治协作：events（协议）、registry（能力/决策）、board（共享读）、coordinator（认领循环）、agents（六自治 Agent）、runtime（黑板→响应）        | `AutonomousAgentRuntime`                                                                         | llm、rag、store      |
 | `app/rag/`                                               | 检索与记忆子系统：text（分词）、scoring（BM25/rerank/融合）、chunking（切块/元数据）、facts（L2 事实抽取与渲染）、memory（L3 摘要）、vector\_store（Chroma/本地降级） | `DatabaseStore.search_knowledge`（组装检索流水线）                                                        | chromadb（可选）       |
-| `app/repository/store.py`                                | 持久化总闸（约 1173 行，第十三轮新增 L4/L2、第十八轮新增主题偏好方法后更新）                                                                           | `DatabaseStore`                                                                                  | entities、rag       |
+| `app/repository/store.py`                                | 持久化总闸（约 1196 行，第十三轮新增 L4/L2、第十八轮新增主题偏好方法后更新）                                                                           | `DatabaseStore`                                                                                  | entities、rag       |
 | `app/tools/`                                             | 工具治理：contracts（契约）、gateway（internal/MCP 网关）、mcp\_client                                              | `governed_payload()`、`build_tool_gateway()`                                                      | store              |
 | `app/services/`                                          | 业务服务：report\_case（审批后编排）、tool\_executor（真实副作用）、tool\_queue（队列/worker）、tool\_records、tool\_governance | `ReportCaseService`、`ToolQueueWorker`                                                            | store、tools        |
 | `app/api/`                                               | HTTP 路由：schemas/deps/middleware/errors（全局异常处理，见 12.3b）/pages/system/auth\_routes/chat/admin                                 | RESTful + SSE 接口                                                                                 | FastAPI、harness    |
 | `app/mcp/`                                               | MCP 边界：server（FastMCP 工具服务）/ client（stdio 客户端）（可选后端）                                       | `@mcp.tool` 暴露的工具                                                                                | store、contracts    |
 | `app/evaluation/`（含 `harness/`）、`eval/`              | 评测闭环：runner / rag（双口径+消融）/ datasets / report\_html / runtime\_ab / judge / harness（factory 装配工厂 + runner 场景回放） | `eval.run_eval`、`app.evaluation.harness.runner`                                                 | store、llm          |
-| `static/`、`tests/`                                       | 双端原生前端 + pytest 单测（历史验证结果应以运行日期和环境为准）                                                                                 | HTML/JS 页面、测试                                                                                    | —                  |
+| `frontend/`、`tests/`                                    | 前端 SPA(Vite 8 + React 19 + TS 6,源码 `frontend/src/`,产物 `frontend/dist/` 由 FastAPI 同源托管)+ pytest 单测(历史验证结果应以运行日期和环境为准) | 三入口页 `/`、`/student`、`/admin`(同一 SPA 入口)、测试                                                  | Vite 工具链、Node  |
 
 ## 2.2 学生端对话主流程（时序图）
 
@@ -603,7 +603,7 @@ RISK_QLORA_TIMEOUT_SECONDS=8
 
 ## 4.3 配置 `.env`：最小可运行 vs 进阶
 
-`.env.example` 是推荐配置清单；但要区分三类值：**`Settings` 代码默认**、**示例文件建议值**和**部署时由 `.env`/系统环境变量覆盖的值**。例如 `embedding_provider` 的代码默认是 `openai`，`.env.example` 则推荐 `local` 以便无外部密钥演示；本地开发者自己的 `.env` 不属于仓库默认。另注意 `.env.example` 并未覆盖全部 90 个 Settings 字段——SMTP 全组、告警目的地（`ALERT_EMAIL_*`）、`LANGGRAPH_CHECKPOINT_PATH`、`TOOL_OUTPUT_DIR`、`EXCEL_PATH`、`RAG_EVAL_*` 等约 24 项只存在于代码默认（见附录 C）；需要这些功能时以附录 C 的变量名为准。最小可运行可直接使用代码默认（`AI_PROVIDER=mock`、SQLite、`VECTOR_ENABLED=false`、Redis 空）。按组理解关键变量：
+`.env.example` 是推荐配置清单；但要区分三类值：**`Settings` 代码默认**、**示例文件建议值**和**部署时由 `.env`/系统环境变量覆盖的值**。例如 `embedding_provider` 的代码默认是 `openai`，`.env.example` 则推荐 `local` 以便无外部密钥演示；本地开发者自己的 `.env` 不属于仓库默认。另注意 `.env.example` 并未覆盖全部 93 个 Settings 字段——SMTP 全组、告警目的地（`ALERT_EMAIL_*`）、`LANGGRAPH_CHECKPOINT_PATH`、`TOOL_OUTPUT_DIR`、`EXCEL_PATH`、`RAG_EVAL_*` 等约 24 项只存在于代码默认（见附录 C）；需要这些功能时以附录 C 的变量名为准。最小可运行可直接使用代码默认（`AI_PROVIDER=mock`、SQLite、`VECTOR_ENABLED=false`、Redis 空）。按组理解关键变量：
 
 | 分组  | 变量                                                           | 作用                                 | 默认                               |
 | --- | ------------------------------------------------------------ | ---------------------------------- | -------------------------------- |
@@ -666,8 +666,8 @@ python -m app.init_db
 # 后端测试（tests/ 目录；联调脚本已迁至 scripts/smoke_chat.py，不在收集范围）
 python -m pytest tests -q
 
-# 前端脚本语法检查
-node --check static/login.js static/student.js static/admin.js
+# 前端：静态检查 + 类型检查 + 构建(产物 dist/ 为 FastAPI 同源托管，必须一起提交)
+cd frontend && npm run lint && npm run build && cd ..
 
 # 综合评测
 python -m eval.run_eval
@@ -734,7 +734,7 @@ Aegis 是一个「学生倾诉 + 风险识别 + 管理员处置」的完整闭�
 第 11 站  工具治理      tools/ + services/                       — 高风险动作必须被管住
 第 12 站  HTTP 层       api/ + main.py                           — 把能力暴露成接口
 第 13 站  评测闭环      evaluation/(含 harness/) + eval/     — 用数据证明系统有效
-第 14 站  收尾          static/ + tests/                         — 双端界面与质量兜底
+第 14 站  收尾          frontend/ + tests/                      — 前端界面与质量兜底
 ```
 
 
@@ -2314,7 +2314,7 @@ print(extract_user_facts("我最近晚上睡不着，考试压力很大"))
 
 ## 第 10 站 repository/store.py — 持久化仓储
 
-`DatabaseStore` 是所有表的读写总闸（约 1173 行，第十三轮新增 L4/L2、第十八轮新增主题偏好方法后更新，按区块组织）：
+`DatabaseStore` 是所有表的读写总闸（约 1196 行，第十三轮新增 L4/L2、第十八轮新增主题偏好方法后更新，按区块组织）：
 
 -   会话/消息  ：`ensure_session`（不存在则建，支持归属回填）、`list/get/delete/rename_session`、`append_message`（首条用户消息自动成为标题）、**`recent_messages`**（L4 滑动窗口，第十三轮新增，支持 `exclude_current` 排除当前消息）。
 -   认证  ：`ensure_default_users`（演示账号）、`authenticate_user`（验密 + 发会话令牌）、`get/revoke_auth_session`（过期即删）。
@@ -2551,13 +2551,13 @@ print("tool_kind" in g, "redacted_payload" in g)   # True True ← 盖章字段
 
 ## 第 12 站 HTTP 层 — api/ + main.py
 
-### 12.1 main.py — 只做装配（约 90 行）
+### 12.1 main.py — 只做装配（约 100 行）
 
-`create_app()` 顺序：settings → engine/会话工厂/建表 → DatabaseStore（默认账号+知识库种子）→ RuntimeServices → SkillRegistry → LLM 客户端 → Orchestrator → Harness → 工具网关 → 队列 worker。全部挂 `app.state`，`app.mount("/static", StaticFiles(directory=STATIC_DIR))` 挂载静态目录，注册中间件与 5 个路由模块。lifespan 里启停 worker。模块末尾还有一行 `app = create_app()`——uvicorn 以 `app.main:app` 为入口时靠它。
+`create_app()` 顺序：settings → engine/会话工厂/建表 → DatabaseStore（默认账号+知识库种子）→ RuntimeServices → SkillRegistry → LLM 客户端 → Orchestrator → Harness → 工具网关 → 队列 worker。全部挂 `app.state`，注册中间件与 5 个路由模块。静态资源托管改为 `if DIST_DIR.exists(): app.mount("/", NoCacheStaticFiles(directory=DIST_DIR, html=True), name="spa")`（`DIST_DIR = frontend/dist`）——挂在页面路由**之后**，使 `/`、`/student`、`/admin` 优先走 `pages` 路由；`NoCacheStaticFiles` 保留 ETag 协商缓存并加 `Cache-Control: no-cache`，迭代时杜绝陈旧 CSS/JS。lifespan 里启停 worker。模块末尾还有一行 `app = create_app()`——uvicorn 以 `app.main:app` 为入口时靠它。
 
 `app.state` 的 11 个键（路由统一 `request.app.state.<key>` 取用）：`settings`、`engine`、`store`、`registry`（SkillRegistry）、`llm_client`、`orchestrator`、`agent_harness`、`runtime`、`tool_gateway`、`tool_worker`、`knowledge_dir`。
 
-> ⚠️ 复现时漏掉 `/static` 挂载是隐形坑：48 个 API 端点全部正常、附录 A 冒烟照样通过（自建核对命令按 `r.methods` 过滤，Mount 没有 methods 会被排除，清单仍是 48），但三端 HTML 引用的 `/static/styles.css`、`/static/*.js` 全部 404，前端直接裸奔。前后端一起复现时务必带上这行。
+> ⚠️ 复现时「前端产物缺失」是隐形坑：`main.py:95` 的 mount 带 `if DIST_DIR.exists()` 守卫，`dist` 不存在时**静默跳过挂载**（不报错、不告警），而 `pages.py` 此时返回一段「前端尚未构建，请执行 `npm install && npm run build`」的指引页。此时 48 个 API 端点全部正常、附录 A 冒烟照样通过（自建核对命令按 `r.methods` 过滤，Mount 没有 methods 会被排除，清单仍是 48），但三端入口页拿到的是指引页而非应用。前后端一起复现时务必先 `cd frontend && npm run build`，并把 `dist/` 一起提交。
 
 
 
@@ -2572,7 +2572,7 @@ def current_principal(request: Request) -> AuthPrincipal:
     ...
 ```
 
-`require_admin = Depends(current_principal) + 角色检查`。路由声明 `principal: AuthPrincipal = Depends(require_admin)` 即完成鉴权——FastAPI 依赖注入的标准用法。
+`require_staff = Depends(current_principal) + 角色检查`（`STAFF_ROLES` = admin + teacher；早期名为 `require_admin`，因实际放行 teacher 已于 2026-10-05 更名以对齐语义）。路由声明 `principal: AuthPrincipal = Depends(require_staff)` 即完成鉴权——FastAPI 依赖注入的标准用法。
 
 ### 12.3 api/middleware.py — 请求追踪（重构补齐的功能）
 
@@ -2674,7 +2674,7 @@ return StreamingResponse(event_stream(), media_type="text/event-stream")
 | `LoginRequest` | `username: str`、`password: str` | 登录 |
 | `RegisterRequest` | `username: str`、`password: str`；`role: str = "student"`、`invite_code: str = ""`（teacher 注册需邀请码） | 注册（成功返回 **201**） |
 | `ThemeRequest` | `theme: str`（取值须在 `THEME_CHOICES` 白名单内） | 主题保存 |
-- `pages.py`（3 个 HTML）与 `system.py`（health/readiness/agent-status/skills）。pages.py 不是简单的静态文件直读：`_resolve_theme()` 会软解析当前用户主题（无会话/未登录/无偏好一律回退默认主题，不抛 401），再把 `data-theme` 内联脚本注入 `<head>` 最前——脚本先于 styles.css 解析执行，消除主题切换的首屏闪烁（完整链路见 12.5b）。
+- `pages.py`（3 个路由 / **1 份** SPA 入口）与 `system.py`（health/readiness/agent-status/skills）。三个路由 `/`、`/student`、`/admin` 都调同一个 `_render(request)`，读 `frontend/dist/index.html`（页内跳转由 React Router 承接）；`_resolve_theme()` 会软解析当前用户主题（无会话/未登录/无偏好一律回退 `DEFAULT_THEME`，不抛 401），再把 `data-theme` 内联脚本注入 `<head>` 最前——脚本先于 `/assets/*.css` 解析执行，消除首屏闪烁。`dist` 尚未构建时返回一段「请执行 `npm install && npm run build`」的构建指引页（`BUILD_HINT`）而不是 500（完整链路见 12.5b）。
 - `auth_routes.py`：注册（教师凭邀请码，重名 409）/登录/登出/当前用户（`/api/auth/*`）——2.1 的 `verify_password` 在这里生效，成功即发会话令牌并种 Cookie（httponly + samesite=lax）。第十八轮起 `/api/auth/me` 随身份返回主题偏好，`PUT /api/auth/me/theme` 保存主题。
 - `admin.py`（约 315 行）：管理端薄路由——待审报告、个案、工具队列/死信、知识库、评测、审计等端点，绝大多数是「参数校验 → 调 store 或 ReportCaseService → 返回 JSON」；审批与派发任务的核心编排已在第 11 站拆到服务层（2.3 时序图），这里不重复业务。
 
@@ -2683,13 +2683,13 @@ return StreamingResponse(event_stream(), media_type="text/event-stream")
 一个横跨四层的小功能，正好检验你是否理解了「领域模型 / 存储 / 路由 / 页面」各层的分工：
 
 1. **表**：`UserPreference`（entities.py:255）——`user_public_id` 唯一、一用户一行，`theme` 存当前主题键。表数口径：按「第十八轮新增后总数达 20」它是收官的一张；若按文件内声明顺序它其实是第 18 个类（后面还有 `UserMemoryFact`、`AdminAuditLog`）。
-2. **store**：`get_user_theme` / `set_user_theme`（store.py:314-335）——写入前用 `THEME_CHOICES = ("warm", "ocean", "forest", "playful")` 白名单校验，非法取值回退 `DEFAULT_THEME`（与治理层「白名单优先」同一思想）；存在则更新、不存在则插入；
-3. **端点**：`GET /api/auth/me` 随身份返回 theme、`PUT /api/auth/me/theme`（auth_routes.py:97）保存——前端切一次主题即写库，跨设备同步；
+2. **store**：`get_user_theme` / `set_user_theme`（store.py:315-336）——写入前用 `THEME_CHOICES = ("light",)` 白名单校验，非法取值回退 `DEFAULT_THEME = "light"`（与治理层「白名单优先」同一思想）；读取侧同样校验，历史 `warm`/`ocean`/`forest`/`playful`/`dark` 记录读取时自动回退 `light`，**无需数据迁移**；存在则更新、不存在则插入。亮暗双模式与四套配色主题已在第二十轮按需求移除，主题键位仅保留 `light` 一档；
+3. **端点**：`GET /api/auth/me` 随身份返回 theme、`PUT /api/auth/me/theme`（auth_routes.py:97）保存。第二十轮起前端**已不再调用**该端点（形态记忆改走 `localStorage: aegis:concept`），端点作为遗留接口保留，`THEME_CHOICES` 收敛为 `("light",)` 后实际只有单一有效取值；
 4. **页面**：pages.py 渲染时把 `<script>document.documentElement.setAttribute("data-theme", "...")</script>` 注入 `<head>` 最前——脚本先于 CSS 解析，首屏即为目标主题、无闪烁。
 
 两个设计取舍：主题这类「用户界面偏好」不走 localStorage 而进数据库，是为了**跨设备同步**；`_resolve_theme` 故意**软解析**（任何一步失败都回退默认主题而不是 401），因为页面渲染不该因偏好读取失败而拒绝服务。取值过白名单则防止任意字符串被注入 HTML 属性。
 
-动手验证（接 12.5 的 TestClient，先登录）：`client.put("/api/auth/me/theme", json={"theme": "ocean"})` 返回 `{"theme": "ocean"}`；再 `client.get("/student")`，响应文本里应能找到 `data-theme","ocean"` 注入脚本。
+动手验证（接 12.5 的 TestClient，先登录）：`client.put("/api/auth/me/theme", json={"theme": "light"})` 返回 `{"theme": "light"}`；把 `"theme"` 换成任意非法值（如 `"ocean"`）**同样返回 200 与 `{"theme": "light"}`——`ThemeRequest.theme` 是纯 `str` 不做枚举校验，白名单只在 `store.set_user_theme` 里生效，非法值被静默回退而非报错**（这正是「白名单优先」在治理层的落点：宁可降级到安全值，也不让任意字符串进入 HTML 属性）。随后 `client.get("/student")` 应能找到 `data-theme","light"` 注入脚本。注意该端点目前是**遗留接口**：第二十轮起前端不再调用它，三概念形态记忆走浏览器 `localStorage: aegis:concept`。
 
 #### 动手试一试：用 TestClient 把 HTTP 层当积木玩
 
@@ -2804,17 +2804,24 @@ python -m app.evaluation.harness.runner --suite risk
 
 <a id="station-14"></a>
 
-## 第 14 站 收尾 — static/ + tests/
+## 第 14 站 收尾 — frontend/ + tests/
 
-- `static/`：原生 JS 三端界面（零构建）：登录页（index/login.js，Hero 标语与数据条）、学生端（student，助手「小暖」——SSE 流式对话、消息头像、心情速选与「需要立即帮助」求助卡）、管理端（admin，三列页签工作台——左列「个案|知识库|协作状态」、中列「风险报告|对话回放」、右列「详情检查器 + 工作台」，界面全中文，桌面端固定一屏）。前端实现详解见《[前端学习指南](docs/frontend-learning-guide.md)》。
+- `frontend/`：Vite 8 + React 19 + TypeScript 6 的 SPA 工程，**无 UI 库**，样式为手写 CSS 令牌体系。三个入口路由 `/`、`/student`、`/admin` 返回同一份 `dist/index.html`，页内跳转由 React Router 承接。
+  - **三概念主题系统**：右下角 `ConceptSwitcher` 在三个设计概念间切换，共享同一套数据层与三段式工作台骨架，各概念独立形态层——`letter` 信笺往来（信纸/邮政/楷体手写感）、`radio` 夜航电台（深夜热线/仪表/CRT，暗色本体）、`atlas` 群岛图鉴（海图/航海日志/信号旗）。概念记忆走 `localStorage: aegis:concept`，`html[data-concept]` 驱动全部样式。
+  - **令牌契约**：概念层提供自己的基色（letter `--pine/--seal/--sheet`、radio `--amber/--teal/--panel`、atlas `--sea/--coral/--chart`），共享层在 `html[data-concept="…"]` 上把它们解成别名 `--surface/--surface-2/--accent/--hot/--cns-ok/--cns-warn`（`shared/console.css`），共享组件只吃别名，故换概念即整体换肤。
+  - **目录速览**：`src/lib/`（`api.ts` fetch 封装 + 401 统一处理、`auth.tsx` 鉴权上下文、`concept.tsx` 概念上下文、`scene.ts` 背景取色、`labels.ts` 枚举中文映射、`types.ts`）、`src/hooks/`（`useChat` SSE 流式引擎、`useAdminData`、`useSystemStatus`）、`src/shared/`（`AdminConsole` 三段式工作台、`LoginHero` 输入框即入口、`ConceptSwitcher`、`fx.ts/css` 动效层、`premium.css` 精美层）、`src/styles/base.css`（全局重置 + `focus-visible` / `prefers-reduced-motion` 无障碍）、`src/concepts/{letter,radio,atlas}/`。
+  - **场景取色（第二十轮新增）**：`lib/scene.ts` 用离屏 canvas 逐帧取背景像素、双区统计，卡片颜色跟随其所在区域。实测驱动信号是**色温**（r-b 跨度 0.250）而非亮度（跨度 0.024）；滑动窗口略长于视频循环长度以归一化，避免循环点跳变。
+  - **构建与托管**：`npm run build`（`tsc -b && vite build`）出 `dist/`，由 FastAPI 同源托管（入口页 `pages.py` 注入主题，`main.py` 挂载静态资源）——前后端同源，无 CORS。`dist` 缺失时页面返回构建指引而非 500（见 12.5）。
+  - 提交前须 `cd frontend && npm run lint && npm run build`，并把 `dist/` 一起提交。
+  - 前端实现详解见《[前端学习指南](docs/frontend-learning-guide.md)》（已随第二十轮重写为 Vite + React + TS 版）。
 - `tests/` 当前包含多个模块化测试文件：orchestrator（提供 `build_orchestrator` 给其他测试复用）、api（TestClient 全链）、agent\_runtime、retrieval\_eval、mcp\_tools、harness、assessment、risk\_dual\_channel（双通道，覆盖 corp-106..130 隐喻双路径并含 `MetaphorAwareStubClient`）、risk\_qlora\_channel（QLoRA 风险通道：升级/不降级/回退/非法 JSON/URL 防护/默认关闭）、function\_calling（FC）、runtime\_ab（A/B）、judge（LLM 评审）、langgraph\_runtime、langgraph\_checkpoint（跨进程恢复）、reply\_style（真人化提示词与模板标签守护）。历史“约 71 项通过”应附带日期与环境，执行时统一使用 `python -m pytest tests -q`（历史上位于根目录的联调脚本 `test_chat.py` 已迁至 `scripts/smoke_chat.py`，不再参与 pytest 收集）。
 - 第十三轮新增的 L2/L4 与 auto Skill 已做烟雾验证，但尚缺少专门 pytest 回归：SCD-2 冲突截断、匿名命名空间隔离、三运行时 L4 去重、仅 L2/L4 时 LangGraph `memory_used`、第 3 次自动蒸馏及 auto Skill 防递归等都应补成独立用例。
 
 #### 动手试一试：给测试「上保险」
 
 ```bash
-# 前端三脚本语法检查(零构建项目的基本卫生)
-node --check static/login.js static/student.js static/admin.js
+# 前端:静态检查 + 类型检查 + 构建(替代旧零构建时代的 `node --check`,产物 dist/ 必须一起提交)
+cd frontend && npm run lint && npm run build && cd ..
 
 # 后端全量(tests/;联调脚本已迁至 scripts/smoke_chat.py,不在收集范围)
 python -m pytest tests -q
@@ -2992,7 +2999,7 @@ L1 管 Agent 协作内务；L2 管「用户现在是什么状态」（SCD-2 有�
 
 > 复现「功能一致」的后端时，对照本表逐端点冒烟。任何一端点行为不一致都说明对应站没复现对。
 > 自建核对：`python -c "from app.main import create_app; [print(sorted(r.methods), r.path) for r in create_app().routes if getattr(r, 'methods', None)]"` 可重新生成路由清单。
-> 鉴权列：**公开**＝无需登录；**登录**＝任意已登录用户（student/teacher/admin）；**属主**＝登录且会话归属当前用户（否则 403）；**员工**＝admin 或 teacher（`require_admin`，deps.py:36）；请求体列 = `schemas.py` 中对应模型（共 11 个，字段清单见 12.5）。
+> 鉴权列：**公开**＝无需登录；**登录**＝任意已登录用户（student/teacher/admin）；**属主**＝登录且会话归属当前用户（否则 403）；**员工**＝admin 或 teacher（`require_staff`，deps.py:40）；请求体列 = `schemas.py` 中对应模型（共 11 个，字段清单见 12.5）。
 
 ## A.1 页面与系统
 
@@ -3347,7 +3354,7 @@ L1 管 Agent 协作内务；L2 管「用户现在是什么状态」（SCD-2 有�
 | `embedding_provider` | str | `"openai"  # openai(兼容API) | local(chromadb 本地嵌入,零外部依赖)` | `EMBEDDING_PROVIDER` |
 | `embedding_timeout_seconds` | float | `30.0` | `EMBEDDING_TIMEOUT_SECONDS` |
 | `ollama_base_url` | str | `"http://127.0.0.1:11434"` | `OLLAMA_BASE_URL` |
-| `ollama_model` | str | `"qwen2.5:7b"` | `OLLAMA_MODEL` |
+| `ollama_model` | str | `"qwen3:4b"` | `OLLAMA_MODEL` |
 | `llm_timeout_seconds` | float | `15.0` | `LLM_TIMEOUT_SECONDS` |
 | `llm_thinking_enabled` | bool | `False` | `LLM_THINKING_ENABLED` |
 | `llm_support_temperature` | float | `0.6  # 支持性回复采样温度(偏高更像真人);风险/改写/评审仍固定 0.0` | `LLM_SUPPORT_TEMPERATURE` |
@@ -3367,6 +3374,9 @@ L1 管 Agent 协作内务；L2 管「用户现在是什么状态」（SCD-2 有�
 | `knowledge_hybrid_vector_weight` | float | `0.65` | `KNOWLEDGE_HYBRID_VECTOR_WEIGHT` |
 | `knowledge_hybrid_bm25_weight` | float | `0.35` | `KNOWLEDGE_HYBRID_BM25_WEIGHT` |
 | `knowledge_rerank_enabled` | bool | `True` | `KNOWLEDGE_RERANK_ENABLED` |
+| `knowledge_rerank_engine` | str | `"lexical"  # lexical | cross_encoder` | `KNOWLEDGE_RERANK_ENGINE` |
+| `knowledge_rerank_top_n` | int | `16` | `KNOWLEDGE_RERANK_TOP_N` |
+| `reranker_model_dir` | str | `"data/models/bge-reranker-base-onnx"` | `RERANKER_MODEL_DIR` |
 | `knowledge_fusion_mode` | str | `"weighted"  # weighted | rrf` | `KNOWLEDGE_FUSION_MODE` |
 | `knowledge_cache_enabled` | bool | `False` | `KNOWLEDGE_CACHE_ENABLED` |
 | `knowledge_cache_ttl_seconds` | int | `300` | `KNOWLEDGE_CACHE_TTL_SECONDS` |
@@ -3438,11 +3448,11 @@ L1 管 Agent 协作内务；L2 管「用户现在是什么状态」（SCD-2 有�
 ***
 
 
-本指南对应 `main` 分支第十四轮（QLoRA 安全集成）之后的已提交状态（REFACTORING → OPTIMIZATION → AUTH-MYSQL → LANGGRAPH-DOCKER → DEEP-ENHANCEMENTS → LLM-RESPONSE-HUMANIZATION → MEMORY-ENHANCEMENT → CONFRONTATIONAL-DIALOGUE-TESTING → ROUND-9-CONSOLIDATION → CORPUS-LAYER-SPLIT → ROUND-11-RISK-LLM-DUAL-CHANNEL → ROUND-12-RAG-ENHANCEMENT-BENCHMARK → ROUND-13-MEMORY-SKILL-DISTILLATION → QLORA-SSE-PRODUCTION-IMPROVEMENTS → ROUND-15-FRONTEND-CALM-THEME → ROUND-16-ADMIN-TEACHER-GUIDE → ROUND-17-FRONTEND-OVERHAUL → ROUND-18-THEME-SWITCHER）。各轮详细变更见 [docs/records/](docs/records/) 系列文档与 [docs/QLORA-SSE-PRODUCTION-IMPROVEMENTS.md](docs/QLORA-SSE-PRODUCTION-IMPROVEMENTS.md)；前端另有姊妹篇《[前端学习指南](docs/frontend-learning-guide.md)》。
+本指南对应 `main` 分支第十四轮（QLoRA 安全集成）之后的已提交状态（REFACTORING → OPTIMIZATION → AUTH-MYSQL → LANGGRAPH-DOCKER → DEEP-ENHANCEMENTS → LLM-RESPONSE-HUMANIZATION → MEMORY-ENHANCEMENT → CONFRONTATIONAL-DIALOGUE-TESTING → ROUND-9-CONSOLIDATION → CORPUS-LAYER-SPLIT → ROUND-11-RISK-LLM-DUAL-CHANNEL → ROUND-12-RAG-ENHANCEMENT-BENCHMARK → ROUND-13-MEMORY-SKILL-DISTILLATION → QLORA-SSE-PRODUCTION-IMPROVEMENTS → ROUND-15-FRONTEND-CALM-THEME → ROUND-16-ADMIN-TEACHER-GUIDE → ROUND-17-FRONTEND-OVERHAUL → ROUND-18-THEME-SWITCHER）。**第二十轮（`98fb4bb`）起**：前端整体重写为 `frontend/`（Vite 8 + React 19 + TypeScript 6）三概念主题系统（`letter` / `radio` / `atlas`），`static/` 目录已删除，`THEME_CHOICES` 收敛为 `("light",)`，新增场景取色（`lib/scene.ts`），并完成卡顿归因（Chrome 默认渲染在 Intel 核显而非独显 RTX 4060，强制独显后帧时间 36.3ms → 6.1ms），详见 [docs/records/ROUND-20-FRONTEND-SCENE-DRIVEN.md](docs/records/ROUND-20-FRONTEND-SCENE-DRIVEN.md)。各轮详细变更见 [docs/records/](docs/records/) 系列文档与 [docs/QLORA-SSE-PRODUCTION-IMPROVEMENTS.md](docs/QLORA-SSE-PRODUCTION-IMPROVEMENTS.md)；前端另有姊妹篇《[前端学习指南](docs/frontend-learning-guide.md)》。
 
 本指南在此基础上做了面向学习的结构化扩充（保持原有章节与结论不变）：新增第零部分（预备知识与术语表）、开篇学习路径与全书目录、每站「动手试一试 / 常见易错点 / 练习」三件套与第六部分 FAQ；所有示例代码均在当前分支实测通过。若章节与代码行为不一致，以仓库源码为准并欢迎修订本指南。
 
 **2026-09-02 勘误与增补**（对照 main 分支源码逐项核对后的修订，详见《[Aegis学习指南审阅报告](Aegis学习指南审阅报告.md)》）：
-- 勘误：entities.py 表数 19→20（新增 `UserPreference`）；AgentEventType 全集补 `MESSAGE_SENT`；store.py 行数 1082→约 1173；admin.py 行数 248→约 315；auth_routes.py 职责补主题端点。
+- 勘误：entities.py 表数 19→20（新增 `UserPreference`）；AgentEventType 全集补 `MESSAGE_SENT`；store.py 行数 1082→约 1196；admin.py 行数 248→约 315；auth_routes.py 职责补主题端点。
 - 增补：9.8「search_knowledge 总装走读」（store.py:803-905 逐段注释 + weighted/RRF 对比示例）；9.3/9.6 区分规则版与 LLM 版检索词改写；8.4 补 GraphState/条件边/SqliteSaver 源码锚点与三运行时对照点；12.3b「全局异常处理」（errors.py 分层异常约定）；12.5b「ROUND-18 主题持久化链路」；第 13 站补 `eval/run_eval.py` 装配走读；第 8 站练习 1 补三运行时 trace 预期形态。
 - 第二批次（同日，面向「学完能复现整个后端」的复现验收）：11.3 补 tool\_queue 失败状态机走读（run\_job 源码逐段注释 + always\_fail 死信示例）；第三部分补「自研 DB 任务队列 vs Celery/消息中间件」选型条目；11.6 补 `@mcp.tool` 骨架示例；新增附录 A「后端 API 契约总表」（48 端点 + 11 schema + 鉴权/请求体，含自建核对命令）；总结四补复现验收自检项；勘误 schemas「9 个请求模型」→ 11。

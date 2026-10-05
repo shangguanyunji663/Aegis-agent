@@ -79,7 +79,7 @@ app/
 │   └── tool_records.py  #   ExcelRecord/AlertRecord 持久化
 ├── api/                 # HTTP 路由层(自 main.py 拆出)
 │   ├── schemas.py       #   全部 Pydantic 请求模型
-│   ├── deps.py          #   current_principal/require_admin/audit 依赖
+│   ├── deps.py          #   current_principal/require_staff/audit 依赖
 │   ├── middleware.py    #   X-Request-ID/X-Trace-ID 追踪中间件
 │   ├── pages.py         #   / /student /admin 页面
 │   ├── system.py        #   /api/health /api/readiness /api/agent/status /api/skills

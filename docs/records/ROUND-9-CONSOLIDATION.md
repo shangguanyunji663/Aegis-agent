@@ -31,7 +31,7 @@
 
 - 添加标准头部元数据：分支名、时间、系列链接
 
-- 修复内部链接：`[第六轮：回复真人化改造](第六轮-回复真人化改造.md)` → `[第六轮：回复真人化改造](LLM-RESPONSE-HUMANIZATION.md)`
+- 修复内部链接：`[第六轮：回复真人化改造](LLM-RESPONSE-HUMANIZATION.md)`（原链接指向已不存在的 `第六轮-回复真人化改造.md`）
 
 - 添加第八轮链接：`[第八轮：对抗型对话测试与AI响应优化分析](CONFRONTATIONAL-DIALOGUE-TESTING.md)`
 
@@ -74,8 +74,8 @@
 新增第七轮和第八轮文档链接：
 
 ```markdown
-- [第七次记忆系统增强(消息数/摘要容量提升)](docs/records/MEMORY-ENHANCEMENT.md)
-- [第八次对抗型对话测试(10轮配合+10轮对抗)](docs/records/CONFRONTATIONAL-DIALOGUE-TESTING.md)
+- [第七次记忆系统增强(消息数/摘要容量提升)](MEMORY-ENHANCEMENT.md)
+- [第八次对抗型对话测试(10轮配合+10轮对抗)](CONFRONTATIONAL-DIALOGUE-TESTING.md)
 ```
 
 ### 4.3 Roadmap 更新

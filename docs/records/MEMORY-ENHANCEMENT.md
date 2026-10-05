@@ -126,7 +126,7 @@ memory_summary_max_chars: int = 3000
 
 - [第六轮：回复真人化改造](LLM-RESPONSE-HUMANIZATION.md)
 - [第八轮：对抗型对话测试与AI响应优化分析](CONFRONTATIONAL-DIALOGUE-TESTING.md)
-- [内部建议文档](待扩展)
+- 内部建议文档：待扩展（占位条目，非有效链接）
 
 ## 8. 提交信息
 

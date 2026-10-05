@@ -11,7 +11,9 @@
 
 - **没有一份以教师为读者的操作文档**。README 的「管理端」功能清单只有 8 条概括性 bullet;[demo-script](../demo-script.md) 是演示脚本而非操作手册;[architecture](../architecture.md)/[safety-design](../safety-design.md) 是技术视角。
 - **若干功能按钮在任何文档中均无说明**:`Rebuild`/`Backup`(知识库重建/备份)、`Dispatch`(手动派发任务)、`Retry`(任务重试)、`Run Eval`(触发综合评测)、板块折叠与「点击行看详情」的交互,在全部既有 md 中均未作为「教师可操作的功能」出现过。
-- 权限表述有歧义:`app/api/deps.py` 的 `require_admin` 实际放行 **admin 与 teacher 双角色**(`STAFF_ROLES`),即教师拥有后台全部操作权限,而 `admin.py` 模块 docstring 仍写「全部要求 admin 角色」。文档必须以代码实际行为为准。
+- 权限表述有歧义:`app/api/deps.py` 的管理端依赖实际放行 **admin 与 teacher 双角色**(`STAFF_ROLES`),即教师拥有后台全部操作权限,而 `admin.py` 模块 docstring 仍写「全部要求 admin 角色」。文档必须以代码实际行为为准。
+
+  > **后续修订（2026-10-05）**：该依赖已由 `require_admin` 更名为 `require_staff`,`admin.py` 的 docstring 同步修正,本条歧义已消除。
 
 ## 2. 板块 × 文档覆盖核对结论
 
@@ -55,7 +57,7 @@
 ## 4. 验证记录
 
 - 按钮清单与 `static/admin.html`(板块与按钮 ID)/`static/admin.js`(事件绑定:`handleClick`、`#search-knowledge`、`#upload-knowledge`、`#rebuild-knowledge`、`#backup-knowledge`、`#run-tool-worker`、`#run-eval`、折叠交互)逐一比对,手册覆盖全部 11 个板块与全部 12 类交互,无遗漏。
-- 权限结论核对 `app/api/deps.py`(STAFF_ROLES)与 `app/api/admin.py`(全部路由 `Depends(require_admin)`)。
+- 权限结论核对 `app/api/deps.py`(STAFF_ROLES)与 `app/api/admin.py`(全部路由 `Depends(require_staff)`)。
 - 状态枚举核对 `app/models.py`:报告 pending/approved/dismissed;个案 open/acknowledged;任务 pending/running/success/dead——手册中的状态说明与之一致。
 
 ## 5. 本轮文件清单

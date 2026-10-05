@@ -3,6 +3,8 @@
 > 分支:`main` · 时间:2026-09-02 · 系列:[ROUND-17-FRONTEND-OVERHAUL](ROUND-17-FRONTEND-OVERHAUL.md) → 本篇
 > 性质:**前后端联动轮次 — 四套心理疗愈主题 + 用户主题偏好持久化 + 服务端首屏注入(零闪烁) + 学生端/管理端顶栏主题切换器**
 
+**历史状态说明**：本篇记录的是第十八轮**当时**的产出（`static/styles.css` + `theme.js` + 四套配色主题 `warm`/`ocean`/`forest`/`playful`）。第二十轮（[ROUND-20-FRONTEND-SCENE-DRIVEN.md](ROUND-20-FRONTEND-SCENE-DRIVEN.md)）已将前端重写为 `frontend/` 下的 Vite + React 19 + TypeScript 三概念系统；`static/` 目录、`theme.js`、`html[data-theme]` 多主题块均已不存在，`app/repository/store.py` 的 `THEME_CHOICES` 已收敛为仅 `("light",)`。视觉形态改由前端三概念（`letter` / `radio` / `atlas`）经 `html[data-concept]` 承担，记忆在 `localStorage`，不落库、不跨设备同步。下文表格、代码与文件清单均为**当时**原样，仅供追溯。
+
 ***
 
 ## 1. 背景与动机

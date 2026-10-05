@@ -7,9 +7,9 @@
 
 ## 1. 背景
 
-第十七、十八轮把前端从模板页改成"疗愈主题 + 多概念切换"，但留下三个问题：
+第十七、十八轮把前端统一为「暖意疗愈」单主题（第十五轮）再扩为四套**配色**主题可切换（`warm`/`ocean`/`forest`/`playful`），但留下三个问题：
 
-- **前端仍是构建产物与源码双轨**：改样式要同时维护旧 CSS 与新实现，第十八轮已经在补丁里反复踩到"改了源码但页面没变"；
+- **三份 HTML 三份 JS 的重复正在到顶**：登录 / 学生 / 管理端各自维护一份请求封装、一份 SSE 解析、一份 `escapeHtml`，任何协议或视觉决策都要改三遍，第十八轮已经在补丁里反复踩到"改了一处忘了另一处"；
 - **配色是写死的常量**：三套概念各有一套 `--amber` / `--pine` / `--sea`，换背景素材就得重调一遍，且卡片颜色与背景无关；
 - **"卡"查不出根因**：用户主观反馈三个页面都顿挫，但常规手段测出来的数据自相矛盾（同一份代码不同时刻差 3~50 倍）。
 
@@ -31,7 +31,7 @@
 
 **排查链**（每一步都排除了一个错误假设）：
 
-1. 括号/注释配对：6 个 CSS 文件全部平衡 → 不是语法错误；
+1. 括号/注释配对：7 个 CSS 文件全部平衡 → 不是语法错误；
 2. 用 `lightningcss` 严格解析：全部通过 → 不是选择器问题；
 3. Playwright 读计算样式：`backdrop-filter` 是 `none`，而同一规则块的 `box-shadow` 正常 → **不是整条规则失效，是单条声明被丢**；
 4. 最小实验：`CSS.supports("-webkit-backdrop-filter", "blur(9px)")` → **false**，`CSS.supports("backdrop-filter", ...)` → true。**Chrome 154 不认 `-webkit-` 前缀**；
@@ -166,7 +166,7 @@ ANGLE (Intel, Intel(R) UHD Graphics (0x0000A788) Direct3D11 vs_5_0 ps_5_0, D3D11
 | --- | --- |
 | `import { gsap }` + `quickTo` tree-shake 后 | 150.0 KB 未压缩 / 39.5 KB gzip（未混淆） |
 | `gsap.min.js`（已混淆，真实传输量） | **27.6 KB gzip** |
-| 当前 JS 总量 | 326.7 KB 未压缩 / 97.9 KB gzip |
+| 当前 JS 总量 | 327.7 KiB 未压缩 / 98.3 KiB gzip（`dist/assets/index-mcw195ER.js`，2026-10-05 实测） |
 
 **tree-shaking 救不了**——GSAP core 是单一大模块，只 import 两个 API 摇完仍有 150 KB，import 就付全额。
 

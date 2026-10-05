@@ -70,7 +70,7 @@
 
 ### 3.7 伴随产出:前端学习指南
 
-新增 [docs/frontend-learning-guide.md](../frontend-learning-guide.md)——与后端《逐文件学习指南》同规格的前端姊妹篇:总览与零构建决策 → styles.css 设计系统(含固定一屏的 grid 调试复盘) → 登录页 → 学生端(SSE 解析与终稿覆盖) → 管理端(页签/映射层/事件委托) → 联调排错 → FAQ 与自检清单;每章配可运行示例(DevTools 实时改变量、SSE 原始流观察等)、常见易错点与练习。
+新增 [docs/frontend-learning-guide.md](../frontend-learning-guide.md)（⚠️ 该文档基于 `static/` 原生实现撰写，第二十轮前端重写后已整体过时，待重写）——与后端《逐文件学习指南》同规格的前端姊妹篇:总览与零构建决策 → styles.css 设计系统(含固定一屏的 grid 调试复盘) → 登录页 → 学生端(SSE 解析与终稿覆盖) → 管理端(页签/映射层/事件委托) → 联调排错 → FAQ 与自检清单;每章配可运行示例(DevTools 实时改变量、SSE 原始流观察等)、常见易错点与练习。
 
 ## 4. 兼容性约束(全程未破坏)
 

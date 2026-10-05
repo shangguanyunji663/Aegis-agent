@@ -73,7 +73,7 @@
 | 内置知识库 | 24 篇 Markdown 文档 |
 | 人工策展 Skill | 8 个（另有运行时自动蒸馏产物） |
 | 评测金标集 | 150 条代表性样本（基础层 63 / 压力层 87）+ 77 条 RAG 问句 + 8 组多轮场景 |
-| 测试覆盖 | 15 个 pytest 模块，覆盖路由 / 风险 / 记忆 / API / MCP / 三运行时 A/B |
+| 测试覆盖 | 15 个 pytest 模块，覆盖路由 / 风险 / 记忆 / API / MCP / 三运行时 A/B（`app/` 源码 75 个模块） |
 | 零密钥启动 | 支持，`AI_PROVIDER=mock` 下无需任何外部 API Key |
 
 ---
@@ -83,7 +83,7 @@
 | 模块 | 解决的问题 | 实现方式 |
 | :--- | :--- | :--- |
 | 双端独立界面 | 学生倾诉体验与管理员处置流程关注点不同，混在一起会导致产品边界混乱 | `/student` 提供学生对话与会话记忆，`/admin` 提供报告、个案、trace、知识库、工具队列与评测工作台 |
-| 四套疗愈主题 | 心理支持需按来访者状态切换视觉语气，单一主题难以覆盖低龄与深度倾诉 | CSS 变量四主题（`warm`/`ocean`/`forest`/`playful`）+ `theme.js` 顶栏切换 + `PUT /api/auth/me/theme` 按用户持久化 + 服务端首屏注入零闪烁 |
+| 三概念主题系统 | 单一界面难以同时承载「私密倾诉」与「深夜求助」两种心理语境 | 第二十轮起改为三套设计概念（`letter` 信笺往来 / `radio` 夜航电台 / `atlas` 群岛图鉴），Vite + React 19 + TypeScript 实现，概念层提供基色令牌、共享层解成别名（`--surface`/`--accent`/`--hot`），右下角切换器即时换形态，记忆在 `localStorage` |
 | Agent Runtime Harness | Agent 调用、上下文注入、风险报告与工具计划散落业务代码将难以审计 | `AegisAgentHarness` 统一封装输入脱敏、运行时调用、trace 保存、消息持久化、报告生成与工具计划 |
 | 自治多 Agent 协作 | 单个 Lead Agent 串行分派容易沦为「伪协作」 | 默认 `autonomous` 运行时基于 append-only blackboard 实现任务发布、Agent claim、artifact 产出、风险 override 与最终验收；可切换 LangGraph 或 ordered 运行时 |
 | 分层 MemoryAgent | 心理支持需要连续性，单轮回复无法体现对用户状态变化的理解 | L1 Agent 私有记忆 + L2 跨会话结构化用户事实 + L3 会话滚动摘要 + L4 最近原话窗口；L2 以有效期截断处理状态冲突，并优先于可能过期的摘要注入 Prompt |
@@ -276,8 +276,8 @@ RISK_QLORA_TIMEOUT_SECONDS=8
 ├── knowledge/                   # 内置心理支持知识库（当前 24 篇 .md）
 ├── eval/                        # 评测 CLI 与 fixtures（路由 / 风险 / 安全 / 多轮 / 检索 / RAG 数据集）
 ├── skills/                      # 人工策展 Skill 规范；运行时可在 skills/auto/ 生成 auto Skill
-├── static/                      # 前端：index | login | student | admin 页面 + styles.css + theme.js
-├── tests/                       # pytest 测试（16 个模块）
+├── frontend/                    # 前端：Vite + React 19 + TS（src/ 三概念 × 三页 + shared/ + lib/），产物 dist/ 由 FastAPI 同源托管
+├── tests/                       # pytest 测试（15 个模块）
 ├── scripts/                     # 启动/联调/诊断：start-local | start-compose | smoke_chat | probe_glm
 │                                #                migrate_sqlite_to_mysql | eval_risk_dual_path | run_benchmark | analyze_layers
 │                                #                eval_minilm_ablation_tmp | eval_ce_tmp（第十九轮 RAG 对照评测）
@@ -298,7 +298,7 @@ RISK_QLORA_TIMEOUT_SECONDS=8
 - **会话管理**：登录登出、会话创建与新会话切换；重命名/删除已提供 API（`PATCH` / `DELETE /api/sessions/{id}`），**界面暂无对应按钮**。
 - **对话助手「小暖」**：SSE 真流式输出，消息头像与入场动画、欢迎屏话题 chips；顶栏时段问候与服务状态圆点（60 秒自动刷新）。另有 `POST /api/chat` 非流式兼容路径。
 - **实用卡片**：「心情速选」2×2 图标卡一键填入表达、「需要立即帮助」（心理援助热线 12356 / 120）与「60 秒放松练习」。
-- **四套疗愈主题**：暖意疗愈（默认）/ 深海冥想 / 晨雾森林 / 童趣治愈贴贴，顶栏切换器即时换色，按用户持久化并跨设备同步；服务端首屏注入 `html[data-theme]`，无切换闪烁。
+- **三套设计概念**：信笺往来（默认）/ 夜航电台 / 群岛图鉴，右下角切换器即时换形态，选择记在 `localStorage`；首屏服务端注入 `html[data-theme="light"]`（仅亮色一档，亮暗双模式已移除），概念由 `html[data-concept]` 驱动，切换无闪烁。
 - **三类回复路径**：低风险陪伴、心理咨询建议、高风险安全回应。低风险对话在生成时逐字直播，中/高风险回复经安全复核通过后再输出。
 - **分层记忆注入**：L2 跨会话当前有效事实 + L3 会话滚动摘要 + L4 最近原话窗口共同注入；当前有效事实优先于可能过期的摘要，避免旧状态干扰当前回应。
 - **信息隔离**：高风险内容不向学生暴露内部报告字段，避免二次伤害与信息泄露。
@@ -398,8 +398,8 @@ python -m app.init_db
 # 后端测试（只收集 tests/，scripts/ 下的联调脚本不在 pytest 范围）
 python -m pytest tests -q
 
-# 前端脚本语法检查
-node --check static/login.js static/student.js static/admin.js
+# 前端检查（第二十轮起为 Vite 工程，不再有手写前端脚本）
+cd frontend && npm run lint && npm run build && cd ..
 
 # 综合评测
 python -m eval.run_eval
@@ -442,7 +442,7 @@ python -m app.mcp.server --list
 
 | 验证项 | 覆盖内容 | 已落盘结果与适用边界 |
 | :--- | :--- | :--- |
-| 单元与接口测试 | API、认证、风险双通道、Function Calling、Agent runtime、LangGraph checkpoint、MCP tools、评测 runner | **历史记录**：2026-08-21 记录 `python -m pytest tests/ -q` 为 **71 passed, 8 warnings**。测试数量与结果应以当前环境重跑为准 |
+| 单元与接口测试 | API、认证、风险双通道、Function Calling、Agent runtime、LangGraph checkpoint、MCP tools、评测 runner | **2026-10-05**：`.conda/python.exe -m pytest tests -q` 为 **82 passed, 1 warning**（耗时 26m42s；唯一 warning 是 chromadb 依赖的 `asyncio.iscoroutinefunction` 弃用提示）。用例数与结果应以当前环境重跑为准 |
 | 150 条规模化基准（双层拆分） | 基础层 63 条 + 压力层 87 条，runner 分别输出两套独立指标 | **2026-08-19**：整体联合准确率 **0.63**、意图 **0.63**、风险 **0.81**、高风险召回 **0.60**、误报率 **0.00**；基础层准确率 **0.97** / 风险 **1.00** / 高召回 **1.00**；压力层准确率 **0.39** / 风险 **0.67** / 高召回 **0.52** |
 | 风险双通道 + QLoRA 微调 | 历史规则/stub/GLM sanity 与当前真实 v9 QLoRA 冻结 stress 87 条验收 | **当前以 v9 QLoRA 为准**：`RISK_QLORA_ENABLED=true` 时八门槛全过 |
 | 多轮回归 | 8 组多轮场景（含升级到中/高风险、第三人称转自身） | **2026-08-19**：最终关键内容命中率 **0.875**（7/8） |
@@ -660,7 +660,7 @@ git push origin feat/<简短描述>
 请在发起 PR 前确保以下条件全部满足：
 
 - [ ] `python -m pytest tests -q` 全部通过
-- [ ] 修改前端后执行 `node --check static/login.js static/student.js static/admin.js`
+- [ ] 修改前端后执行 `cd frontend && npm run lint && npm run build`（`dist/` 为 FastAPI 同源托管的产物，必须一起提交）
 - [ ] 新增配置项已同步写入 `.env.example` 与本 README 的 [配置说明](#配置说明) 表格
 - [ ] 新增依赖已写入 `requirements.txt`
 - [ ] 未向仓库提交任何 `AEGIS_TRAINING_ROOT` 下的训练产物（脚本、数据、adapter、merged 模型、GGUF、报告）

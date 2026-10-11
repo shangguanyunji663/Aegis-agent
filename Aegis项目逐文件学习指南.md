@@ -55,7 +55,7 @@
 | [第七部分](#part-7) | 总结与自检清单 | 「怎么确认自己学会了？」 |
 | [附录 A](#appendix-a) | 后端 API 契约总表（48 端点） | 「复现后端时怎么逐端点验收？」 |
 | [附录 B](#appendix-b) | 数据模型字段总表（20 张表 172 列） | 「建表时每张表有哪些列？」 |
-| [附录 C](#appendix-c) | Settings 全量字段表（95 项） | 「每个配置项的默认值与环境变量名？」 |
+| [附录 C](#appendix-c) | Settings 全量字段表（96 项） | 「每个配置项的默认值与环境变量名？」 |
 
 快速跳转：[第〇章 学习路线总览](#station-0) · [第 1 站](#station-1) · [第 2 站](#station-2) · [第 3 站](#station-3) · [第 4 站](#station-4) · [第 5 站](#station-5) · [第 6 站](#station-6) · [第 7 站](#station-7) · [第 8 站](#station-8) · [第 9 站](#station-9) · [第 10 站](#station-10) · [第 11 站](#station-11) · [第 12 站](#station-12) · [第 13 站](#station-13) · [第 14 站](#station-14) · [术语表](#glossary) · [FAQ](#faq)
 
@@ -222,7 +222,7 @@ flowchart LR
     end
     subgraph 能力层
       Agents["六类 Agent<br/>Memory/Lead/Risk/Knowledge/Counselor/Companion"]
-      RAG["Hybrid RAG<br/>BM25 + Vector + Rerank"]
+      RAG["Hybrid RAG<br/>BM25 + 本地向量 + 三引擎精排"]
       Tools["工具治理<br/>ToolJob + 契约 + 审计"]
     end
     subgraph 基础设施
@@ -308,8 +308,8 @@ flowchart LR
 | `app/agents/harness.py`                                  | Runtime Harness：脱敏/会话解析/报告/trace 收口                                                                  | `AegisAgentHarness`                                                                              | orchestrator、store |
 | `app/agents/langgraph_runtime.py`                        | LangGraph StateGraph 运行时 + 检查点                                                                       | `LangGraphRuntime`                                                                               | langgraph          |
 | `app/autonomous/`                                        | 自治协作：events（协议）、registry（能力/决策）、board（共享读）、coordinator（认领循环）、agents（六自治 Agent）、runtime（黑板→响应）        | `AutonomousAgentRuntime`                                                                         | llm、rag、store      |
-| `app/rag/`                                               | 检索与记忆子系统：text（分词）、scoring（BM25/rerank/融合）、chunking（切块/元数据）、facts（L2 事实抽取与渲染）、memory（L3 摘要）、vector\_store（Chroma/本地降级） | `DatabaseStore.search_knowledge`（组装检索流水线）                                                        | chromadb（可选）       |
-| `app/repository/store.py`                                | 持久化总闸（约 1196 行，第十三轮新增 L4/L2、第十八轮新增主题偏好方法后更新）                                                                           | `DatabaseStore`                                                                                  | entities、rag       |
+| `app/rag/`                                               | 检索与记忆子系统：text（分词）、scoring（BM25/融合/词法精排公式）、chunking（切块/元数据）、facts（L2 事实抽取与渲染）、memory（L3 摘要）、vector\_store（Chroma 后端 + local-zh 本地中文嵌入 / crc32 伪向量降级）、zh\_embedder（本地 ONNX 嵌入引擎）、reranker（Cross-Encoder 精排 ONNX） | `DatabaseStore.search_knowledge`（组装检索流水线）                                                        | chromadb（可选）、onnxruntime |
+| `app/repository/store.py`                                | 持久化总闸（约 1231 行；第十三轮新增 L4/L2、第十八轮新增主题偏好方法、第二十一轮新增 `_apply_ce_fusion_rerank` 与「精排前先排序」修复后更新）                                                                           | `DatabaseStore`                                                                                  | entities、rag       |
 | `app/tools/`                                             | 工具治理：contracts（契约）、gateway（internal/MCP 网关）、mcp\_client                                              | `governed_payload()`、`build_tool_gateway()`                                                      | store              |
 | `app/services/`                                          | 业务服务：report\_case（审批后编排）、tool\_executor（真实副作用）、tool\_queue（队列/worker）、tool\_records、tool\_governance | `ReportCaseService`、`ToolQueueWorker`                                                            | store、tools        |
 | `app/api/`                                               | HTTP 路由：schemas/deps/middleware/errors（全局异常处理，见 12.3b）/pages/system/auth\_routes/chat/admin                                 | RESTful + SSE 接口                                                                                 | FastAPI、harness    |
@@ -604,7 +604,7 @@ RISK_QLORA_TIMEOUT_SECONDS=8
 
 ## 4.3 配置 `.env`：最小可运行 vs 进阶
 
-`.env.example` 是推荐配置清单；但要区分三类值：**`Settings` 代码默认**、**示例文件建议值**和**部署时由 `.env`/系统环境变量覆盖的值**。例如 `embedding_provider` 的代码默认是 `openai`，`.env.example` 则推荐 `local` 以便无外部密钥演示；本地开发者自己的 `.env` 不属于仓库默认。另注意 `.env.example` 并未覆盖全部 93 个 Settings 字段——SMTP 全组、告警目的地（`ALERT_EMAIL_*`）、`LANGGRAPH_CHECKPOINT_PATH`、`TOOL_OUTPUT_DIR`、`EXCEL_PATH`、`RAG_EVAL_*` 等约 24 项只存在于代码默认（见附录 C）；需要这些功能时以附录 C 的变量名为准。最小可运行可直接使用代码默认（`AI_PROVIDER=mock`、SQLite、`VECTOR_ENABLED=false`、Redis 空）。按组理解关键变量：
+`.env.example` 是推荐配置清单；但要区分三类值：**`Settings` 代码默认**、**示例文件建议值**和**部署时由 `.env`/系统环境变量覆盖的值**。例如 `embedding_provider` 的代码默认是 `openai`，`.env.example` 则推荐 `local` 以便无外部密钥演示；本地开发者自己的 `.env` 不属于仓库默认。另注意 `.env.example` 并未覆盖全部 96 个 Settings 字段——SMTP 全组、告警目的地（`ALERT_EMAIL_*`）、`TOOL_OUTPUT_DIR`、`TOOL_QUEUE_*`、`EXCEL_PATH`、`RAG_EVAL_*` 等 28 项只存在于代码默认（见附录 C）；需要这些功能时以附录 C 的变量名为准。最小可运行可直接使用代码默认（`AI_PROVIDER=mock`、SQLite、`VECTOR_ENABLED=false`、Redis 空）。按组理解关键变量：
 
 | 分组  | 变量                                                           | 作用                                 | 默认                               |
 | --- | ------------------------------------------------------------ | ---------------------------------- | -------------------------------- |
@@ -694,7 +694,7 @@ python -m app.mcp.server --list
 
 -   `ModuleNotFoundError`  ：没激活 venv 或没装依赖——回到 4.2 第 2、3 步。
 -   SQLite 多线程报错  ：确认用的是 `sqlite:///...` 且 `check_same_thread=False`（代码已处理；若自改 engine 注意这点）。
--   向量检索不工作  ：`VECTOR_ENABLED=false` 会关闭向量召回，但 BM25 + 条件 rerank 仍可用；想要向量召回需设 `VECTOR_ENABLED=true`，再选择 Chroma 或 local-hash 后端。`LocalVectorBackend` 是已开启向量时的本地降级，不是关闭向量后的替代品。
+-   向量检索不工作  ：`VECTOR_ENABLED=false` 会关闭向量召回，但 BM25 + 条件精排仍可用；想要向量召回需设 `VECTOR_ENABLED=true`，再选后端：`chroma` + `EMBEDDING_PROVIDER=local-zh`（第二十一轮起的生产组合，本地中文嵌入）、`chroma` + `local`（chromadb 内置英文 MiniLM）或 `local`（crc32 伪向量降级）。`LocalVectorBackend` 是已开启向量但 Chroma 不可用时的降级，不是关闭向量后的替代品。
 -   邮件/预警没发出  ：默认 `ALERT_EMAIL_DELIVERY_MODE=log`，只写日志；要真发需配 `SMTP_*`。
 -   限流误伤  ：本地演示调小 `CHAT_RATE_LIMIT_PER_MINUTE` 或调大；Redis 为空时走进程内限流。
 -   改代码后行为异常  ：优先跑 `python -m pytest tests -q` + harness，再用 4.5 的「风险闭环」手动验证，避免只信 demo。
@@ -767,7 +767,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 ```
 
-> 全文共 **90 个** Settings 字段（RAG 阈值、向量库、SMTP 告警、工具队列、技能蒸馏……），上面是节选。完整字段/类型/默认值/环境变量名对照表见 **[附录 C](#appendix-c)**；4.3 只解释常用项。
+> 全文共 **96 个** Settings 字段（RAG 阈值、向量库、SMTP 告警、工具队列、技能蒸馏……），上面是节选。完整字段/类型/默认值/环境变量名对照表见 **[附录 C](#appendix-c)**；4.3 只解释常用项。
 
 - `BaseSettings` 来自 `pydantic-settings`：环境变量和 `.env` 文件自动映射到字段（`AI_PROVIDER=xxx` → `ai_provider`），大小写不敏感。
 - 每个字段都有安全默认值——你不写任何 .env，系统也能本地跑。
@@ -1833,7 +1833,7 @@ def tokenize(text: str) -> list[str]:
 
 - `bm25_scores`：教科书式 BM25（k1=1.5, b=0.75），中文用 bigram 词表。
 - `rerank_score`：四路词法信号加权：——`base*0.55 + (余弦*0.75+关键词*0.25)*0.25 + 覆盖率*0.15 + 短语命中*0.05`。纯 Python，零模型成本，却显著改善排序。
-- `fused_score` + `normalize_scores`：向量分与 BM25 分各自 min-max 归一后按权重（默认 0.65/0.35）线性融合。
+- `fused_score` + `normalize_scores`：向量分与 BM25 分各自 min-max 归一后按权重（代码默认 0.65/0.35）线性融合；另有 RRF 按排名融合（第二十一轮起生产用 `rrf`，见 9.7.2）。
 - `expand_best_hit`：冠军块合并同源相邻块——切块会把答案拦腰截断，这一步把邻居拼回来。
 
 ### 9.3 chunking.py — 知识文档处理
@@ -1897,7 +1897,7 @@ superseded_by  替代它的新事实 public_id
 
 `build_vector_backend(settings)` 按配置返回：
 
-- `VECTOR_ENABLED=false`（代码默认）：返回禁用向量后端，检索仍继续执行 BM25、加权融合/条件 rerank 和邻块扩展，只是不产生向量候选。
+- `VECTOR_ENABLED=false`（代码默认）：返回禁用向量后端，检索仍继续执行 BM25、加权/RRF 融合、条件精排与邻块扩展，只是不产生向量候选（第二十一轮起生产已启用向量，见 9.7.9）。
 - `ChromaVectorBackend`：真向量库，chromadb 持久化（cosine 空间），支持快照。嵌入有三种来源，由 `EMBEDDING_PROVIDER` 决定：
   - `local`（`.env.example` 的推荐示例）：chromadb 内置英文 MiniLM 本地嵌入——离线、零 KEY、零费用，但中文判别力弱（9.7.8 实测 66/77），仅宜离线演示；
   - `local-zh`（**第二十一轮起的生产配置**）：`app/rag/zh_embedder.py` 本地加载 ONNX 中文嵌入 bge-small-zh-v1.5（512 维，CLS 池化 + L2 归一化；模型目录 `ZH_EMBEDDING_MODEL_DIR`）——离线、中文可用、单条约 2.5ms；
@@ -1984,7 +1984,7 @@ superseded_by  替代它的新事实 public_id
 
 **Q4 LocalVectorBackend 的「hash 伪向量」具体怎么算？为什么说它「伪」？**
 
-一句话：把文本拆成相邻双字（bigram），每个双字用 Python 内置 `hash()` 扔进 64 个桶之一，数每个桶命中几次，得到 64 维计数向量再归一化——本质是字符 n-gram 直方图，不含任何语义。
+一句话：把文本拆成相邻双字（bigram），每个双字用 `zlib.crc32` 哈希（2026-10-10 起替代内置 `hash()`，保证跨进程可复现）扔进 64 个桶之一，数每个桶命中几次，得到 64 维计数向量再归一化——本质是字符 n-gram 直方图，不含任何语义。
 
 五步流程（vector_store.py:355-370）：清洗（去空白转小写，:362）→ 滑窗切 bigram（:365-366）→ 哈希分桶 `crc32(gram) % 64`（:367）→ 桶计数（:368）→ L2 归一化（:369-370，此后余弦即点积）。
 
@@ -2003,7 +2003,7 @@ superseded_by  替代它的新事实 public_id
 2. **哈希碰撞制造假相似**：64 个桶要装下近乎无限的 bigram 组合，不同双字常撞进同一桶，无关文本可能被算出相似度；
 3. ~~跨进程不可复现~~（**已于 2026-10-10 修复**）：原实现用 Python 内置 `hash()`，默认随 `PYTHONHASHSEED` 随机化、换进程重跑分桶即变；现改为 `zlib.crc32`（vector_store.py:367），跨进程分桶一致、评测可复现。
 
-因此 9.7.5 消融里 hybrid 的退化（0.8312 vs 0.9351）说明的是「local-hash 不适合做高权重语义召回」，**不能据此否定真实语义向量**（MiniLM / OpenAI embedding）的价值。
+因此 9.7.5 消融里 hybrid 的退化（0.8312 vs 0.9351）说明的是「local-hash 不适合做高权重语义召回」，**不能据此否定真实语义向量**（MiniLM / bge-small-zh / OpenAI embedding）的价值——第二十一轮正是用真中文嵌入把 rrf 召回从 64 拉回 75（9.7.9）。
 
 **Q5 LocalVectorBackend 到底是「降级」还是「替代」？「默认」为什么有两个？**
 
@@ -2026,7 +2026,7 @@ superseded_by  替代它的新事实 public_id
 
 召回层 → 重排层，不要反过来：
 
-1. 先确认召回信号质量：local-hash 有跨进程不稳定问题时，先关闭向量或换真嵌入；
+1. 先确认召回信号质量：local-hash 的跨进程不稳定已在 2026-10-10 修复（改 crc32），但它仍不含语义——要提升召回质量只能换真嵌入（第二十一轮：bge-small-zh 本地中文嵌入）；
 2. 接入真嵌入模型（路 3），用 9.7.5 的消融方法跑 `bm25_only` vs `hybrid` 同配置对照，确认增益为正再启用；
 3. 前两步有结论后，再评估 Cross-Encoder 精排收益——它只能优化「池内座次」，池子的缺口要靠召回层补。
 
@@ -2419,13 +2419,13 @@ print(extract_user_facts("我最近晚上睡不着，考试压力很大"))
 
 - **以为 bigram 是「两个词」**：是两个**汉字**的滑动窗口（让「考试」成为一个可统计单元），不是分词——不引 jieba 的轻量取舍。
 - **拿 `rerank_score` 的某一路当总分**：四路信号各管一件事（融合保底 / 词法相似 / 覆盖率 / 短语命中），单独拎出来解释排序都会以偏概全。
-- **混用两种融合模式的预期**：`rrf` 模式融合后**不再叠加**本地 rerank；拿 weighted+rerank 的结果当 RRF 的预期会得出错误结论（9.7.2 有专门说明）。
-- **以为默认有语义向量**：`VECTOR_ENABLED` 代码默认 `false`，默认链路是纯 BM25 + 条件 rerank；消融数据（9.7.5）也表明 local-hash 词法向量反而会稀释 BM25 分数。
+- **混用两种融合模式的预期**：`rrf` 模式融合后默认**不再叠加**词法/替换式精排（分数口径不兼容），唯一例外是 `ce_fusion` 引擎（第二十一轮起可在 rrf 下执行）；拿 weighted+rerank 的结果当 RRF 的预期会得出错误结论（9.7.2 有专门说明）。
+- **以为默认有语义向量**：`VECTOR_ENABLED` 代码默认仍是 `false`（最小可运行路径 = 纯 BM25 + 条件精排），但第二十一轮起生产已启用 `local-zh` + rrf + ce_fusion（9.7.9）；9.7.5 的「local-hash 稀释 BM25」结论只对**伪向量**成立，不能外推到真嵌入——真中文嵌入实测让 rrf 召回从 64 提升到 75。
 - **高估查询缓存**：Redis 只写不读（预留能力），命中来自进程内 LRU——多进程部署别指望跨进程命中（9.7.6）。
 
 #### 练习
 
-1. 用 `tokenize` 对比「睡不好」与「失眠」的 token 交集，体会为什么需要语义路；（进阶：若已装 Chroma，开 `VECTOR_ENABLED=true` 重跑 4.7 的 RAG 评测，对比 HitRate。）
+1. 用 `tokenize` 对比「睡不好」与「失眠」的 token 交集，体会为什么需要语义路；（进阶：若已装 Chroma，开 `VECTOR_ENABLED=true` 并设 `EMBEDDING_PROVIDER=local-zh` + `KNOWLEDGE_FUSION_MODE=rrf` + `KNOWLEDGE_RERANK_ENGINE=ce_fusion`（模型见 9.7.9），跑 `.conda/python.exe scripts/eval_retrieval_window.py` 对比不同候选窗口的 HitRate。）
 2. 把 `chunk_text` 的 `overlap` 改成 0，观察切块边界变差后 `expand_best_hit`（邻块扩展）还能不能拼回完整答案。
 3. 给 `extract_user_facts` 加一条「逃课」相关的事实抽取规则，跑通后回答：为什么这一层叫「确定性抽取」而不是「诊断」？
 
@@ -2435,7 +2435,7 @@ print(extract_user_facts("我最近晚上睡不着，考试压力很大"))
 
 ## 第 10 站 repository/store.py — 持久化仓储
 
-`DatabaseStore` 是所有表的读写总闸（约 1196 行，第十三轮新增 L4/L2、第十八轮新增主题偏好方法后更新，按区块组织）：
+`DatabaseStore` 是所有表的读写总闸（约 1231 行；第十三轮新增 L4/L2、第十八轮新增主题偏好方法、第二十一轮新增 `_apply_ce_fusion_rerank` 与「精排前先排序」修复后更新，按区块组织）：
 
 -   会话/消息  ：`ensure_session`（不存在则建，支持归属回填）、`list/get/delete/rename_session`、`append_message`（首条用户消息自动成为标题）、**`recent_messages`**（L4 滑动窗口，第十三轮新增，支持 `exclude_current` 排除当前消息）。
 -   认证  ：`ensure_default_users`（演示账号）、`authenticate_user`（验密 + 发会话令牌）、`get/revoke_auth_session`（过期即删）。
@@ -2989,7 +2989,9 @@ python -m pytest tests/test_assessment.py -q
 
 **Q4：RAG 为什么默认关向量？开了不更强吗？**
 
-`VECTOR_ENABLED=false` 时走 BM25 + 条件 rerank：零依赖、零延迟、可解释，且在本地词法向量下实测最强（9.7.5 消融：纯 BM25 0.9351 优于混入 local-hash 向量的 0.83）。语义向量的增量需要**真嵌入**（Chroma + MiniLM 或 OpenAI embeddings），启用后应重新评测。
+代码默认仍关向量（`VECTOR_ENABLED=false` → 纯 BM25 + 条件精排，零依赖即可跑通）——这是第十二轮的历史决策：当时能用的「本地向量」只有 local-hash 伪向量与英文 MiniLM，9.7.5 消融显示二者都让 BM25 精确信号被稀释（0.9351 → 0.83），「开了反而更差」。
+
+**第二十一轮的结论已翻转**：换成真中文嵌入（`local-zh` / bge-small-zh-v1.5）后 rrf 召回 64 → 75；再叠加 CE 融合式精排与候选窗口 128，570 块扩库下宽松命中 0.818 / 严格 0.792（9.7.9）。「默认关」现在只适用于零依赖最小路径，生产配置已启用向量——复现时按 9.7.9 的配置与 `scripts/eval_retrieval_window.py` 验证。
 
 **Q5：记忆 L1~L4 各自解决什么问题？（一句话版）**
 
@@ -3015,7 +3017,7 @@ L1 管 Agent 协作内务；L2 管「用户现在是什么状态」（SCD-2 有�
 
 **Q10：评测结果与文中引用的数字对不上？**
 
-文中所有指标都对应特定分支 / 日期 / 配置。复现要点：关自动蒸馏与查询缓存、按 9.7.5 的四配置对照检查向量开关、同数据集同 top_k。复现不了就先 diff 配置，再怀疑代码。
+文中所有指标都对应特定分支 / 日期 / 配置。复现要点：关自动蒸馏与查询缓存、按 9.7.5 的四配置对照或 9.7.9 的三引擎配置检查向量开关与候选窗口（`scripts/eval_retrieval_window.py`）、同数据集同 top_k。复现不了就先 diff 配置，再怀疑代码。
 
 **Q11：`AI_PROVIDER=openai` 起服务后请求超时 / 连接失败？**
 
@@ -3106,7 +3108,7 @@ L1 管 Agent 协作内务；L2 管「用户现在是什么状态」（SCD-2 有�
 - [ ] 风险评估是确定性规则、且是关键词单一事实来源（第 3 站）
 - [ ] 高风险回复由规则决定，模型只在低风险路径参与，且回复经「内部字段泄漏」复核（第 6、7 站）
 - [ ] 多 Agent 协作有共享状态、任务认领、产物验收、安全一票否决、可回放 trace（第 7 站）
-- [ ] RAG 先路由再检索，BM25 与向量融合 + rerank，向量可降级（第 9 站）
+- [ ] RAG 先路由再检索，BM25 与向量融合（weighted/RRF）+ 三引擎精排（词法 / CE 替换式 / CE 融合式），向量可降级（第 9 站）
 - [ ] 工具不直接执行，先成受治理 ToolJob，经契约/审批/脱敏/审计，后台 worker 异步跑（第 11 站）
 - [ ] HTTP 层纯净（鉴权/限流/路由），Agent 细节收口在 Harness（第 8、12 站）
 - [ ] 评测可重复：单测 + 端到端 harness + 三运行时 A/B + 风险 LLM 通道双路径验证（第 13 站）
@@ -3461,7 +3463,7 @@ L1 管 Agent 协作内务；L2 管「用户现在是什么状态」（SCD-2 有�
 
 <a id="appendix-c"></a>
 
-# 附录 C：Settings 全量字段表（config.py · 95 项 · 复现配置用）
+# 附录 C：Settings 全量字段表（config.py · 96 项 · 复现配置用）
 
 > 环境变量名 = 字段名大写（`model_config` 未设 env_prefix；`.env` 由 pydantic-settings 自动加载，`extra=ignore`）。带「路径」标记的字段经 `resolve_path()` 解析（相对路径锚定项目根）。节选自第 4.3 节的常用项此处不再重复解释。
 >
@@ -3566,7 +3568,7 @@ L1 管 Agent 协作内务；L2 管「用户现在是什么状态」（SCD-2 有�
 | `skill_distill_min_repeat` | int | `3` | `SKILL_DISTILL_MIN_REPEAT` |
 | `skill_distill_dir` | str | `"skills/auto"` | `SKILL_DISTILL_DIR` |
 
-> 清点：90 个字段。
+> 清点：96 个字段（2026-10-11 按 AST 复核）。
 
 ***
 
@@ -3575,9 +3577,11 @@ L1 管 Agent 协作内务；L2 管「用户现在是什么状态」（SCD-2 有�
 ***
 
 
-本指南对应 `main` 分支第十四轮（QLoRA 安全集成）之后的已提交状态（REFACTORING → OPTIMIZATION → AUTH-MYSQL → LANGGRAPH-DOCKER → DEEP-ENHANCEMENTS → LLM-RESPONSE-HUMANIZATION → MEMORY-ENHANCEMENT → CONFRONTATIONAL-DIALOGUE-TESTING → ROUND-9-CONSOLIDATION → CORPUS-LAYER-SPLIT → ROUND-11-RISK-LLM-DUAL-CHANNEL → ROUND-12-RAG-ENHANCEMENT-BENCHMARK → ROUND-13-MEMORY-SKILL-DISTILLATION → QLORA-SSE-PRODUCTION-IMPROVEMENTS → ROUND-15-FRONTEND-CALM-THEME → ROUND-16-ADMIN-TEACHER-GUIDE → ROUND-17-FRONTEND-OVERHAUL → ROUND-18-THEME-SWITCHER）。**第二十轮（`98fb4bb`）起**：前端整体重写为 `frontend/`（Vite 8 + React 19 + TypeScript 6）三概念主题系统（`letter` / `radio` / `atlas`），`static/` 目录已删除，`THEME_CHOICES` 收敛为 `("light",)`，新增场景取色（`lib/scene.ts`），并完成卡顿归因（Chrome 默认渲染在 Intel 核显而非独显 RTX 4060，强制独显后帧时间 36.3ms → 6.1ms），详见 [docs/records/ROUND-20-FRONTEND-SCENE-DRIVEN.md](docs/records/ROUND-20-FRONTEND-SCENE-DRIVEN.md)。各轮详细变更见 [docs/records/](docs/records/) 系列文档与 [docs/QLORA-SSE-PRODUCTION-IMPROVEMENTS.md](docs/QLORA-SSE-PRODUCTION-IMPROVEMENTS.md)；前端另有姊妹篇《[前端学习指南](docs/frontend-learning-guide.md)》。
+本指南对应 `main` 分支第十四轮（QLoRA 安全集成）之后的已提交状态（REFACTORING → OPTIMIZATION → AUTH-MYSQL → LANGGRAPH-DOCKER → DEEP-ENHANCEMENTS → LLM-RESPONSE-HUMANIZATION → MEMORY-ENHANCEMENT → CONFRONTATIONAL-DIALOGUE-TESTING → ROUND-9-CONSOLIDATION → CORPUS-LAYER-SPLIT → ROUND-11-RISK-LLM-DUAL-CHANNEL → ROUND-12-RAG-ENHANCEMENT-BENCHMARK → ROUND-13-MEMORY-SKILL-DISTILLATION → QLORA-SSE-PRODUCTION-IMPROVEMENTS → ROUND-15-FRONTEND-CALM-THEME → ROUND-16-ADMIN-TEACHER-GUIDE → ROUND-17-FRONTEND-OVERHAUL → ROUND-18-THEME-SWITCHER → ROUND-19-RAG-SEMANTIC-RERANK → ROUND-20-FRONTEND-SCENE-DRIVEN → ROUND-21-RAG-LOCAL-UPGRADE）。**第二十轮（`98fb4bb`）起**：前端整体重写为 `frontend/`（Vite 8 + React 19 + TypeScript 6）三概念主题系统（`letter` / `radio` / `atlas`），`static/` 目录已删除，`THEME_CHOICES` 收敛为 `("light",)`，新增场景取色（`lib/scene.ts`），并完成卡顿归因（Chrome 默认渲染在 Intel 核显而非独显 RTX 4060，强制独显后帧时间 36.3ms → 6.1ms），详见 [docs/records/ROUND-20-FRONTEND-SCENE-DRIVEN.md](docs/records/ROUND-20-FRONTEND-SCENE-DRIVEN.md)。**第二十一轮（`2ab9010`）起**：RAG 链路本地化升级——bge-small-zh-v1.5 本地中文嵌入（`app/rag/zh_embedder.py`）、CE 融合式精排引擎（`ce_fusion`，λ=0.4）、知识库真实扩至 173 篇 / 570 块、RRF 候选窗口 128，并修复「精排 head 取自未排序候选」的生产 bug（宽松 0.442 → 0.740 → 0.818），详见 [docs/records/ROUND-21-RAG-LOCAL-UPGRADE.md](docs/records/ROUND-21-RAG-LOCAL-UPGRADE.md)（对应本文 9.7.9）。各轮详细变更见 [docs/records/](docs/records/) 系列文档与 [docs/QLORA-SSE-PRODUCTION-IMPROVEMENTS.md](docs/QLORA-SSE-PRODUCTION-IMPROVEMENTS.md)；前端另有姊妹篇《[前端学习指南](docs/frontend-learning-guide.md)》。
 
 本指南在此基础上做了面向学习的结构化扩充（保持原有章节与结论不变）：新增第零部分（预备知识与术语表）、开篇学习路径与全书目录、每站「动手试一试 / 常见易错点 / 练习」三件套与第六部分 FAQ；所有示例代码均在当前分支实测通过。若章节与代码行为不一致，以仓库源码为准并欢迎修订本指南。
+
+**2026-10-11 勘误与增补（第二十一轮 RAG 本地化，逐行审计）**：Settings 字段数 90/93/95 → **96**（AST 复核），目录 / 4.3 / 第 1 站 / 附录 C 标题与清点四处统一；1.3 架构图 RAG 节点与 README 同步（BM25 + 本地向量 + 三引擎精排）；2.1 模块矩阵补 `zh_embedder`/`reranker`，store.py 行数 1196 → 1231；9.2 补 RRF 生产口径；9.6 补 local-zh 来源与现行配置；9.7.0 Q4「crc32 已修复」与 Q6 升级建议同步；第 9 站易错点与练习、FAQ Q4（「默认关向量」的历史决策 vs 第二十一轮翻转）、Q10 复现要点、自检清单同步；文末版本声明补第十九 / 二十 / 二十一轮。`.env.example` 补 `ZH_EMBEDDING_MODEL_DIR` / `KNOWLEDGE_CE_FUSION_LAMBDA`（未覆盖字段 30 → 28）。
 
 **2026-09-02 勘误与增补**（对照 main 分支源码逐项核对后的修订，详见《[Aegis学习指南审阅报告](Aegis学习指南审阅报告.md)》）：
 - 勘误：entities.py 表数 19→20（新增 `UserPreference`）；AgentEventType 全集补 `MESSAGE_SENT`；store.py 行数 1082→约 1196；admin.py 行数 248→约 315；auth_routes.py 职责补主题端点。

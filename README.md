@@ -11,44 +11,21 @@
 ![LangGraph](https://img.shields.io/badge/Runtime-autonomous%20%7C%20langgraph%20%7C%20ordered-4B8BBE?style=flat-square)
 ![Storage](https://img.shields.io/badge/Storage-SQLite%20%7C%20MySQL%20%7C%20PostgreSQL-4479A1?style=flat-square&logo=mysql&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
-![Skills](https://img.shields.io/badge/Skills-8%20curated%20%2B%20auto--distilled-orange?style=flat-square)
+![Skills](https://img.shields.io/badge/Skills-7%20curated%20%2B%20auto--distilled-orange?style=flat-square)
+![Iterations](https://img.shields.io/badge/Iterations-21%20rounds-blueviolet?style=flat-square)
 
-[项目简介](#项目简介) · [核心亮点](#核心亮点) · [快速开始](#快速开始) · [目录结构](#目录结构) · [核心功能](#核心功能) · [配置说明](#配置说明) · [评测结果](#评测结果) · [贡献指南](#贡献指南)
+[项目简介](#项目简介) · [核心亮点](#核心亮点) · [系统架构](#系统架构) · [快速开始](#快速开始) · [目录结构](#目录结构) · [核心功能](#核心功能) · [配置说明](#配置说明) · [API 摘要](#api-摘要)
+
+[常用命令](#常用命令) · [评测结果](#评测结果) · [设计取舍](#设计取舍) · [文档地图](#文档地图) · [Roadmap](#roadmap) · [贡献指南](#贡献指南) · [许可证](#许可证)
 
 </div>
 
 ---
 
-> :warning: **安全声明（请先阅读）**
->
-> 本项目用于心理支持工程学习与系统展示，**不提供医学诊断，也不能替代专业心理咨询或危机干预服务**。
+> [!WARNING]
+> **安全声明（请先阅读）**：本项目用于心理支持工程学习与系统展示，**不提供医学诊断，也不能替代专业心理咨询或危机干预服务**。
 > 高风险场景下，系统仅承担风险识别、辅助总结与转介建议职责，最终干预必须由具备资质的人员完成。
 > 评测数据反映测试集表现，**不等同于临床有效性评估**。
-
----
-
-## 目录
-
-- [项目简介](#项目简介)
-- [核心亮点](#核心亮点)
-- [系统架构](#系统架构)
-- [快速开始](#快速开始)
-  - [环境要求](#环境要求)
-  - [方式一：本地运行](#方式一本机运行推荐)
-  - [方式二：Docker Compose](#方式二docker-compose)
-  - [访问地址与演示账号](#访问地址与演示账号)
-  - [启用 QLoRA 风险模型（可选）](#启用-qlora-风险模型可选)
-- [目录结构](#目录结构)
-- [核心功能](#核心功能)
-- [配置说明](#配置说明)
-- [API 摘要](#api-摘要)
-- [常用命令](#常用命令)
-- [评测结果](#评测结果)
-- [设计取舍](#设计取舍)
-- [文档地图](#文档地图)
-- [Roadmap](#roadmap)
-- [贡献指南](#贡献指南)
-- [许可证](#许可证)
 
 ---
 
@@ -71,9 +48,9 @@
 | 项 | 数值 |
 | :--- | :--- |
 | 内置知识库 | 173 篇 Markdown 文档（约 570 个检索块） |
-| 人工策展 Skill | 8 个（另有运行时自动蒸馏产物） |
+| 人工策展 Skill | 7 个（另有运行时自动蒸馏产物） |
 | 评测金标集 | 150 条代表性样本（基础层 63 / 压力层 87）+ 77 条 RAG 问句 + 8 组多轮场景 |
-| 测试覆盖 | 15 个 pytest 模块，覆盖路由 / 风险 / 记忆 / API / MCP / 三运行时 A/B（`app/` 源码 75 个模块） |
+| 测试覆盖 | 16 个 pytest 模块，覆盖路由 / 风险 / 记忆 / API / MCP / 三运行时 A/B（`app/` 源码 76 个模块） |
 | 零密钥启动 | 支持，`AI_PROVIDER=mock` 下无需任何外部 API Key |
 
 ---
@@ -121,6 +98,18 @@ flowchart LR
 
     Admin --> Eval["Eval & Harness Reports"]
     Eval --> Store
+
+    classDef client fill:#E8F4FD,stroke:#4A90D9,stroke-width:1.5px,color:#1A4971
+    classDef core fill:#FFF4E6,stroke:#E8A33D,stroke-width:1.5px,color:#7A4A00
+    classDef agent fill:#F3EAFB,stroke:#9B72CF,stroke-width:1.5px,color:#4A2D73
+    classDef store fill:#EAF6EC,stroke:#5BAF6F,stroke-width:1.5px,color:#1E5A2E
+    classDef tool fill:#FDECEF,stroke:#D97A94,stroke-width:1.5px,color:#7A2338
+
+    class Student,Admin client
+    class API,Harness core
+    class Runtime,Memory,Lead,Risk,Knowledge,Counselor,Companion,RAG agent
+    class Store,Eval store
+    class ToolPlan,Queue,MCP,Outputs tool
 ```
 
 **数据流说明**：学生消息进入 Harness → 输入脱敏 → 意图路由 → 按意图决定是否检索 → 多 Agent 在黑板协议下协作 → 风险双通道判定 → 生成 `ToolJob` 而非直接执行 → 回复流式返回同时工具异步入队 → trace / 报告 / 审计全量落库。
@@ -196,7 +185,15 @@ Compose 会启动应用、MySQL 8.0、Redis 与 Chroma。默认本地模式仍�
 | 管理员 | `admin` | `admin123!` | 初始账号，生产环境必须修改 |
 | 教师 | 自由注册 + 邀请码 | 自定义 | 默认邀请码 `aegis-teacher`，由 `AUTH_TEACHER_INVITE_CODE` 配置，注册后进入咨询工作台 |
 
-> :camera: **界面截图待补充**：欢迎通过 PR 提供 `/student`、`/admin` 页面截图至 `docs/assets/`，并同步更新本节。
+### 界面预览
+
+![登录页 — 信笺往来概念](docs/assets/screenshot-login.jpg)
+
+| 学生端 · 对话（信笺往来） | 管理端 · 咨询工作台 |
+| :---: | :---: |
+| ![学生端](docs/assets/screenshot-student.jpg) | ![管理端](docs/assets/screenshot-admin.jpg) |
+
+> 界面支持三套设计概念（信笺往来 / 夜航电台 / 群岛图鉴），右下角切换器即时换形态；截图为「信笺往来」概念，数据来自本地演示环境。
 
 ### 启用 QLoRA 风险模型（可选）
 
@@ -424,7 +421,8 @@ python -m app.mcp.server --list
 
 评测体系基于**人工构造、人工标注且贴近校园心理求助语料的代表性金标集**。我们不筛选样本、不为追求满分而人为凑 100%，允许并保留非满分的真实通过率，用以暴露真实代码与能力边界。
 
-> :warning: 评测指标反映测试集表现，**非真实用户流量验证，不等同于临床有效性评估**。评测产物是可再生快照，不代表后续提交必然得到相同数值。
+> [!IMPORTANT]
+> 评测指标反映测试集表现，**非真实用户流量验证，不等同于临床有效性评估**。评测产物是可再生快照，不代表后续提交必然得到相同数值。
 
 > **QLoRA 训练侧证据**：模型配置、八门槛验收记录与数据来源声明见 [`docs/training/`](docs/training/OVERVIEW.md)（训练证据摘要层；权重与数据本体在隔离训练仓，不入本仓库）。
 

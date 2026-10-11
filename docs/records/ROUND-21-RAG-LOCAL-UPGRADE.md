@@ -126,6 +126,81 @@ RRF 作为"嵌入质量晴雨表"验证成立：无权重旋钮，弱嵌入垫�
 - **配置模板同步**：`.env.example` 的 `KNOWLEDGE_CANDIDATE_K` / `VECTOR_TOP_K` 同步为 128 并加注窗口语义（避免复现者掉进同一坑）；
 - **全库扫描**：确认"未排序切片"仅存于 store 精排链路两处（已修复），`vector_store` 本地/Chroma 后端均为先排序再截断。
 
+## 7A. 评测体系补测与消融引擎缺陷修复（2026-11-11）
+
+> 本节记录第 7 节之后的补充工作：把生产配置的**完整 7 指标**跑出来、修复消融引擎切换缺陷、并定位一处「反直觉但正确」的结果。产出已同步学习指南 9.7.9 / 9.7.10。
+
+### 7A.1 背景：指标口径分裂
+
+第 6 节的生产复评只产出**宽松/严格 2 个口径**（`eval_production_check.py` 是自定义脚本，未走 `evaluate()` 的完整聚合），而 `rag-eval-report.json` 虽含**全部 7 个指标**却产生于旧配置（`local` MiniLM + weighted + lexical，24 块库时代）。
+
+**即：生产配置的 Recall / Precision / MRR / NDCG 从未测过。** 补跑 `python -m app.evaluation.rag`（耗时 12 分 49秒）后填齐。
+
+### 7A.2 生产配置 7 指标（77 题 Top-4）
+
+| 指标 | 值 |
+| --- | --- |
+| recallAtK | 0.8182 |
+| precisionAtK | 0.2857 |
+| mrr | 0.6656 |
+| ndcgAtK | 0.6997 |
+| hitRate（宽松） | 0.8182（63/77） |
+| hitRateStrict | 0.7922（61/77） |
+| averageFirstRelevantRank | 1.5079 |
+
+**★ 强交叉验证**：本次 `hitRate`/`hitRateStrict` = **63/77 / 61/77**，与第 6 节生产黑盒复评**完全一致**——两条独立代码路径（生产 `store.search_knowledge` vs 评测框架 `evaluate()`）得到同一结果，检索链路可复现。
+
+### 7A.3 消融引擎切换缺陷（已修复）
+
+**缺陷**：`run_ablation` 只切`rerank_enabled` / `fusion_mode` / `vector_enabled`，**从不切 `knowledge_rerank_engine`**——因此所有 `rerank_enabled=True` 的组实际执行的都是生产值 `ce_fusion`，而非模式声称的「词法重排」。
+
+**影响**：消融结论被归因到错误的引擎。据此得出的「词法重排是纯亏组合」**结论碰巧正确但证据是错误的**（那个零增益实际来自 CE 的部分生效）。
+
+**修复**（`app/evaluation/rag.py`）：每个模式显式声明 `engine`；循环内真正切换；`config.rerankEngine` 留痕；`finally` 中还原 `original_engine` 防状态残留。新增 `rrf_ce`（生产配置）与 `hybrid_ce` 两组。回归：`tests/test_retrieval_eval.py` 5 passed。
+
+### 7A.4 六组消融（修复后真正切换引擎）
+
+| 模式 | 向量 | 融合 | 重排引擎 | HitRate | 命中 | 平均延迟 |
+| --- | --- | --- | --- | --- | --- | --- |
+| **`rrf_ce`（= 生产配置）** | ✓ | rrf | **ce_fusion** | **0.8182** | **63/77** | 1995ms |
+| `rrf` | ✓ | rrf | 无 | 0.7922 | 61/77 | **329ms** |
+| `hybrid` | ✓ | weighted | 无 | 0.7532 | 58/77 | 306ms |
+| `hybrid_rerank` | ✓ | weighted | **lexical** | 0.7532 | 58/77 | 745ms |
+| `hybrid_ce` | ✓ | weighted | **ce_fusion** | 0.7273 | 56/77 | 2005ms |
+| `bm25_only` | ✗ | weighted | **lexical** | 0.6753 | 52/77 | 501ms |
+
+**四条结论**：
+
+1. `rrf_ce` 当前最优，且等于主指标、等于第 6 节生产复评值——**三处独立数字互相吻合**；
+2. **融合方式比精排引擎更关键**：`rrf_ce` vs `hybrid_ce` 差 **9 条**，而 `rrf` vs `hybrid` 只差 3 条 → 先定融合、再定精排，这正是本轮的选型顺序；
+3. **词法重排确认真零增益**：`hybrid` → `hybrid_rerank` 一条不多、慢 2.4 倍。注意这**不等于「词法没用」**——BM25 召回阶段已完成词法工作，精排再叠一层是重复劳动；
+4. **关向量最差**：`bm25_only`仅 0.6753，**语义召回是规模化的必要前提**（第 4 节结论的独立复现）。
+
+### 7A.5 反常项：weighted 下加 CE反而掉 2 条
+
+`hybrid`(0.7532) → `hybrid_ce`(0.7273)，**加精排反而变差**，违反直觉。
+
+**排除误判**：延迟增量 `hybrid_ce` +1699ms vs `rrf_ce` +1666ms，几乎相同 ⇒ CE 在两种融合下都真实执行，不是漏跑或回退。
+
+**根因**：`store.py:886-893` 两分支的候选池守卫不同——weighted 只跳过「双零」块（候选池 ≈ 全库 570），rrf 须至少进过一路榜单（候选池 ≈ 128 + BM25 命中数）。
+
+**机制**：weighted 融合分经 `normalize_scores` 做 min-max 后**长尾被拉平**，头部 16 与17~50 名的差距远小于 RRF的阶梯状分布（`1/(60+rank)`），导致 `ranked[:16]` 未必是真正相关的 16 条；CE 融合式在这个噪声 head 上归一化加权，**反而放大噪声**、把排序带偏 2 条。rrf 候选池小且都是强候选，head 质量高，CE 才能真正发挥。
+
+**升级结论**：**融合方式的选择比精排引擎的选择更能决定最终效果**（差 9 条 vs 差 2 条）——融合决定候选池质量上限，精排只能在池子里挑。这是 9.7.0 Q1「召回失败不可挽回」在融合层的具体体现。
+
+**未实测的遗留改进项**（供后续参考，非本轮结论）：① weighted 分支引入「至少进一路榜单」守卫收窄池子；② 归一化改z-score / 秩归一化以减少长尾拉平。
+
+### 7A.6 指标口径缺陷（与本轮改动同期发现）
+
+1. **Recall 名不副实**：实现为 `1.0 if hit else 0.0`（`rag.py:169`），已退化成 HitRate——两次独立实测recall 与 hitRate 完全相等（0.8701/0.8701、0.8182/0.8182）。
+2. **Precision@K 超理论上限**：分母固定 `top_k=4`，而每题只有 1~2 个期望源 → 单题上限 0.25~0.5，实测却有 23 题达 0.5~0.75。根因是 `is_relevant` 宽松口径为「source 命中 **OR** term 命中」，会把同主题不同文档误判相关（如 `rag-anx-03` 期望 `anxiety.md`，实际 rank1 `career-anxiety.md` 因含term「求职」被判相关）。
+
+**处置**：明确标注 Recall 与 Precision **非标准IR 语义、跨系统不可引用**；HitRate 与 MRR/NDCG 口径清晰，作为可对外引用的主指标。
+
+### 7A.7 复现性
+
+同配置曾跑出 62/77（差 1 条），源于 Chroma 向量后端的近似检索非确定性，属正常抖动而非配置差异。旧配置的 7 指标报告已归档为 `data/eval/rag-eval-report.minilm-archive.json`。
+
 ## 8. 结论与数据链
 
 **最终生产配置**：`local-zh（bge-small-zh-v1.5 ONNX）+ rrf 融合 + ce_fusion λ0.4 + candidate_k=128 + head16`。
@@ -151,3 +226,5 @@ RRF 作为"嵌入质量晴雨表"验证成立：无权重旋钮，弱嵌入垫�
 - `data/eval/align-k128-report.json`（K=128 白盒）
 - `data/eval/production-check-report.json`（**128 窗口生产复评·最终**）
 - `data/eval/production-check-buggy-archive.json`（bug 版存档）/ `production-check-k16-report.json`（窗口 16 版）
+- `data/eval/rag-eval-report.json`（**生产配置 7 指标 + 六组消融·7A 节最终**）
+- `data/eval/rag-eval-report.minilm-archive.json`（旧 MiniLM 配置 7 指标存档）

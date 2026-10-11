@@ -194,8 +194,15 @@ def run_ablation(store: DatabaseStore, cases: list[dict], top_k: int) -> dict:
     配置矩阵(与生产语义对齐,每个模式的生效配置记录在 config 字段):
     - bm25_only: 关闭向量(仅 BM25 + 词法重排)
     - hybrid: 开启向量 + BM25 融合(无重排)
-    - hybrid_rerank: hybrid + 词法重排(生产默认)
+    - hybrid_rerank: hybrid + 词法重排
     - rrf: RRF 排名融合(无重排)
+    - rrf_ce:RRF 排名融合 + CE 融合式精排(**当前生产配置**)
+    - hybrid_ce: weighted 融合 + CE 融合式精排(用于与 rrf_ce 对照融合方式)
+
+    ⚠️ 每个「有重排」的模式必须显式指定 engine。历史实现只切 knowledge_rerank_enabled,
+    不切 knowledge_rerank_engine,导致 rerank_enabled=True 时实际执行的是生产值
+    (ce_fusion)而非本模式声称的词法引擎——消融结论会归因到错误的引擎上。
+    (2026-11 修复:新增 engine 维度并补充 finally 还原)
 
     向量路复用 store 的真实配置(chroma + 真实嵌入模型,MiniLM/OpenAI 兼容 API),
     不再硬编码降级后端;当 store 当前向量后端已有索引数据时直接复用(只读检索,
@@ -207,6 +214,7 @@ def run_ablation(store: DatabaseStore, cases: list[dict], top_k: int) -> dict:
     original_rerank = store.settings.knowledge_rerank_enabled
     original_fusion = store.settings.knowledge_fusion_mode
     original_vector_enabled = store.settings.vector_enabled
+    original_engine = getattr(store.settings, "knowledge_rerank_engine", "lexical")
 
     # 复用当前已启用且有数据的 chroma 后端(主评测刚建好的隔离索引 / 生产已有索引),
     # 避免消融对同一知识库重复全量嵌入;否则在临时目录内重建一份。
@@ -244,10 +252,12 @@ def run_ablation(store: DatabaseStore, cases: list[dict], top_k: int) -> dict:
             vector_cache.append(store.vector_backend)
 
     mode_configs = {
-        "bm25_only": {"vector": False, "rerank": True, "fusion": "weighted"},
-        "hybrid": {"vector": True, "rerank": False, "fusion": "weighted"},
-        "hybrid_rerank": {"vector": True, "rerank": True, "fusion": "weighted"},
-        "rrf": {"vector": True, "rerank": False, "fusion": "rrf"},
+        "bm25_only": {"vector": False, "rerank": True, "fusion": "weighted", "engine": "lexical"},
+        "hybrid": {"vector": True, "rerank": False, "fusion": "weighted", "engine": None},
+        "hybrid_rerank": {"vector": True, "rerank": True, "fusion": "weighted", "engine": "lexical"},
+        "rrf": {"vector": True, "rerank": False, "fusion": "rrf", "engine": None},
+        "rrf_ce": {"vector": True, "rerank": True, "fusion": "rrf", "engine": "ce_fusion"},
+        "hybrid_ce": {"vector": True, "rerank": True, "fusion": "weighted", "engine": "ce_fusion"},
     }
     ablation = {}
     try:
@@ -255,6 +265,10 @@ def run_ablation(store: DatabaseStore, cases: list[dict], top_k: int) -> dict:
             _swap_vector(config["vector"])
             store.settings.knowledge_rerank_enabled = config["rerank"]
             store.settings.knowledge_fusion_mode = config["fusion"]
+            # 关键:显式切换重排引擎。engine=None 表示本模式「不做重排」,
+            # 此时 engine 取任意值都不生效(knowledge_rerank_enabled=False 已短路),
+            # 设为原始值以免污染 config 快照。
+            store.settings.knowledge_rerank_engine = config["engine"] or original_engine
 
             hits = 0
             total_latency = 0.0
@@ -278,6 +292,7 @@ def run_ablation(store: DatabaseStore, cases: list[dict], top_k: int) -> dict:
                     "vectorEnabled": config["vector"],
                     "rerankEnabled": config["rerank"],
                     "fusionMode": config["fusion"],
+                    "rerankEngine": config["engine"] or "none",
                     "backend": store.vector_backend.backend_name,
                     "embeddingModel": getattr(store.vector_backend, "embedding_model", "none"),
                 },
@@ -288,6 +303,7 @@ def run_ablation(store: DatabaseStore, cases: list[dict], top_k: int) -> dict:
         store.settings.knowledge_rerank_enabled = original_rerank
         store.settings.knowledge_fusion_mode = original_fusion
         store.settings.vector_enabled = original_vector_enabled
+        store.settings.knowledge_rerank_engine = original_engine
         # 仅释放本函数新建的隔离后端(复用的后端归其所有者管理);临时目录总是清理
         if reuse_backend is None:
             for backend in vector_cache:
@@ -333,6 +349,8 @@ if __name__ == "__main__":
     for mode, metrics in report["ablation"].items():
         cfg = metrics.get("config", {})
         print(
-            f"{mode:<15} hitRate={metrics['hitRate']} hitCount={metrics['hitCount']}/{metrics['totalCases']} "
-            f"avgLatencyMs={metrics['avgLatencyMs']} backend={cfg.get('backend')} embedding={cfg.get('embeddingModel')}"
+            f"{mode:<13} hitRate={metrics['hitRate']:<7} hit={metrics['hitCount']}/{metrics['totalCases']} "
+            f"lat={metrics['avgLatencyMs']:<8.1f} fusion={cfg.get('fusionMode'):<9} "
+            f"engine={cfg.get('rerankEngine', 'none'):<11} vector={cfg.get('vectorEnabled')} "
+            f"embed={cfg.get('embeddingModel')}"
         )

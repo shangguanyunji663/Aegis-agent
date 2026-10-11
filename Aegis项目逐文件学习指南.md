@@ -4,10 +4,10 @@
 >
 > 读者定位：刚接触 Agent 应用开发、有 Python 基础的学生。你不需要先懂 LangChain 或 RAG——本文档从「为什么需要这个东西」讲起。读完并按引导走完，你应当能依据思路独立搭出结构相同、功能一致的项目，而不是照抄代码。
 >
-> 文档结论的「正确性」以仓库当前 `main` 分支为准；本文档在多处给出「为什么这么选」的判断，便于你在自己的项目里做取舍。
+> 文档结论的「正确性」以仓库当前 `main` 分支为准；本文档在多处给出「为什么这么选」的判断，便于你在自己的项目里做取舍。  
 > **双册学习路径**：本指南覆盖 **Agent 侧**（编排 / RAG / 工具治理 / 记忆）。配套的「模型侧」学习手册在隔离训练仓：`D:\AegisTraining\training\LEARNING-GUIDE.md`——QLoRA 微调、数据契约、泄漏防护、冻结验收与发布回滚，含易混淆点澄清、岗位能力映射、面试追问预演与简历 STAR 模板。两册合读 = 完整的「Agent 开发实习」能力拼图；面试叙事建议把两个仓库讲成**一个系统的两半**（训练侧模型经受保护 HTTP 契约接入本项目的 max 融合链路）。
 
-***
+---
 
 <a id="how-to-use"></a>
 
@@ -17,12 +17,12 @@
 
 ## 四类读者，四条路径
 
-| 你是… | 建议路径 | 预计投入 | 怎么走 |
-| --- | --- | --- | --- |
-| 想先看看效果 | 路径 A · 快速体验 | 约 1 小时 | 读 1.1 → 按 4.2 跑起来 → 按 4.5 三步验证 → 照「总结三」实操。其余章节用到再回来查。 |
-| 零基础系统学习 | 路径 B · 全程跟学 | 1~2 周 | 从第零部分补齐概念 → 按第一~五部分顺序通读 → 每站完成「动手试一试」与「练习」。 |
-| 有经验、想查特定专题 | 路径 C · 专题跳读 | 按需 | 用下方「专题地图」直接定位；每站开头的「为什么先写它」都可独立成篇。 |
-| 要把它讲给别人 / 裁剪成自己的项目 | 路径 B + 第七部分 | 2~3 周 | 全程跟学后，用「总结四」的从零重建检查清单逐项自测。 |
+| 你是…                | 建议路径        | 预计投入   | 怎么走                                                   |
+| ------------------ | ----------- | ------ | ----------------------------------------------------- |
+| 想先看看效果             | 路径 A · 快速体验 | 约 1 小时 | 读 1.1 → 按 4.2 跑起来 → 按 4.5 三步验证 → 照「总结三」实操。其余章节用到再回来查。 |
+| 零基础系统学习            | 路径 B · 全程跟学 | 1~2 周  | 从第零部分补齐概念 → 按第一~五部分顺序通读 → 每站完成「动手试一试」与「练习」。           |
+| 有经验、想查特定专题         | 路径 C · 专题跳读 | 按需     | 用下方「专题地图」直接定位；每站开头的「为什么先写它」都可独立成篇。                    |
+| 要把它讲给别人 / 裁剪成自己的项目 | 路径 B + 第七部分 | 2~3 周  | 全程跟学后，用「总结四」的从零重建检查清单逐项自测。                            |
 
 **路径 C · 专题地图**（四个最受关注的话题，各自的最短阅读路线）：
 
@@ -43,19 +43,19 @@
 
 ## 全书总目录
 
-| 部分 | 内容 | 回答的问题 |
-| --- | --- | --- |
-| [第零部分](#part-0) | [预备知识与术语表](#glossary) | 「这个词是什么意思？」 |
-| [第一部分](#part-1) | 架构设计思路 | 「为什么这样设计？」 |
-| [第二部分](#part-2) | 模块职责与交互流程 | 「谁负责什么、怎么协作？」 |
-| [第三部分](#part-3) | 关键技术选型理由 | 「为什么选这些技术？」 |
-| [第四部分](#part-4) | 环境搭建与运行步骤 | 「怎么把它跑起来？」 |
-| [第五部分](#part-5) | 从零动手 · 14 站实现地图 | 「每一站具体怎么写？」 |
-| [第六部分](#faq) | 常见问题解答（FAQ） | 「卡住了 / 想不通，看哪里？」 |
-| [第七部分](#part-7) | 总结与自检清单 | 「怎么确认自己学会了？」 |
-| [附录 A](#appendix-a) | 后端 API 契约总表（48 端点） | 「复现后端时怎么逐端点验收？」 |
-| [附录 B](#appendix-b) | 数据模型字段总表（20 张表 172 列） | 「建表时每张表有哪些列？」 |
-| [附录 C](#appendix-c) | Settings 全量字段表（96 项） | 「每个配置项的默认值与环境变量名？」 |
+| 部分                  | 内容                    | 回答的问题              |
+| ------------------- | --------------------- | ------------------ |
+| [第零部分](#part-0)     | [预备知识与术语表](#glossary) | 「这个词是什么意思？」        |
+| [第一部分](#part-1)     | 架构设计思路                | 「为什么这样设计？」         |
+| [第二部分](#part-2)     | 模块职责与交互流程             | 「谁负责什么、怎么协作？」      |
+| [第三部分](#part-3)     | 关键技术选型理由              | 「为什么选这些技术？」        |
+| [第四部分](#part-4)     | 环境搭建与运行步骤             | 「怎么把它跑起来？」         |
+| [第五部分](#part-5)     | 从零动手 · 14 站实现地图       | 「每一站具体怎么写？」        |
+| [第六部分](#faq)        | 常见问题解答（FAQ）           | 「卡住了 / 想不通，看哪里？」   |
+| [第七部分](#part-7)     | 总结与自检清单               | 「怎么确认自己学会了？」       |
+| [附录 A](#appendix-a) | 后端 API 契约总表（48 端点）    | 「复现后端时怎么逐端点验收？」    |
+| [附录 B](#appendix-b) | 数据模型字段总表（20 张表 172 列） | 「建表时每张表有哪些列？」      |
+| [附录 C](#appendix-c) | Settings 全量字段表（96 项）  | 「每个配置项的默认值与环境变量名？」 |
 
 快速跳转：[第〇章 学习路线总览](#station-0) · [第 1 站](#station-1) · [第 2 站](#station-2) · [第 3 站](#station-3) · [第 4 站](#station-4) · [第 5 站](#station-5) · [第 6 站](#station-6) · [第 7 站](#station-7) · [第 8 站](#station-8) · [第 9 站](#station-9) · [第 10 站](#station-10) · [第 11 站](#station-11) · [第 12 站](#station-12) · [第 13 站](#station-13) · [第 14 站](#station-14) · [术语表](#glossary) · [FAQ](#faq)
 
@@ -65,7 +65,7 @@
 2. **对照源码读**：本文所有代码片段都标注了出处文件；片段是为讲清主干做了删节，完整行为以源码为准。
 3. **卡住先查 FAQ**：第六部分按「概念 / 运行排错 / 学习建议」归类了高频问题；仍解决不了再回到对应章节细读。
 
-***
+---
 
 <a id="part-0"></a>
 
@@ -75,13 +75,13 @@
 
 ## 0.1 预备知识自检清单
 
-| 领域 | 需要掌握到… | 不会怎么办 |
-| --- | --- | --- |
-| Python | 函数、类、`dataclass`、`Enum`、类型注解；能读懂（不必会写）`async/await` | 先过一遍官方教程；本文用到新语法时会就地给一句解释 |
-| 命令行 | 会 `cd`、`pip`、`python -m` | 对照 4.2 逐行抄即可，每条命令都有注释 |
-| HTTP | 知道「请求-响应」「JSON」「状态码」 | 第 12 站开头有 3 分钟版背景说明 |
-| SQL | 知道「表、行、列」即可 | ORM 会替你写 SQL，1.3 / 1.4 有最小背景 |
-| 大模型 | 用过任意聊天产品即可 | 0.2 从「LLM 是什么」讲起 |
+| 领域     | 需要掌握到…                                              | 不会怎么办                        |
+| ------ | --------------------------------------------------- | ---------------------------- |
+| Python | 函数、类、`dataclass`、`Enum`、类型注解；能读懂（不必会写）`async/await` | 先过一遍官方教程；本文用到新语法时会就地给一句解释    |
+| 命令行    | 会 `cd`、`pip`、`python -m`                            | 对照 4.2 逐行抄即可，每条命令都有注释        |
+| HTTP   | 知道「请求-响应」「JSON」「状态码」                                | 第 12 站开头有 3 分钟版背景说明          |
+| SQL    | 知道「表、行、列」即可                                         | ORM 会替你写 SQL，1.3 / 1.4 有最小背景 |
+| 大模型    | 用过任意聊天产品即可                                          | 0.2 从「LLM 是什么」讲起             |
 
 ## 0.2 十分钟概念速成
 
@@ -113,54 +113,54 @@
 
 **模型与提示**
 
-| 术语 | 对应代码 / 配置 | 在本项目中的含义 |
-| --- | --- | --- |
-| 模型后端 | `LLMClient` | 协议 + Mock / OpenAI 兼容 / Ollama 三实现（第 5 站） |
-| mock 模式 | `AI_PROVIDER=mock` | 无外部 key 的本地假模型，所有 LLM 方法返回 `None` → 触发模板兜底 |
-| 风险双通道 | `assess_message` ∪ `assess_risk` | 规则通道与 LLM 通道取并集，任一判 high 即 high（第 3 站） |
-| 真流式 | `stream_support_reply` | 模型 token 一边生成一边经 SSE 推给前端（8.1） |
+| 术语      | 对应代码 / 配置                        | 在本项目中的含义                                   |
+| ------- | -------------------------------- | ------------------------------------------ |
+| 模型后端    | `LLMClient`                      | 协议 + Mock / OpenAI 兼容 / Ollama 三实现（第 5 站）  |
+| mock 模式 | `AI_PROVIDER=mock`               | 无外部 key 的本地假模型，所有 LLM 方法返回 `None` → 触发模板兜底 |
+| 风险双通道   | `assess_message` ∪ `assess_risk` | 规则通道与 LLM 通道取并集，任一判 high 即 high（第 3 站）     |
+| 真流式     | `stream_support_reply`           | 模型 token 一边生成一边经 SSE 推给前端（8.1）             |
 
 **检索与记忆**
 
-| 术语 | 对应代码 / 配置 | 在本项目中的含义 |
-| --- | --- | --- |
-| 知识块 | `KnowledgeChunk` | 知识文档切块后的最小检索单元，带元数据与可选向量（1.3） |
+| 术语   | 对应代码 / 配置               | 在本项目中的含义                                                                                                      |
+| ---- | ----------------------- | ------------------------------------------------------------------------------------------------------------- |
+| 知识块  | `KnowledgeChunk`        | 知识文档切块后的最小检索单元，带元数据与可选向量（1.3）                                                                                 |
 | 混合检索 | `KNOWLEDGE_FUSION_MODE` | BM25 + 向量双路召回 → weighted / RRF 融合 → 重排（三引擎：词法公式 / Cross-Encoder / CE 融合式；9.7；小白概念地图与「四条路」见 9.7.0，最新实测见 9.7.8） |
-| 邻块扩展 | `expand_best_hit` | 把冠军块的同源相邻块拼回来，防答案被「拦腰截断」（9.7.4） |
-| 记忆四层 | L1~L4 | Agent 私有 / 用户事实（SCD-2）/ 会话摘要 / 原话窗口（9.5） |
-| 滚动摘要 | `build_memory_summary` | 每轮一行、超字符预算丢最旧（9.4） |
+| 邻块扩展 | `expand_best_hit`       | 把冠军块的同源相邻块拼回来，防答案被「拦腰截断」（9.7.4）                                                                               |
+| 记忆四层 | L1~L4                   | Agent 私有 / 用户事实（SCD-2）/ 会话摘要 / 原话窗口（9.5）                                                                      |
+| 滚动摘要 | `build_memory_summary`  | 每轮一行、超字符预算丢最旧（9.4）                                                                                            |
 
 **协作与运行时**
 
-| 术语 | 对应代码 / 配置 | 在本项目中的含义 |
-| --- | --- | --- |
-| 黑板 | `CollaborationBlackboard` | 一轮对话的共享状态，append-only、克隆式不可变（7.1） |
-| 工件 | `AgentArtifact` | Agent 发布到黑板的一切中间产物（memory/intent/risk/…）（7.1） |
-| 认领制 | claim-based | Agent 按「能力匹配 + 置信度」主动认领任务（7.4） |
-| 安全一票否决 | `SAFETY_OVERRIDE` | 该事件发出后黑板风险恒为 HIGH，不可被后续评估覆盖（7.5） |
-| 预算护栏 | `AGENT_MAX_ROUNDS` 等 | 轮次上限 / 每轮认领上限 / 单 Agent 认领上限（7.4） |
-| 三档运行时 | `AGENT_RUNTIME` | autonomous（默认）/ ordered / langgraph（1.5、8.4） |
+| 术语     | 对应代码 / 配置                 | 在本项目中的含义                                      |
+| ------ | ------------------------- | --------------------------------------------- |
+| 黑板     | `CollaborationBlackboard` | 一轮对话的共享状态，append-only、克隆式不可变（7.1）             |
+| 工件     | `AgentArtifact`           | Agent 发布到黑板的一切中间产物（memory/intent/risk/…）（7.1） |
+| 认领制    | claim-based               | Agent 按「能力匹配 + 置信度」主动认领任务（7.4）                |
+| 安全一票否决 | `SAFETY_OVERRIDE`         | 该事件发出后黑板风险恒为 HIGH，不可被后续评估覆盖（7.5）              |
+| 预算护栏   | `AGENT_MAX_ROUNDS` 等      | 轮次上限 / 每轮认领上限 / 单 Agent 认领上限（7.4）             |
+| 三档运行时  | `AGENT_RUNTIME`           | autonomous（默认）/ ordered / langgraph（1.5、8.4）  |
 
 **治理与安全**
 
-| 术语 | 对应代码 / 配置 | 在本项目中的含义 |
-| --- | --- | --- |
-| 待审报告 | `PendingReport` | 高风险对话产生、等管理员审批的报告（2.3） |
-| 工具任务 | `ToolJob` | 一切外部副作用的受治理封装：先审批，后异步执行（第 11 站） |
-| 契约 | `ToolContract` | 每个工具的「谁能调、什么风险、要不要审批、脱敏哪些字段」（11.1） |
-| 死信 | `DeadLetterRecord` | 重试超限后落入的可运营失败队列（11.3） |
-| 脱敏 | `redact_payload` | 敏感字段替换为 `[redacted]`，存储侧与输出侧双覆盖（2.2） |
-| 输入消毒 | `sanitize_user_input` | 进模型前压缩空白、把「手机号」等替换成中性说法（2.2） |
+| 术语   | 对应代码 / 配置             | 在本项目中的含义                             |
+| ---- | --------------------- | ------------------------------------ |
+| 待审报告 | `PendingReport`       | 高风险对话产生、等管理员审批的报告（2.3）               |
+| 工具任务 | `ToolJob`             | 一切外部副作用的受治理封装：先审批，后异步执行（第 11 站）      |
+| 契约   | `ToolContract`        | 每个工具的「谁能调、什么风险、要不要审批、脱敏哪些字段」（11.1）   |
+| 死信   | `DeadLetterRecord`    | 重试超限后落入的可运营失败队列（11.3）                |
+| 脱敏   | `redact_payload`      | 敏感字段替换为 `[redacted]`，存储侧与输出侧双覆盖（2.2） |
+| 输入消毒 | `sanitize_user_input` | 进模型前压缩空白、把「手机号」等替换成中性说法（2.2）         |
 
 **工程与评测**
 
-| 术语 | 对应代码 / 配置 | 在本项目中的含义 |
-| --- | --- | --- |
-| 会话 | `ChatSession` | 一次多轮对话的容器，带归属（owner）校验（1.3） |
-| trace | `AgentRunTrace` | 每一步 Agent 动作的落库痕迹，管理端可回放（第 10 站） |
-| 工程 Harness | `app/evaluation/harness` | 8 套件端到端回放，失败退出码 1 可接 CI（第 13 站） |
-| 技能 | `SkillSpec` | 注册成表的能力单元；人工策展与自动蒸馏两类（第 4 站） |
-| 蒸馏 | `SKILL_DISTILL_ENABLED` | 把反复出现的技能组合固化成 auto SKILL.md（4.1） |
+| 术语         | 对应代码 / 配置                | 在本项目中的含义                         |
+| ---------- | ------------------------ | -------------------------------- |
+| 会话         | `ChatSession`            | 一次多轮对话的容器，带归属（owner）校验（1.3）      |
+| trace      | `AgentRunTrace`          | 每一步 Agent 动作的落库痕迹，管理端可回放（第 10 站） |
+| 工程 Harness | `app/evaluation/harness` | 8 套件端到端回放，失败退出码 1 可接 CI（第 13 站）  |
+| 技能         | `SkillSpec`              | 注册成表的能力单元；人工策展与自动蒸馏两类（第 4 站）     |
+| 蒸馏         | `SKILL_DISTILL_ENABLED`  | 把反复出现的技能组合固化成 auto SKILL.md（4.1） |
 
 ## 0.4 行文约定
 
@@ -169,7 +169,7 @@
 - 代码片段若标注文件路径即出自该文件，为讲清主干有删节；`...` 表示省略与本节无关的字段；
 - 所有命令默认在项目根目录、已激活虚拟环境（见 4.2）的前提下执行。
 
-***
+---
 
 <a id="part-1"></a>
 
@@ -179,25 +179,25 @@
 
 校园心理支持场景里，一个「聊天机器人」远远不够。用户（学生）和管理者（辅导员/学校心理中心）关心的东西完全不同：
 
--   学生侧  关心的是：能不能放心倾诉、对话是否连续、遇到危机时有没有人管。
--   管理侧  关心的是：谁有风险、风险多高、有没有留下可追溯的记录、外部动作（通知家长/老师/建档）有没有被审批和审计。
+- 学生侧  关心的是：能不能放心倾诉、对话是否连续、遇到危机时有没有人管。
+- 管理侧  关心的是：谁有风险、风险多高、有没有留下可追溯的记录、外部动作（通知家长/老师/建档）有没有被审批和审计。
 
 如果只做一个聊天框，会出现三个真实矛盾，这正是本项目设计的起点：
 
-1.   「普通聊天」不该被过度检索和过度工具化。   学生说「今天好累」，如果每次都去知识库检索、都要调工具，回复质量反而被噪声拖垮。需要「先判断意图，再决定要不要检索/调工具」。
-2.   「高风险表达」必须进入可审计流程。   涉及自伤、危机的表达，不能只由模型「回复一句安抚」就结束——它需要人审、脱敏、重试、留痕，且工具执行不能由模型越权直接触发。
-3.   「多 Agent 协作」不能只是顺序调用。   单个 Lead Agent 串行分派，复杂场景下没有中间产物、没有任务认领、没有验收点，一旦出错无法复盘。
+1. 「普通聊天」不该被过度检索和过度工具化。   学生说「今天好累」，如果每次都去知识库检索、都要调工具，回复质量反而被噪声拖垮。需要「先判断意图，再决定要不要检索/调工具」。
+2. 「高风险表达」必须进入可审计流程。   涉及自伤、危机的表达，不能只由模型「回复一句安抚」就结束——它需要人审、脱敏、重试、留痕，且工具执行不能由模型越权直接触发。
+3. 「多 Agent 协作」不能只是顺序调用。   单个 Lead Agent 串行分派，复杂场景下没有中间产物、没有任务认领、没有验收点，一旦出错无法复盘。
 
->   一句话定位：Aegis 不是聊天机器人，而是把「学生侧即时支持」与「管理侧可审计干预」拆成两套独立信息架构，并用一套后端 Agent Runtime 统一处理意图路由、记忆注入、RAG 检索、风险报告、trace 落库与工具计划。
+> 一句话定位：Aegis 不是聊天机器人，而是把「学生侧即时支持」与「管理侧可审计干预」拆成两套独立信息架构，并用一套后端 Agent Runtime 统一处理意图路由、记忆注入、RAG 检索、风险报告、trace 落库与工具计划。
 
 ## 1.2 四条贯穿全程的设计哲学
 
 记住这四条，后面每个模块你都会看到它们的影子：
 
-1.   安全前置、规则优先  ：高风险判断靠确定性关键词规则（`assessment.py`），不靠模型输出。LLM 永远拿不到「是否高危」的最终决定权——它只是「双通道」里的辅助通道，且失败/超时自动回退纯规则。
-2.   治理与业务正交  ：工具只管「做事」，而「谁能调、什么风险等级能调、要不要审批、哪些字段要脱敏、失败怎么重试」统一在契约层（`tools/contracts.py`）拦截。业务代码不再散落 `if role == admin` 之类的判断。
-3.   确定性可回放  ：多 Agent 协作的全部中间状态落在 append-only 黑板（blackboard）上，事件进 trace 落库。任何一次回复都能复盘「谁认领了什么、产出什么、被谁驳回、最终怎么验收」。
-4.   默认可本地运行  ：`AI_PROVIDER=mock` 时不需要任何外部 API key，整条闭环（含评测）照样跑通。这是对「学习友好」和「演示友好」的关键承诺。
+1. 安全前置、规则优先  ：高风险判断靠确定性关键词规则（`assessment.py`），不靠模型输出。LLM 永远拿不到「是否高危」的最终决定权——它只是「双通道」里的辅助通道，且失败/超时自动回退纯规则。
+2. 治理与业务正交  ：工具只管「做事」，而「谁能调、什么风险等级能调、要不要审批、哪些字段要脱敏、失败怎么重试」统一在契约层（`tools/contracts.py`）拦截。业务代码不再散落 `if role == admin` 之类的判断。
+3. 确定性可回放  ：多 Agent 协作的全部中间状态落在 append-only 黑板（blackboard）上，事件进 trace 落库。任何一次回复都能复盘「谁认领了什么、产出什么、被谁驳回、最终怎么验收」。
+4. 默认可本地运行  ：`AI_PROVIDER=mock` 时不需要任何外部 API key，整条闭环（含评测）照样跑通。这是对「学习友好」和「演示友好」的关键承诺。
 
 ## 1.3 分层架构总览
 
@@ -247,10 +247,11 @@ flowchart LR
 
 ## 1.4 为什么是「双端分离 + 中间 Harness」
 
--   双端分离  ：学生倾诉体验和管理员处置流程关注点不同，混在一起会让产品边界混乱、权限模型复杂。`/student` 提供对话与会话记忆，`/admin` 提供报告、个案、trace、知识库、工具队列、评测。
--   中间 Harness  ：Agent 调用、上下文注入、风险报告、trace 落库、消息持久化、工具计划如果散落在业务/路由代码里，既难审计也难复用。`AegisAgentHarness` 把它们收口成薄适配层——路由层因此可以保持「参数校验 + 鉴权 + 限流」的纯净，不碰任何 Agent 细节。这也是「让 HTTP 层与 Agent 世界解耦」的标准做法。
+- 双端分离  ：学生倾诉体验和管理员处置流程关注点不同，混在一起会让产品边界混乱、权限模型复杂。`/student` 提供对话与会话记忆，`/admin` 提供报告、个案、trace、知识库、工具队列、评测。
+- 中间 Harness  ：Agent 调用、上下文注入、风险报告、trace 落库、消息持久化、工具计划如果散落在业务/路由代码里，既难审计也难复用。`AegisAgentHarness` 把它们收口成薄适配层——路由层因此可以保持「参数校验 + 鉴权 + 限流」的纯净，不碰任何 Agent 细节。这也是「让 HTTP 层与 Agent 世界解耦」的标准做法。
 
 ## 1.5 为什么「三个运行时」同时存在
+
 
 这是本项目最有教学价值的设计之一。`AGENT_RUNTIME` 可切换三档：
 
@@ -259,8 +260,6 @@ flowchart LR
 | `autonomous`（默认） | 自研 append-only 黑板 + 认领制协调器          | 真正的多 Agent 协作：共享状态、任务认领、产物验收、安全 override |
 | `ordered`        | 六类单轮 Agent 按固定顺序跑                   | 最简链路，便于理解「每个 Agent 各做一步」                 |
 | `langgraph`      | LangGraph `StateGraph` 声明式状态图 + 条件边 | 工业级编排，带 `SqliteSaver` 检查点，长对话可恢复         |
-
-
 
 为什么三个运行时都要存在：三者复用同一批 Agent 与安全规则，只是「调度方式」不同。这让读者可以：先读 `ordered` 理解每个零件，再读 `autonomous` 理解真实协作，最后对比 `langgraph` 理解工业方案——并且用「三运行时 A/B 评测」证明换引擎不改业务语义（三档运行时判定彼此一致）。
 
@@ -283,39 +282,40 @@ flowchart LR
  [异步,管理端] 审批高风险报告 → 建个案 → 派 5 个 ToolJob → Worker 执行 → 落记录
 ```
 
-***
+---
 
 <a id="part-2"></a>
 
 # 第二部分：模块职责与交互流程
 
+
 ## 2.1 模块职责矩阵
 
 这张表是后续阅读地图的「索引」。每个模块回答三个问题：负责什么 / 对外暴露什么 / 依赖谁。
 
-| 模块                                                       | 核心职责                                                                                                 | 对外关键接口                                                                                           | 主要依赖               |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------ |
-| `app/config.py`                                          | 全局配置（env / .env 映射，全部带安全默认值）                                                                         | `Settings`、`get_settings()`                                                                      | pydantic-settings  |
-| `app/models.py`                                          | 领域模型（Intent/RiskLevel/ChatResponse 等纯数据词汇表）                                                          | 枚举、`dataclass`、SSE 映射                                                                            | 仅标准库               |
-| `app/entities.py`                                        | ORM 实体（20 张表，含 L2 事实表与 `UserPreference` 主题偏好表）                                                                                        | `Base` 下的实体类                                                                                     | SQLAlchemy         |
-| `app/database.py`                                        | 引擎/会话工厂/建表/迁移/就绪检查                                                                                   | `build_engine`、`build_session_factory`、`create_schema`                                           | SQLAlchemy         |
-| `app/assessment.py`                                      | 确定性风险评估（规则通道单一事实来源）                                                                                  | `assess_message()`                                                                               | 无（纯函数）             |
-| `app/skills.py`                                          | 注册式执行 Skill、人工策展 Skill、使用观察器与自动蒸馏/重载                                                                                 | `SkillRegistry`、`response_skill_names()`                                                         | store 回调注入         |
-| `app/core/`                                              | 横切原语：auth（口令/会话）、privacy（脱敏/消毒）、runtime_services（Redis 限流锁，可降级）、network（出站 URL 校验，SSRF 防护）、utils | 各类工具函数                                                                                           | redis（可选）          |
-| `app/llm/`                                               | 模型后端：client（Mock/OpenAI/Ollama 三实现 + 工厂）、prompts（提示词）                                                | `LLMClient`(Protocol)、`build_llm_client()`                                                       | httpx/urllib       |
-| `app/agents/classic.py`                                  | 六个单轮智能体（各司其职、无状态）                                                                                    | `MemoryAgent`/`RiskGuardianAgent`/`LeadAgent`/`KnowledgeAgent`/`CounselorAgent`/`CompanionAgent` | llm、skills、rag     |
-| `app/agents/orchestrator.py`                             | 装配六 Agent + 双/三运行时切换总入口                                                                              | `PsychOrchestrator`                                                                              | 上述全部               |
-| `app/agents/harness.py`                                  | Runtime Harness：脱敏/会话解析/报告/trace 收口                                                                  | `AegisAgentHarness`                                                                              | orchestrator、store |
-| `app/agents/langgraph_runtime.py`                        | LangGraph StateGraph 运行时 + 检查点                                                                       | `LangGraphRuntime`                                                                               | langgraph          |
-| `app/autonomous/`                                        | 自治协作：events（协议）、registry（能力/决策）、board（共享读）、coordinator（认领循环）、agents（六自治 Agent）、runtime（黑板→响应）        | `AutonomousAgentRuntime`                                                                         | llm、rag、store      |
-| `app/rag/`                                               | 检索与记忆子系统：text（分词）、scoring（BM25/融合/词法精排公式）、chunking（切块/元数据）、facts（L2 事实抽取与渲染）、memory（L3 摘要）、vector\_store（Chroma 后端 + local-zh 本地中文嵌入 / crc32 伪向量降级）、zh\_embedder（本地 ONNX 嵌入引擎）、reranker（Cross-Encoder 精排 ONNX） | `DatabaseStore.search_knowledge`（组装检索流水线）                                                        | chromadb（可选）、onnxruntime |
-| `app/repository/store.py`                                | 持久化总闸（约 1231 行；含 L1~L4 记忆分层、主题偏好方法与 CE 融合式精排（含「精排前先排序」修复）后更新）                                                                           | `DatabaseStore`                                                                                  | entities、rag       |
-| `app/tools/`                                             | 工具治理：contracts（契约）、gateway（internal/MCP 网关）、mcp\_client                                              | `governed_payload()`、`build_tool_gateway()`                                                      | store              |
-| `app/services/`                                          | 业务服务：report\_case（审批后编排）、tool\_executor（真实副作用）、tool\_queue（队列/worker）、tool\_records、tool\_governance | `ReportCaseService`、`ToolQueueWorker`                                                            | store、tools        |
-| `app/api/`                                               | HTTP 路由：schemas/deps/middleware/errors（全局异常处理，见 12.3b）/pages/system/auth\_routes/chat/admin                                 | RESTful + SSE 接口                                                                                 | FastAPI、harness    |
-| `app/mcp/`                                               | MCP 边界：server（FastMCP 工具服务）/ client（stdio 客户端）（可选后端）                                       | `@mcp.tool` 暴露的工具                                                                                | store、contracts    |
-| `app/evaluation/`（含 `harness/`）、`eval/`              | 评测闭环：runner / rag（双口径+消融）/ datasets / report\_html / runtime\_ab / judge / harness（factory 装配工厂 + runner 场景回放） | `eval.run_eval`、`app.evaluation.harness.runner`                                                 | store、llm          |
-| `frontend/`、`tests/`                                    | 前端 SPA(Vite 8 + React 19 + TS 6,源码 `frontend/src/`,产物 `frontend/dist/` 由 FastAPI 同源托管)+ pytest 单测(历史验证结果应以运行日期和环境为准) | 三入口页 `/`、`/student`、`/admin`(同一 SPA 入口)、测试                                                  | Vite 工具链、Node  |
+| 模块                                      | 核心职责                                                                                                                                                                                                         | 对外关键接口                                                                                           | 主要依赖                     |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ | ------------------------ |
+| `app/config.py`                         | 全局配置（env / .env 映射，全部带安全默认值）                                                                                                                                                                                 | `Settings`、`get_settings()`                                                                      | pydantic-settings        |
+| `app/models.py`                         | 领域模型（Intent/RiskLevel/ChatResponse 等纯数据词汇表）                                                                                                                                                                  | 枚举、`dataclass`、SSE 映射                                                                            | 仅标准库                     |
+| `app/entities.py`                       | ORM 实体（20 张表，含 L2 事实表与 `UserPreference` 主题偏好表）                                                                                                                                                               | `Base` 下的实体类                                                                                     | SQLAlchemy               |
+| `app/database.py`                       | 引擎/会话工厂/建表/迁移/就绪检查                                                                                                                                                                                           | `build_engine`、`build_session_factory`、`create_schema`                                           | SQLAlchemy               |
+| `app/assessment.py`                     | 确定性风险评估（规则通道单一事实来源）                                                                                                                                                                                          | `assess_message()`                                                                               | 无（纯函数）                   |
+| `app/skills.py`                         | 注册式执行 Skill、人工策展 Skill、使用观察器与自动蒸馏/重载                                                                                                                                                                         | `SkillRegistry`、`response_skill_names()`                                                         | store 回调注入               |
+| `app/core/`                             | 横切原语：auth（口令/会话）、privacy（脱敏/消毒）、runtime_services（Redis 限流锁，可降级）、network（出站 URL 校验，SSRF 防护）、utils                                                                                                             | 各类工具函数                                                                                           | redis（可选）                |
+| `app/llm/`                              | 模型后端：client（Mock/OpenAI/Ollama 三实现 + 工厂）、prompts（提示词）                                                                                                                                                        | `LLMClient`(Protocol)、`build_llm_client()`                                                       | httpx/urllib             |
+| `app/agents/classic.py`                 | 六个单轮智能体（各司其职、无状态）                                                                                                                                                                                            | `MemoryAgent`/`RiskGuardianAgent`/`LeadAgent`/`KnowledgeAgent`/`CounselorAgent`/`CompanionAgent` | llm、skills、rag           |
+| `app/agents/orchestrator.py`            | 装配六 Agent + 双/三运行时切换总入口                                                                                                                                                                                      | `PsychOrchestrator`                                                                              | 上述全部                     |
+| `app/agents/harness.py`                 | Runtime Harness：脱敏/会话解析/报告/trace 收口                                                                                                                                                                          | `AegisAgentHarness`                                                                              | orchestrator、store       |
+| `app/agents/langgraph_runtime.py`       | LangGraph StateGraph 运行时 + 检查点                                                                                                                                                                               | `LangGraphRuntime`                                                                               | langgraph                |
+| `app/autonomous/`                       | 自治协作：events（协议）、registry（能力/决策）、board（共享读）、coordinator（认领循环）、agents（六自治 Agent）、runtime（黑板→响应）                                                                                                                | `AutonomousAgentRuntime`                                                                         | llm、rag、store            |
+| `app/rag/`                              | 检索与记忆子系统：text（分词）、scoring（BM25/融合/词法精排公式）、chunking（切块/元数据）、facts（L2 事实抽取与渲染）、memory（L3 摘要）、vector_store（Chroma 后端 + local-zh 本地中文嵌入 / crc32 伪向量降级）、zh_embedder（本地 ONNX 嵌入引擎）、reranker（Cross-Encoder 精排 ONNX） | `DatabaseStore.search_knowledge`（组装检索流水线）                                                        | chromadb（可选）、onnxruntime |
+| `app/repository/store.py`               | 持久化总闸（约 1231 行；含 L1~L4 记忆分层、主题偏好方法与 CE 融合式精排（含「精排前先排序」修复）后更新）                                                                                                                                                | `DatabaseStore`                                                                                  | entities、rag             |
+| `app/tools/`                            | 工具治理：contracts（契约）、gateway（internal/MCP 网关）、mcp_client                                                                                                                                                       | `governed_payload()`、`build_tool_gateway()`                                                      | store                    |
+| `app/services/`                         | 业务服务：report_case（审批后编排）、tool_executor（真实副作用）、tool_queue（队列/worker）、tool_records、tool_governance                                                                                                              | `ReportCaseService`、`ToolQueueWorker`                                                            | store、tools              |
+| `app/api/`                              | HTTP 路由：schemas/deps/middleware/errors（全局异常处理，见 12.3b）/pages/system/auth_routes/chat/admin                                                                                                                   | RESTful + SSE 接口                                                                                 | FastAPI、harness          |
+| `app/mcp/`                              | MCP 边界：server（FastMCP 工具服务）/ client（stdio 客户端）（可选后端）                                                                                                                                                         | `@mcp.tool` 暴露的工具                                                                                | store、contracts          |
+| `app/evaluation/`（含 `harness/`）、`eval/` | 评测闭环：runner / rag（双口径+消融）/ datasets / report_html / runtime_ab / judge / harness（factory 装配工厂 + runner 场景回放）                                                                                                 | `eval.run_eval`、`app.evaluation.harness.runner`                                                  | store、llm                |
+| `frontend/`、`tests/`                    | 前端 SPA(Vite 8 + React 19 + TS 6,源码 `frontend/src/`,产物 `frontend/dist/` 由 FastAPI 同源托管)+ pytest 单测(历史验证结果应以运行日期和环境为准)                                                                                         | 三入口页 `/`、`/student`、`/admin`(同一 SPA 入口)、测试                                                       | Vite 工具链、Node            |
 
 ## 2.2 学生端对话主流程（时序图）
 
@@ -422,7 +422,7 @@ settings → engine/会话工厂 → create_schema
 
 所有实例挂到 `app.state.*`，路由通过 `request.app.state.xxx` 显式获取——这是「依赖注入」的轻量实现，比初版「45 个路由闭包捕获变量」可读、可测得多。
 
-***
+---
 
 <a id="part-3"></a>
 
@@ -529,7 +529,7 @@ settings → engine/会话工厂 → create_schema
 - `httpx`：异步 HTTP 客户端（SMTP/外部调用备用）。
 - 不引 `jieba`/`yaml`：中文分词用 bigram、frontmatter 手写解析，刻意控制依赖面，降低「新人装不上」的门槛。
 
-***
+---
 
 <a id="part-4"></a>
 
@@ -539,9 +539,9 @@ settings → engine/会话工厂 → create_schema
 
 ## 4.1 环境要求
 
--   Python  ：3.12（Docker 用 `python:3.12-slim`；本地建议 ≥3.10，SQLAlchemy 2.0 需要）。
--   网络  ：默认 `AI_PROVIDER=mock` 完全离线；接 OpenAI/Ollama/Chroma/Redis/SMTP 才需要网络或本地服务。
--   操作系统  ：Linux/macOS/Windows 均可；Windows 路径用反斜杠激活脚本即可。
+- Python  ：3.12（Docker 用 `python:3.12-slim`；本地建议 ≥3.10，SQLAlchemy 2.0 需要）。
+- 网络  ：默认 `AI_PROVIDER=mock` 完全离线；接 OpenAI/Ollama/Chroma/Redis/SMTP 才需要网络或本地服务。
+- 操作系统  ：Linux/macOS/Windows 均可；Windows 路径用反斜杠激活脚本即可。
 
 ## 4.2 方式一：本地 venv（推荐学习路径）
 
@@ -586,7 +586,6 @@ RISK_QLORA_TIMEOUT_SECONDS=8
 
 再执行上面的 FastAPI 启动命令。不开启时 `RISK_QLORA_ENABLED=false`，行为保持原样；服务超时、不可达或 JSON 非法时自动回退规则。训练根目录、模型路径和服务脚本位置均可按机器改为其他 `AEGIS_*` 配置，不要求使用 `D:\AegisTraining`。
 
-
 打开浏览器：
 
 - 首页：<http://127.0.0.1:8091>
@@ -606,32 +605,30 @@ RISK_QLORA_TIMEOUT_SECONDS=8
 
 `.env.example` 是推荐配置清单；但要区分三类值：**`Settings` 代码默认**、**示例文件建议值**和**部署时由 `.env`/系统环境变量覆盖的值**。例如 `embedding_provider` 的代码默认是 `openai`，`.env.example` 则推荐 `local` 以便无外部密钥演示；本地开发者自己的 `.env` 不属于仓库默认。另注意 `.env.example` 并未覆盖全部 96 个 Settings 字段——SMTP 全组、告警目的地（`ALERT_EMAIL_*`）、`TOOL_OUTPUT_DIR`、`TOOL_QUEUE_*`、`EXCEL_PATH`、`RAG_EVAL_*` 等 28 项只存在于代码默认（见附录 C）；需要这些功能时以附录 C 的变量名为准。最小可运行可直接使用代码默认（`AI_PROVIDER=mock`、SQLite、`VECTOR_ENABLED=false`、Redis 空）。按组理解关键变量：
 
-| 分组  | 变量                                                           | 作用                                 | 默认                               |
-| --- | ------------------------------------------------------------ | ---------------------------------- | -------------------------------- |
-| 模型  | `AI_PROVIDER`                                                | `mock`/`openai`/`ollama`           | `mock`                           |
-| 模型  | `OPENAI_API_KEY`/`OPENAI_BASE_URL`/`OPENAI_MODEL`            | OpenAI 兼容端点                        | 空 / `https://api.openai.com/v1` / gpt-4o-mini |
-| 模型  | `OLLAMA_BASE_URL`/`OLLAMA_MODEL`                             | 本地 Ollama                          | 127.0.0.1:11434 / qwen2.5:7b     |
-| 模型  | `LLM_THINKING_ENABLED`                                       | 深度思考（接 GLM 建议关）                    | `false`                          |
-| 模型  | `LLM_SUPPORT_TEMPERATURE`                                    | 支持性回复采样温度（偏高更真人）                   | `0.6`                            |
-| 风险  | `RISK_LLM_CHANNEL_ENABLED`                                   | 通用 LLM 风险通道；`RISK_QLORA_ENABLED=true` 时由 QLoRA 接管 | `true`                           |
-| 风险  | `RISK_QLORA_ENABLED` / `RISK_QLORA_URL` / `RISK_QLORA_TIMEOUT_SECONDS` | v9 QLoRA 隔离服务开关 / 地址 / 超时 | `false` / `https://qlora-endpoint.example.invalid` / `8` |
-| 技能  | `FUNCTION_CALLING_ENABLED`                                   | 模型在白名单内自主选技能                       | `true`                           |
-| 检索  | `EMBEDDING_PROVIDER`                                         | `openai`（代码默认）/ `local`（离线英文 MiniLM）/ `local-zh`（离线中文 bge-small-zh，生产在用） | `openai`（`.env.example` 推荐 `local`）                          |
-| 检索  | `VECTOR_ENABLED` / `VECTOR_BACKEND`                          | 是否启用向量 / 后端                        | `false` / `chroma`               |
-| 检索  | `KNOWLEDGE_FUSION_MODE` / `KNOWLEDGE_CACHE_ENABLED`          | 加权/RRF 融合 / 进程内缓存开关              | `weighted` / `false`（生产用 `rrf`）             |
-| 检索  | `KNOWLEDGE_CANDIDATE_K` / `VECTOR_TOP_K` / `KNOWLEDGE_RERANK_ENGINE` | RRF 候选窗口 / 向量返回条数（两者取 min 生效）/ 重排引擎（`lexical`/`cross_encoder`/`ce_fusion`） | `16` / `16` / `lexical`（生产用 `128` / `128` / `ce_fusion`） |
-| 记忆  | `MEMORY_RECENT_MESSAGES` / `MEMORY_SUMMARY_MAX_CHARS`        | L4 原话窗口 / L3 摘要上限                  | 15 / 3000                        |
-| 技能  | `SKILL_DISTILL_ENABLED` / `SKILL_DISTILL_MIN_REPEAT` / `SKILL_DISTILL_DIR` | 是否蒸馏 / 重复阈值 / 输出目录 | `true` / 3 / `skills/auto` |
-| 运行时 | `AGENT_RUNTIME`                                              | `autonomous`/`ordered`/`langgraph` | `autonomous`                     |
-| 运行时 | `AGENT_MAX_ROUNDS` / `AGENT_FINAL_ACCEPTANCE_MIN_CONFIDENCE` | 预算护栏                               | 8 / 0.6                          |
-| 限流  | `CHAT_RATE_LIMIT_PER_MINUTE` / `REDIS_URL`                   | 聊天限流 / 可选 Redis                    | 40 / 空                           |
-| 工具  | `TOOL_BACKEND`                                               | `internal`/`mcp`                   | `internal`                       |
-| 工具  | `ALERT_EMAIL_DELIVERY_MODE`                                  | `log`/`smtp`                       | `log`                            |
-| 工具  | `TOOL_QUEUE_*`                                               | worker 轮询/批量/线程/重试                 | 2s/20/4/5s                       |
-| 存储  | `DATABASE_URL`                                               | SQLite / MySQL / PG                | `sqlite:///data/aegis.sqlite`    |
-| 认证  | `AUTH_DEFAULT_*` / `AUTH_TEACHER_INVITE_CODE`                | 默认账号 / 教师邀请码                       | 见上表                              |
-
-
+| 分组  | 变量                                                                         | 作用                                                                         | 默认                                                       |
+| --- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------- |
+| 模型  | `AI_PROVIDER`                                                              | `mock`/`openai`/`ollama`                                                   | `mock`                                                   |
+| 模型  | `OPENAI_API_KEY`/`OPENAI_BASE_URL`/`OPENAI_MODEL`                          | OpenAI 兼容端点                                                                | 空 / `https://api.openai.com/v1` / gpt-4o-mini            |
+| 模型  | `OLLAMA_BASE_URL`/`OLLAMA_MODEL`                                           | 本地 Ollama                                                                  | 127.0.0.1:11434 / qwen2.5:7b                             |
+| 模型  | `LLM_THINKING_ENABLED`                                                     | 深度思考（接 GLM 建议关）                                                            | `false`                                                  |
+| 模型  | `LLM_SUPPORT_TEMPERATURE`                                                  | 支持性回复采样温度（偏高更真人）                                                           | `0.6`                                                    |
+| 风险  | `RISK_LLM_CHANNEL_ENABLED`                                                 | 通用 LLM 风险通道；`RISK_QLORA_ENABLED=true` 时由 QLoRA 接管                          | `true`                                                   |
+| 风险  | `RISK_QLORA_ENABLED` / `RISK_QLORA_URL` / `RISK_QLORA_TIMEOUT_SECONDS`     | v9 QLoRA 隔离服务开关 / 地址 / 超时                                                  | `false` / `https://qlora-endpoint.example.invalid` / `8` |
+| 技能  | `FUNCTION_CALLING_ENABLED`                                                 | 模型在白名单内自主选技能                                                               | `true`                                                   |
+| 检索  | `EMBEDDING_PROVIDER`                                                       | `openai`（代码默认）/ `local`（离线英文 MiniLM）/ `local-zh`（离线中文 bge-small-zh，生产在用）   | `openai`（`.env.example` 推荐 `local`）                      |
+| 检索  | `VECTOR_ENABLED` / `VECTOR_BACKEND`                                        | 是否启用向量 / 后端                                                                | `false` / `chroma`                                       |
+| 检索  | `KNOWLEDGE_FUSION_MODE` / `KNOWLEDGE_CACHE_ENABLED`                        | 加权/RRF 融合 / 进程内缓存开关                                                        | `weighted` / `false`（生产用 `rrf`）                          |
+| 检索  | `KNOWLEDGE_CANDIDATE_K` / `VECTOR_TOP_K` / `KNOWLEDGE_RERANK_ENGINE`       | RRF 候选窗口 / 向量返回条数（两者取 min 生效）/ 重排引擎（`lexical`/`cross_encoder`/`ce_fusion`） | `16` / `16` / `lexical`（生产用 `128` / `128` / `ce_fusion`） |
+| 记忆  | `MEMORY_RECENT_MESSAGES` / `MEMORY_SUMMARY_MAX_CHARS`                      | L4 原话窗口 / L3 摘要上限                                                          | 15 / 3000                                                |
+| 技能  | `SKILL_DISTILL_ENABLED` / `SKILL_DISTILL_MIN_REPEAT` / `SKILL_DISTILL_DIR` | 是否蒸馏 / 重复阈值 / 输出目录                                                         | `true` / 3 / `skills/auto`                               |
+| 运行时 | `AGENT_RUNTIME`                                                            | `autonomous`/`ordered`/`langgraph`                                         | `autonomous`                                             |
+| 运行时 | `AGENT_MAX_ROUNDS` / `AGENT_FINAL_ACCEPTANCE_MIN_CONFIDENCE`               | 预算护栏                                                                       | 8 / 0.6                                                  |
+| 限流  | `CHAT_RATE_LIMIT_PER_MINUTE` / `REDIS_URL`                                 | 聊天限流 / 可选 Redis                                                            | 40 / 空                                                   |
+| 工具  | `TOOL_BACKEND`                                                             | `internal`/`mcp`                                                           | `internal`                                               |
+| 工具  | `ALERT_EMAIL_DELIVERY_MODE`                                                | `log`/`smtp`                                                               | `log`                                                    |
+| 工具  | `TOOL_QUEUE_*`                                                             | worker 轮询/批量/线程/重试                                                         | 2s/20/4/5s                                               |
+| 存储  | `DATABASE_URL`                                                             | SQLite / MySQL / PG                                                        | `sqlite:///data/aegis.sqlite`                            |
+| 认证  | `AUTH_DEFAULT_*` / `AUTH_TEACHER_INVITE_CODE`                              | 默认账号 / 教师邀请码                                                               | 见上表                                                      |
 
 **切到 MySQL 8.0（可选）**：在 `.env` 设
 
@@ -647,9 +644,9 @@ DATABASE_URL=mysql+pymysql://root:你的密码@localhost:3306/aegis?charset=utf8
 
 ## 4.5 验证：三步跑通闭环
 
-1.   普通对话  ：学生端登录 `student/student123!`，发「我最近考试压力很大，晚上睡不着」。管理端 `/admin` 应能搜到对应知识、看到会话 trace。
-2.   风险闭环  ：发「我不想活了」。观察：学生端得到本地安全模板回复（mock 下也是）→ 管理端出现「待审报告」→ 审批 → 「工具任务」全部 `success`（可在死信/审计页核对）。
-3.   代码护栏  ：往 `app/assessment.py` 的 `HIGH_TERMS` 加一个词，跑 `python -m pytest tests -q` 与 `python -m app.evaluation.harness.runner --suite risk`——体会「单一来源 + 评测护栏」让修改变安全。
+1. 普通对话  ：学生端登录 `student/student123!`，发「我最近考试压力很大，晚上睡不着」。管理端 `/admin` 应能搜到对应知识、看到会话 trace。
+2. 风险闭环  ：发「我不想活了」。观察：学生端得到本地安全模板回复（mock 下也是）→ 管理端出现「待审报告」→ 审批 → 「工具任务」全部 `success`（可在死信/审计页核对）。
+3. 代码护栏  ：往 `app/assessment.py` 的 `HIGH_TERMS` 加一个词，跑 `python -m pytest tests -q` 与 `python -m app.evaluation.harness.runner --suite risk`——体会「单一来源 + 评测护栏」让修改变安全。
 
 ## 4.6 方式二：Docker Compose
 
@@ -692,12 +689,12 @@ python -m app.mcp.server --list
 
 ## 4.8 常见问题与排错
 
--   `ModuleNotFoundError`  ：没激活 venv 或没装依赖——回到 4.2 第 2、3 步。
--   SQLite 多线程报错  ：确认用的是 `sqlite:///...` 且 `check_same_thread=False`（代码已处理；若自改 engine 注意这点）。
--   向量检索不工作  ：`VECTOR_ENABLED=false` 会关闭向量召回，但 BM25 + 条件精排仍可用；想要向量召回需设 `VECTOR_ENABLED=true`，再选后端：`chroma` + `EMBEDDING_PROVIDER=local-zh`（当前生产组合，本地中文嵌入）、`chroma` + `local`（chromadb 内置英文 MiniLM）或 `local`（crc32 伪向量降级）。`LocalVectorBackend` 是已开启向量但 Chroma 不可用时的降级，不是关闭向量后的替代品。
--   邮件/预警没发出  ：默认 `ALERT_EMAIL_DELIVERY_MODE=log`，只写日志；要真发需配 `SMTP_*`。
--   限流误伤  ：本地演示调小 `CHAT_RATE_LIMIT_PER_MINUTE` 或调大；Redis 为空时走进程内限流。
--   改代码后行为异常  ：优先跑 `python -m pytest tests -q` + harness，再用 4.5 的「风险闭环」手动验证，避免只信 demo。
+- `ModuleNotFoundError`  ：没激活 venv 或没装依赖——回到 4.2 第 2、3 步。
+- SQLite 多线程报错  ：确认用的是 `sqlite:///...` 且 `check_same_thread=False`（代码已处理；若自改 engine 注意这点）。
+- 向量检索不工作  ：`VECTOR_ENABLED=false` 会关闭向量召回，但 BM25 + 条件精排仍可用；想要向量召回需设 `VECTOR_ENABLED=true`，再选后端：`chroma` + `EMBEDDING_PROVIDER=local-zh`（当前生产组合，本地中文嵌入）、`chroma` + `local`（chromadb 内置英文 MiniLM）或 `local`（crc32 伪向量降级）。`LocalVectorBackend` 是已开启向量但 Chroma 不可用时的降级，不是关闭向量后的替代品。
+- 邮件/预警没发出  ：默认 `ALERT_EMAIL_DELIVERY_MODE=log`，只写日志；要真发需配 `SMTP_*`。
+- 限流误伤  ：本地演示调小 `CHAT_RATE_LIMIT_PER_MINUTE` 或调大；Redis 为空时走进程内限流。
+- 改代码后行为异常  ：优先跑 `python -m pytest tests -q` + harness，再用 4.5 的「风险闭环」手动验证，避免只信 demo。
 
 ## 4.9 建议的开发工作流
 
@@ -708,7 +705,7 @@ python -m app.mcp.server --list
 5. 需要可重复的 eval/Harness 时，显式关闭 `SKILL_DISTILL_ENABLED` 或把自动 Skill 输出目录隔离；否则重复调用可能写入 `data/skill-usage.json` 和 `skills/auto/`，污染后续基线。
 6. 提交前 `python -m app.evaluation.harness.runner --suite all`。
 
-***
+---
 
 <a id="part-5"></a>
 
@@ -739,19 +736,15 @@ Aegis 是一个「学生倾诉 + 风险识别 + 管理员处置」的完整闭�
 第 14 站  收尾          frontend/ + tests/                      — 前端界面与质量兜底
 ```
 
-
-
 **贯穿全程的四条设计哲学**（见第一部分 1.2）：安全前置规则优先 / 治理与业务正交 / 确定性可回放 / 默认可本地运行。
 
-***
+---
 
 <a id="station-1"></a>
 
 ## 第 1 站 地基：config / models / entities / database
 
 ### 1.1 app/config.py — 全局配置
-
-
 
 **为什么先写它**：后面每个模块都要读配置（模型提供方、知识库路径、限流阈值……），配置层必须最先就位。
 
@@ -784,8 +777,6 @@ def resolve_path(self, value: str) -> Path:
 ```
 
 - `@lru_cache` 的 `get_settings()` 保证全进程只有一份配置实例。
-
-
 
 **学习要点**：配置是「数据」不是「代码」；用带默认值的声明式字段替代散落各处的常量；`.env.example` 是给使用者的配置说明书。
 
@@ -836,8 +827,6 @@ def from_dict(cls, data: dict[str, Any]) -> "PendingReport":
 
 - `RuntimeEvent` + `sse_event` 属性 — 把内部事件类型映射为 SSE 前端事件名（13 → 8，见上），流式输出的协议适配就在这一个小字典里。
 
-
-
 **学习要点**：领域模型层要保持「零依赖」（只依赖标准库），它决定了整个系统的公共语言；`str+Enum` 是做配置类枚举的惯用法。
 
 ### 1.3 app/entities.py — ORM 实体（20 张表）
@@ -871,13 +860,11 @@ def build_session_factory(runtime_settings=None):
     return sessionmaker(bind=build_engine(runtime_settings), autoflush=False, autocommit=False)
 ```
 
--   工厂而非模块级单例  ：测试要用独立的 tmp 数据库，每个调用方自建 engine。
+- 工厂而非模块级单例  ：测试要用独立的 tmp 数据库，每个调用方自建 engine。
 - `resolve_database_url()`：把相对的 `sqlite:///...` 路径解析到**项目根**（并自动创建父目录）——这就是为什么无论从哪个目录启动，库总落在 `data/aegis.sqlite`。
 - `create_schema()` 里 `from app import entities` 是惰性导入——先注册全部 ORM 实体到 `Base.metadata`，再 `create_all`。
 - `migrate_legacy_schema()`：对旧库手写 `ALTER TABLE`/`CREATE TABLE` 补列补表，保证升级不丢数据。**仅 SQLite 生效**（函数开头 `if bind_engine.dialect.name != "sqlite": return`，MySQL 建库即新 schema 无需迁移）。清单：`chat_sessions` 补 `owner_user_public_id`、`knowledge_chunks` 补 `embedding_json`/`metadata_json`、`tool_jobs` 补 `run_after`，另新建 6 张表（agent_private_memories/agent_model_profiles/tool_audit_records/dead_letter_records/excel_records/alert_records）。它与 entities.py 是两份 schema 真相，是已知的遗留债（见 REFACTORING.md 第 10 节）。
 - `readiness_check()` 只做 `SELECT 1`，是 `/api/readiness` 的依据——和 `/api/health`（进程活着）区分。
-
-
 
 **学习要点**：SQLite 要跨线程必须 `check_same_thread=False`（本项目有后台工具 worker 线程）；「建表」与「迁移」是两件事，小项目手写迁移能用，正规项目上 Alembic。
 
@@ -921,7 +908,7 @@ True
 2. 打开 `data/aegis.sqlite`（任意 SQLite 工具），数一数有多少张表，与 `entities.py` 里 20 个 `Base` 子类一一对应（含 `user_preferences`）。
 3. 思考题：如果 `models.py` import 了 SQLAlchemy，「测试可以单独 import 它」会失去什么？（写下答案，与 1.2 的学习要点对照）
 
-***
+---
 
 <a id="station-2"></a>
 
@@ -959,8 +946,6 @@ INTERNAL_RESPONSE_TERMS = ("report_id", "risk-", "内部评分", "confidence")
 - `contains_internal_response_leak(text)`：安全复核的关键——任何要发给学生的回复，先过这个函数——只要包含 `report_id`/`risk-`/`confidence` 等内部词汇，就会被 RiskGuardian 打回重写。
 - `sanitize_user_input(text)`：进入模型前的预处理——压缩空白，并把「手机号/电话/身份证」替换成「联系方式/证件」，降低模型诱导输出个人敏感信息的概率。
 
-
-
 **学习要点**：心理场景的隐私是合规底线；脱敏要同时覆盖「存储侧」（payload 进审计表之前）和「输出侧」（回复发给用户之前）两个面。
 
 ### 2.3 core/runtime_services.py — RuntimeServices（限流与锁）
@@ -992,8 +977,6 @@ def loads_or(raw: str, default: Any) -> Any: ...    # 失败给默认值(仓储�
 def now_utc() -> datetime: ...                      # aware UTC(服务层新代码)
 def now_utc_naive() -> datetime: ...                # naive UTC(与库中历史数据一致)
 ```
-
-
 
 **学习要点**：去重前先确认「真的相同」。两份 `_now` 语义不同（naive/aware），强行统一会改变数据库写入行为——正确做法是命名出两种语义，让调用点各取所需。
 
@@ -1045,13 +1028,11 @@ print(verify_password("admin123!", salt, digest), verify_password("wrong!", salt
 2. 构造一句含「手机号 + 连续空格」的消息，对比 `sanitize_user_input` 前后差异，解释为什么要在进模型前做。
 3. 思考题：`AuthPrincipal` 为什么用 frozen dataclass？如果它是可变的，路由中途被改写角色会发生什么？（对照 1.2 的「不可变」思想）
 
-***
+---
 
 <a id="station-3"></a>
 
 ## 第 3 站 assessment.py — 确定性风险评估
-
-
 
 **为什么在 LLM 之前写它**：这是全系统最重要的安全组件，而且完全不依赖模型——mock 模式下它就是「大脑」的安全部分。
 
@@ -1075,18 +1056,16 @@ ANXIETY_TERMS = ["焦虑", "压力", "考试", "睡不着", "失眠", "panic", "
 
 `assess_message(text) -> AssessmentResult` 是纯函数：先匹配 HIGH（命中即高危分支），再 MEDIUM，再按抑郁/焦虑词给出 LOW，最后兜底「普通陪伴」。六个分支的判定常量如下（复现时照抄即可，全部是 `assessment.py` 的字面值）：
 
-| 分支 | 触发条件 | emotion | emotion_score | confidence | recommended_stance | escalation_policy | report_eligible |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| HIGH | 命中 HIGH_TERMS 且无第三人称标记 | `high_risk` | 4.0 | 0.95 | `immediate_safety` | `create_pending_report_and_require_admin_review` | True |
-| HIGH→降级 | 命中 HIGH_TERMS 但命中任一 THIRD_PERSON_MARKERS | `normal` | 0.0 | 0.7 | `companion_support` | `no_report` | False（rationale 只取首个高危词、截 1 条） |
-| MEDIUM | 命中 MEDIUM_TERMS（emotion 按是否命中 DEPRESSED_TERMS 取 `depressed`/`anxiety`） | 二选一 | 3.1 | 0.78 | `stabilize_and_refer` | `offer_grounding_and_referral_guidance` | False |
-| LOW·抑郁 | 只命中 DEPRESSED_TERMS | `depressed` | 2.4 | 0.72 | `supportive_exploration` | `monitor_for_escalation` | False |
-| LOW·焦虑 | 只命中 ANXIETY_TERMS | `anxiety` | 2.0 | 0.72 | `supportive_planning` | `no_report` | False |
-| 兜底 | 什么都没命中 | `normal` | 0.0 | 0.66 | `companion_support` | `no_report` | False |
+| 分支      | 触发条件                                                                   | emotion     | emotion_score | confidence | recommended_stance       | escalation_policy                                | report_eligible                |
+| ------- | ---------------------------------------------------------------------- | ----------- | ------------- | ---------- | ------------------------ | ------------------------------------------------ | ------------------------------ |
+| HIGH    | 命中 HIGH_TERMS 且无第三人称标记                                                 | `high_risk` | 4.0           | 0.95       | `immediate_safety`       | `create_pending_report_and_require_admin_review` | True                           |
+| HIGH→降级 | 命中 HIGH_TERMS 但命中任一 THIRD_PERSON_MARKERS                               | `normal`    | 0.0           | 0.7        | `companion_support`      | `no_report`                                      | False（rationale 只取首个高危词、截 1 条） |
+| MEDIUM  | 命中 MEDIUM_TERMS（emotion 按是否命中 DEPRESSED_TERMS 取 `depressed`/`anxiety`） | 二选一         | 3.1           | 0.78       | `stabilize_and_refer`    | `offer_grounding_and_referral_guidance`          | False                          |
+| LOW·抑郁  | 只命中 DEPRESSED_TERMS                                                    | `depressed` | 2.4           | 0.72       | `supportive_exploration` | `monitor_for_escalation`                         | False                          |
+| LOW·焦虑  | 只命中 ANXIETY_TERMS                                                      | `anxiety`   | 2.0           | 0.72       | `supportive_planning`    | `no_report`                                      | False                          |
+| 兜底      | 什么都没命中                                                                 | `normal`    | 0.0           | 0.66       | `companion_support`      | `no_report`                                      | False                          |
 
 `summary` 是计算属性：`"；".join(rationale)`。`as_skill_output()` 把结果转成扁平 dict（含 `emotion`/`emotion_score`），供技能层透传。
-
-
 
 **学习要点（风险双通道）**：`assess_message` 是规则通道；`RiskGuardianAgent` 会再用可选模型通道复核——通用 LLM 或开启 `RISK_QLORA_ENABLED` 后的 v9 QLoRA 隔离服务，严格 JSON、8s 短超时；两通道取并集，任一判 high 即 high；模型失败/超时/mock 一律回退纯规则，输出 `risk_channels` 溯源。
 
@@ -1131,13 +1110,11 @@ low | companion_support | ['轻生']
 2. 找一句会被 MEDIUM 命中的话，打印完整 `AssessmentResult`，解释 `rationale`、`summary` 与 `matched_indicators` 的关系。
 3. 思考题：HIGH 的 `escalation_policy` 为什么叫 `create_pending_report_and_require_admin_review`？它对应第 11 站闭环里的哪条链路？
 
-***
+---
 
 <a id="station-4"></a>
 
 ## 第 4 站 skills.py — 技能注册表
-
-
 
 **设计思路**：Agent 需要的能力（评估风险/检索知识/稳定练习/建报告）统一注册成 `SkillSpec`，而不是散落在各 Agent 里：
 
@@ -1154,12 +1131,12 @@ class SkillSpec:
 
 `SkillRegistry.__init__` 注册 4 个内置技能：
 
-| 技能                      | 副作用   | 实现                                                 |
-| ----------------------- | ----- | -------------------------------------------------- |
-| `assess_risk`           | 否     | 调 `assess_message`（第 3 站）                          |
-| `search_knowledge`      | 否     | 优先用注入的 `knowledge_search`（真 RAG）；无注入时退化为关键词计分的本地检索 |
-| `grounding_exercise`    | 否     | 返回固定三步「60 秒稳定练习」                                   |
-| `create_pending_report` |   是   | 构造 `PendingReport` 并通过 `report_sink` 落库            |
+| 技能                      | 副作用 | 实现                                                 |
+| ----------------------- | --- | -------------------------------------------------- |
+| `assess_risk`           | 否   | 调 `assess_message`（第 3 站）                          |
+| `search_knowledge`      | 否   | 优先用注入的 `knowledge_search`（真 RAG）；无注入时退化为关键词计分的本地检索 |
+| `grounding_exercise`    | 否   | 返回固定三步「60 秒稳定练习」                                   |
+| `create_pending_report` | 是   | 构造 `PendingReport` 并通过 `report_sink` 落库            |
 
 注意构造参数的依赖注入：
 
@@ -1176,16 +1153,16 @@ SkillRegistry(knowledge_dir, store.add_report, store.search_knowledge, settings=
 
 `response_skill_names(intent, risk, text)` 的规则白名单完整逻辑（`skills.py`，顺序执行后去重）：
 
-| 条件 | 注入技能 |
-| --- | --- |
-| `COMPANION + LOW` | 直接返回 `[]`（陪聊不注入任何策展技能） |
-| 所有其余组合（恒有） | `supportive_response_baseline` |
-| `risk == HIGH` | 追加 `high_risk_safety_plan`、`counselor_handoff_summary` |
-| `risk == MEDIUM` | 追加 `referral_resource_guidance` |
-| 文本含「焦虑/panic/惊恐/紧张/心慌」 | 追加 `anxiety_grounding_support` |
-| 文本含「睡不着/失眠/睡眠/熬夜」 | 追加 `sleep_routine_support` |
-| 文本含「考试/绩点/论文/作业/学习」 | 追加 `academic_stress_planning` |
-| 末尾 | 追加命中的 auto 技能并去重（不参与二次蒸馏观察） |
+| 条件                     | 注入技能                                                   |
+| ---------------------- | ------------------------------------------------------ |
+| `COMPANION + LOW`      | 直接返回 `[]`（陪聊不注入任何策展技能）                                 |
+| 所有其余组合（恒有）             | `supportive_response_baseline`                         |
+| `risk == HIGH`         | 追加 `high_risk_safety_plan`、`counselor_handoff_summary` |
+| `risk == MEDIUM`       | 追加 `referral_resource_guidance`                        |
+| 文本含「焦虑/panic/惊恐/紧张/心慌」 | 追加 `anxiety_grounding_support`                         |
+| 文本含「睡不着/失眠/睡眠/熬夜」      | 追加 `sleep_routine_support`                             |
+| 文本含「考试/绩点/论文/作业/学习」    | 追加 `academic_stress_planning`                          |
+| 末尾                     | 追加命中的 auto 技能并去重（不参与二次蒸馏观察）                            |
 
 `standard_context(names)` 再把选中技能的 SKILL.md 正文拼成提示词注入。这是「用文档约束模型输出结构」的轻量做法。
 
@@ -1212,8 +1189,6 @@ _distill_skill() 写入 skills/auto/<slug>/SKILL.md
 - 当前实现达到阈值后会直接写文件、重载并参与后续注入；**尚未实现**人工审核状态、管理员启停、版本回滚或审计工作台。正式部署应限制 `skills/auto/` 写权限、纳入版本控制，并在启用前增加审核门禁。
 
 `_split_frontmatter` 手写解析 YAML 头——不引入 yaml 依赖的取舍（知识文档的 frontmatter 解析在 `rag/chunking.py`，两者格式相似但容错策略不同：技能解析遇到坏文档直接跳过，知识解析静默忽略坏行）。
-
-
 
 ### 4.2 select_response_skills — 模型自选技能（Function Calling）
 
@@ -1329,7 +1304,7 @@ print(select_response_skills(MockLLMClient(), reg, Intent.COUNSELING, RiskLevel.
 3. 对比 `skills/` 下人工策展 SKILL.md 与 `skills/auto/` 的 frontmatter 差异（`origin` 字段），解释为什么要防止 auto Skill 触发下一层蒸馏。
 4. 用 FakeFCClient 分别返回「一个白名单内技能」和「一个白名单外技能」，验证 `('...', 'fc')` 与 `rules` 回退两路输出，并解释 `[]` 与 `None` 两种返回值为什么是不同的语义（对照 4.2 第 3 点）。
 
-***
+---
 
 <a id="station-5"></a>
 
@@ -1390,8 +1365,6 @@ system = (
 
 提示词从「机器人模板」改成「真人陪伴风格」：不再自称「咨询回复生成器」，改为「你是 Aegis，校园心理支持助手」；指令从「先共情→1-3步骤→开放问题」改成灵活对话指导（短句口语、长度匹配用户消息、一次最多一个问题、建议最多两条且只在合适时给）。历史摘要/知识/练习字段仍动态注入。`prompts.py` 还有一个独立模板 `build_rewrite_messages`：把「消息 + 记忆摘要」改写成更适合检索的查询（RAG 检索词的 LLM 改写走它，与规则版 `chunking.rewrite_query` 是两条路径）。
 
-
-
 **学习要点**：提示词放独立文件便于审计；`prompts.py` 与 `client.py` 互相只用类型注解引用（`TYPE_CHECKING`），不产生运行时循环依赖。
 
 #### 动手试一试：mock 客户端与「None 即兜底」
@@ -1426,7 +1399,7 @@ print(client.generate_support_reply(ctx))   # None ← None 就是「请走本�
 2. 对比 `MockLLMClient().status()` 与 `OpenAICompatibleClient` 的 status 字段差异，想清楚「status 为什么也是协议的一部分」（管理端 agent-status 页要用它）。
 3. 阅读 `RISK_ASSESS_SYSTEM_PROMPT`，找出「第三人称 / 虚构语境不视为自身 high」的提示词依据——它与第 3 站的规则启发式如何互补？
 
-***
+---
 
 <a id="station-6"></a>
 
@@ -1434,14 +1407,14 @@ print(client.generate_support_reply(ctx))   # None ← None 就是「请走本�
 
 这一层是「每个角色做一件小事」，基本是无状态类——持有依赖的有三个：`RiskGuardianAgent(registry, llm_client, llm_channel_enabled)`、`KnowledgeAgent(registry, llm_client)`、`CounselorAgent(registry, llm_client)`，其余（Memory/Lead/Companion）零依赖：
 
-| Agent               | 方法                                         | 职责                                                             |
-| ------------------- | ------------------------------------------ | -------------------------------------------------------------- |
-| `MemoryAgent`       | `load / update`                            | 加载 L2 当前事实、L3 摘要和 L4 原话窗口；回复后更新 L3 并抽取 L2 事实 |
-| `RiskGuardianAgent` | `assess / create_report`                   | 调 assess\_risk 技能（规则∪LLM 双通道取并集，详见第 3 站）；HIGH 时建待审报告       |
-| `LeadAgent`         | `route`                                    | 关键词路由（见下方完整词表与自伤覆写分支） |
-| `KnowledgeAgent`    | `search / rewrite_query`                   | LLM 改写检索词（失败退化原文前 60 字）+ 检索                                    |
-| `CounselorAgent`    | `grounding / compose_plan / finalize_plan` | 组装 ResponsePlan 并生成最终回复                                        |
-| `CompanionAgent`    | —                                          | 空类，低风险陪伴的「占位角色」（回复实际复用 Counselor 的模板路径）                        |
+| Agent               | 方法                                         | 职责                                                  |
+| ------------------- | ------------------------------------------ | --------------------------------------------------- |
+| `MemoryAgent`       | `load / update`                            | 加载 L2 当前事实、L3 摘要和 L4 原话窗口；回复后更新 L3 并抽取 L2 事实        |
+| `RiskGuardianAgent` | `assess / create_report`                   | 调 assess_risk 技能（规则∪LLM 双通道取并集，详见第 3 站）；HIGH 时建待审报告 |
+| `LeadAgent`         | `route`                                    | 关键词路由（见下方完整词表与自伤覆写分支）                               |
+| `KnowledgeAgent`    | `search / rewrite_query`                   | LLM 改写检索词（失败退化原文前 60 字）+ 检索                         |
+| `CounselorAgent`    | `grounding / compose_plan / finalize_plan` | 组装 ResponsePlan 并生成最终回复                             |
+| `CompanionAgent`    | —                                          | 空类，低风险陪伴的「占位角色」（回复实际复用 Counselor 的模板路径）             |
 
 `LeadAgent.route` 的完整判定顺序（`classic.py`）：
 
@@ -1471,8 +1444,6 @@ def finalize_plan(self, plan: ResponsePlan, on_token=None) -> tuple[str, AgentTr
 ```
 
 `_fallback_answer` 的模板按风险分**四档**开头（HIGH 高危安全段 / MEDIUM 稳定转介段 / COMPANION 轻松段 / 其余通用段），再拼 L3 摘要回显、稳定练习、知识首条（只取第一条 `content[:240]`）、意图化收尾——这就是 mock 模式下学生看到的回复来源。知识段的来源标注由 `format_source_label()` 映射（如 `response_plan→内部建议`）；HIGH 时跳过摘要回显与知识段。注意边界：L2/L4 已传入真实 LLM Prompt，但当前模板兜底主要读取 L3 摘要；因此 L2/L4 对“贴着原话、避免引用过期状态”的改善主要体现于真实 LLM 可用的路径。
-
-
 
 **学习要点**：每个方法都返回 `AgentTrace`——「做事」与「留痕」是绑定的；安全关键路径（HIGH）与模型路径在 ② 处显式分流，这是「规则优先」哲学的落点。
 
@@ -1514,7 +1485,7 @@ companion | LeadAgent route | intent=companion, risk=low
 2. 在第 8 站的最小全链路里分别用 HIGH 与 LOW 消息触发 `_fallback_answer`，逐段对照其拼装顺序（高危开头 / 摘要回显 / 练习 / 知识 / 收尾）。
 3. 思考题：为什么每个方法都返回 `AgentTrace`，而不是在方法内部自己写日志？（提示：trace 的归属、排序与落库时机由谁决定？）
 
-***
+---
 
 <a id="station-7"></a>
 
@@ -1526,7 +1497,7 @@ companion | LeadAgent route | intent=companion, risk=low
 
 先定义「协作的语言」：
 
-- `AgentEventType`：TURN\_STARTED / ROUND\_STARTED / TASK\_CREATED / TASK\_CLAIMED / TASK\_CLOSED / TASK\_REOPENED / MESSAGE\_SENT / ARTIFACT\_PUBLISHED / CRITIQUE\_PUBLISHED / SAFETY\_OVERRIDE / REVISION\_REQUESTED / FINAL\_ACCEPTED / BUDGET\_EXHAUSTED（events.py 的真实枚举全集，共 13 个；MESSAGE\_SENT 由 `send_message()` 在 Agent 间互发消息时发出）
+- `AgentEventType`：TURN_STARTED / ROUND_STARTED / TASK_CREATED / TASK_CLAIMED / TASK_CLOSED / TASK_REOPENED / MESSAGE_SENT / ARTIFACT_PUBLISHED / CRITIQUE_PUBLISHED / SAFETY_OVERRIDE / REVISION_REQUESTED / FINAL_ACCEPTED / BUDGET_EXHAUSTED（events.py 的真实枚举全集，共 13 个；MESSAGE_SENT 由 `send_message()` 在 Agent 间互发消息时发出）
 - `AgentTask`：带 `required_capabilities`（能力要求）、`priority`、`status`、`metadata`。
 - `AgentArtifact`：`(id, owner, kind, payload, confidence, task_id, metadata)`——一切中间产物，第一个字段就是 `id`（事件里的 `artifact_id` 指向它）；kind 取值：`memory`/`intent`/`risk`/`context`/`response_proposal`/`safety_review`/`critique`/`pending_report`。
 - `CollaborationBlackboard`：核心结构，`turn_id/session_id/user_input` + `tasks`（**dict**，按任务 id 索引，`add_task` 即 upsert）+ `artifacts/messages/events` 三个 tuple + `final_artifact_id`（验收通过后落下总工件 id）。
@@ -1600,8 +1571,8 @@ def intent_from_board(board, *, use_board_risk=True, use_hard_terms=True) -> Int
 
 每个子类实现 `decide()`（要不要认领）+ `act()`（做事发产物）。最值得读的是 `RiskGuardianAutonomousAgent`——它身兼两职：
 
-1.   独立评估  （`_assess`）：调单轮 RiskGuardian，产出 `risk` 工件；HIGH 时追加 `pending_report` 工件 + 发 `SAFETY_OVERRIDE` 事件（这个事件会让 `risk_from_board` 永远返回 HIGH，即使后续有人评估成 LOW——安全一票否决——）。
-2.   复核回复  （`_review_response`）：对每个新提案做安全审查——
+1. 独立评估  （`_assess`）：调单轮 RiskGuardian，产出 `risk` 工件；HIGH 时追加 `pending_report` 工件 + 发 `SAFETY_OVERRIDE` 事件（这个事件会让 `risk_from_board` 永远返回 HIGH，即使后续有人评估成 LOW——安全一票否决——）。
+2. 复核回复  （`_review_response`）：对每个新提案做安全审查——
 
 ```python
 if contains_internal_response_leak(answer):        # 泄漏内部字段?
@@ -1620,11 +1591,9 @@ if risk is RiskLevel.HIGH and not any(term in answer for term in ["安全", "可
 2. 建黑板、发 `TURN_STARTED`，交给协调器跑到收敛；
 3. 取 `accepted_artifact() or latest_artifact("response_proposal")` 的 answer（空则兜底一句话）；
 4. 落 assistant 消息、更新记忆、发 `ARTIFACT_PUBLISHED`；
-5. 从黑板抽取结果组装 `AutonomousRunOutcome`（intent/risk/skills/trace/pending\_report/response\_plan）——各种 `_xxx_from_board` 把四散的工件收敛成 API 需要的形状。
+5. 从黑板抽取结果组装 `AutonomousRunOutcome`（intent/risk/skills/trace/pending_report/response_plan）——各种 `_xxx_from_board` 把四散的工件收敛成 API 需要的形状。
 
-
-
-**学习要点**：黑板模式 + 认领制让「协作」有真实语义（谁认领、凭什么、产出什么），而不是假装的顺序调用；SAFETY\_OVERRIDE 的一票否决和 revise 循环是多 Agent 安全治理的样板。
+**学习要点**：黑板模式 + 认领制让「协作」有真实语义（谁认领、凭什么、产出什么），而不是假装的顺序调用；SAFETY_OVERRIDE 的一票否决和 revise 循环是多 Agent 安全治理的样板。
 
 #### 动手试一试：亲眼看黑板「不可变」
 
@@ -1658,7 +1627,7 @@ print(board is new_board, len(board.artifacts), len(new_board.artifacts))
 2. 写一个小函数 `timeline(board)`：把 `board.events` 打印成「时间戳 · 类型 · 谁」的时间线，体会管理端 trace 的数据来源。
 3. 思考题：克隆式不可变会不会内存爆炸？（提示：黑板的生命周期 = 一轮对话一次 `run`，run 结束即可整体回收；对照 7.6。）
 
-***
+---
 
 <a id="station-8"></a>
 
@@ -1679,9 +1648,9 @@ if runtime_mode == "autonomous":
 # 否则:有序流水线(第 6 站的 Agent 按固定顺序跑)
 ```
 
-有序路径（`agent_runtime="ordered"`）同样值得读一遍：load memory → assess risk → route →（companion 跳过检索！）→ search\_knowledge → grounding → HIGH 则 create\_report → 选标准 Skill → compose\_plan → finalize\_plan → 存消息/更新记忆/落 trace。每步都经 `runtime_runner.run_step()` 包裹（记录 AGENT\_STARTED/RUN\_FAILED 事件）。
+有序路径（`agent_runtime="ordered"`）同样值得读一遍：load memory → assess risk → route →（companion 跳过检索！）→ search_knowledge → grounding → HIGH 则 create_report → 选标准 Skill → compose_plan → finalize_plan → 存消息/更新记忆/落 trace。每步都经 `runtime_runner.run_step()` 包裹（记录 AGENT_STARTED/RUN_FAILED 事件）。
 
-两条路径最终都汇成 `ChatResponse`。`_run_autonomous` 额外把黑板事件流翻译成 RuntimeEvent 发给 `emit`——这就是 SSE 流式输出的来源（HTTP 层怎么把 StreamEvent 编码成 SSE 帧、线程如何推进、异常怎么兜底，见 12.4）。低风险对话支持真流式：回复生成的 token 经回调链（services.on\_reply\_token → finalize\_plan → stream\_support\_reply）实时推给 SSE，首字延迟≈模型首 token 延迟；中/高风险不直播，必须等 RiskGuardian 安全复核通过后输出。直播过真实 token 后，结尾的模拟切块 `_token_chunks()` 会自动跳过，避免重复。
+两条路径最终都汇成 `ChatResponse`。`_run_autonomous` 额外把黑板事件流翻译成 RuntimeEvent 发给 `emit`——这就是 SSE 流式输出的来源（HTTP 层怎么把 StreamEvent 编码成 SSE 帧、线程如何推进、异常怎么兜底，见 12.4）。低风险对话支持真流式：回复生成的 token 经回调链（services.on_reply_token → finalize_plan → stream_support_reply）实时推给 SSE，首字延迟≈模型首 token 延迟；中/高风险不直播，必须等 RiskGuardian 安全复核通过后输出。直播过真实 token 后，结尾的模拟切块 `_token_chunks()` 会自动跳过，避免重复。
 
 ### 8.2 harness.py — AegisAgentHarness
 
@@ -1697,15 +1666,15 @@ def _prepare(self, message, session_id, owner_user_public_id):
 
 `stream()` 把 `handle_stream` 的事件转发给 emit 回调。路由层因此可以保持「参数校验 + 鉴权 + 限流」的纯净，不碰任何 Agent 细节。
 
-### 8.3 model\_profiles.py — 每 Agent 模型档案
+### 8.3 model_profiles.py — 每 Agent 模型档案
 
 `DEFAULT_AGENT_MODEL_PROFILES` 为六个 Agent 声明默认温度（记忆/路由/安全 0.0、知识 0.1、咨询 0.2、陪伴 0.3）与系统提示词，启动时写入 `agent_model_profiles` 表。`client_for(agent_name)`：档案是 `inherit` 就返回全局客户端，否则按档案的 provider/model 现造一个——让「安全评估用小模型、回复生成用大模型」成为一行配置——。
 
-### 8.4 langgraph\_runtime.py — LangGraph StateGraph（三档运行时之一）
+### 8.4 langgraph_runtime.py — LangGraph StateGraph（三档运行时之一）
 
-`LangGraphRuntime` 用 LangGraph 的声明式状态图编排同一批单轮 Agent：`START → load_memory → assess_risk → route_intent →（条件边：companion+low 直接跳 compose，否则）→ context → report（仅 HIGH）→ compose → finalize → END`。状态 `GraphState` 是 TypedDict，`trace/skills` 字段用 `Annotated[list, operator.add]` 让节点返回增量自动合并；图只编译一次，每次对话 invoke 新状态，天然线程安全；finalize 仅低风险传 `on_token` 直播回调，安全门控与另两个运行时一致。`AGENT_RUNTIME=langgraph|autonomous|ordered` 三档切换（默认 **autonomous**），是「同一业务、三种编排」的活教材。图还挂了 SqliteSaver 检查点（thread\_id=会话 ID，`LANGGRAPH_CHECKPOINT_ENABLED`），`get_state(session_id)` 可读取最近终态——长对话跨进程断点可恢复。
+`LangGraphRuntime` 用 LangGraph 的声明式状态图编排同一批单轮 Agent：`START → load_memory → assess_risk → route_intent →（条件边：companion+low 直接跳 compose，否则）→ context → report（仅 HIGH）→ compose → finalize → END`。状态 `GraphState` 是 TypedDict，`trace/skills` 字段用 `Annotated[list, operator.add]` 让节点返回增量自动合并；图只编译一次，每次对话 invoke 新状态，天然线程安全；finalize 仅低风险传 `on_token` 直播回调，安全门控与另两个运行时一致。`AGENT_RUNTIME=langgraph|autonomous|ordered` 三档切换（默认 **autonomous**），是「同一业务、三种编排」的活教材。图还挂了 SqliteSaver 检查点（thread_id=会话 ID，`LANGGRAPH_CHECKPOINT_ENABLED`），`get_state(session_id)` 可读取最近终态——长对话跨进程断点可恢复。
 
-这段话落到源码上是三块，值得对照 langgraph\_runtime.py 逐行读：
+这段话落到源码上是三块，值得对照 langgraph_runtime.py 逐行读：
 
 ```python
 class GraphState(TypedDict, total=False):        # ① 状态形状:total=False 允许节点只返回"增量字段"
@@ -1751,7 +1720,7 @@ def _build_graph(self):                          # ③ 声明式装配:节点=�
 
 ### 8.5 runtime.py — AgentRegistry / AgentRuntimeRunner
 
-有序路径的执行骨架：`run_step(agent_id, action, call)` 统一包裹「取 Agent → 执行 → 记事件 → 异常记 RUN\_FAILED 再抛」。仅 60 行，却让有序路径的每一步都可观测。
+有序路径的执行骨架：`run_step(agent_id, action, call)` 统一包裹「取 Agent → 执行 → 记事件 → 异常记 RUN_FAILED 再抛」。仅 60 行，却让有序路径的每一步都可观测。
 
 #### 动手试一试：20 行跑通「最小全链路」
 
@@ -1810,7 +1779,7 @@ high True 我很在意你刚才提到的危险信号。此刻请
 2. 第二次 `handle` 之后，检查 `resp2.pending_report` 的 `risk_level` 与 `status` 字段——它此刻在等谁做什么？（答案在第 11 站）
 3. 用 `store.list_traces()` 取回 trace，与管理端 `/admin` 的 trace 页面对照，找出同一次对话在两边的对应关系。
 
-***
+---
 
 <a id="station-9"></a>
 
@@ -1825,8 +1794,6 @@ def tokenize(text: str) -> list[str]:
     grams.extend(compact[i:i + 2] for i in range(...))                   # 中文再补二元组
 ```
 
-
-
 **为什么中文要 bigram**：单字粒度太碎（「考试」和「考/试」混在一起），BM25 的词频统计会失真；补上二元组让常用双字词成为可统计单元——不引 jieba 的轻量取舍。
 
 ### 9.2 scoring.py — 打分
@@ -1838,7 +1805,7 @@ def tokenize(text: str) -> list[str]:
 
 ### 9.3 chunking.py — 知识文档处理
 
-`parse_knowledge_document` 解析 frontmatter（topic/audience/risk\_level/source\_type/last\_reviewed）；`metadata_matches` 做元数据过滤；`chunk_text` 是滑窗切块（size-overlap 步进）。这里还有一个容易与 Agent 层混淆的函数——`rewrite_query`（chunking.py:74，**规则归一化**：压缩空白 + 超长截断为前 60 字，无任何模型调用）。它与第 6 站 `KnowledgeAgent.rewrite_query`（**LLM 语义改写**，失败回退原文前 60 字）名字相同、职责不同：9.8 检索流水线入口用的是前者，Agent 检索前的查询改写用的是后者。
+`parse_knowledge_document` 解析 frontmatter（topic/audience/risk_level/source_type/last_reviewed）；`metadata_matches` 做元数据过滤；`chunk_text` 是滑窗切块（size-overlap 步进）。这里还有一个容易与 Agent 层混淆的函数——`rewrite_query`（chunking.py:74，**规则归一化**：压缩空白 + 超长截断为前 60 字，无任何模型调用）。它与第 6 站 `KnowledgeAgent.rewrite_query`（**LLM 语义改写**，失败回退原文前 60 字）名字相同、职责不同：9.8 检索流水线入口用的是前者，Agent 检索前的查询改写用的是后者。
 
 ### 9.4 memory.py — 会话记忆摘要
 
@@ -1853,12 +1820,12 @@ new_line = f"用户提到：{compact_sentence(user_message, 120)}；系统回应
 
 长对话不能只靠“把全部历史塞进 Prompt”，也不能只靠“滚动摘要”。Aegis 将记忆拆成四层：每层回答不同问题，并在注入模型时明确优先级。
 
-| 层级 | 存储与作用域 | 存什么 | 读写时机 | 是否进入回复 Prompt |
-| --- | --- | --- | --- | --- |
-| **L1 Agent 私有记忆** | `agent_private_memories`；`agent_name + session_public_id` 隔离 | Agent 的协作策略、已完成任务等内部记录 | 各自治 Agent 按需读写 | 不作为统一用户画像直接注入 |
-| **L2 用户事实** | `user_memory_facts`；登录用户按 `user_public_id` 跨会话聚合，匿名会话以 `session_public_id` 隔离 | 睡眠、情绪、学业/人际压力、求助进展，以及有限的年级/专业背景 | 每轮回复后确定性抽取并写入；下一轮加载 | **是，且优先级最高** |
-| **L3 会话摘要** | `session_memories`；会话级 | 历史对话压缩要点 | 每轮追加并按字符预算裁剪 | 是，但可能含过期状态 |
-| **L4 原话窗口** | `chat_messages`；会话级精确读取 | 最近 `MEMORY_RECENT_MESSAGES` 条角色/内容原文 | 每轮加载，默认 15 条 | 是，用于贴近近期措辞 |
+| 层级                | 存储与作用域                                                                        | 存什么                                  | 读写时机                | 是否进入回复 Prompt |
+| ----------------- | ----------------------------------------------------------------------------- | ------------------------------------ | ------------------- | ------------- |
+| **L1 Agent 私有记忆** | `agent_private_memories`；`agent_name + session_public_id` 隔离                  | Agent 的协作策略、已完成任务等内部记录               | 各自治 Agent 按需读写      | 不作为统一用户画像直接注入 |
+| **L2 用户事实**       | `user_memory_facts`；登录用户按 `user_public_id` 跨会话聚合，匿名会话以 `session_public_id` 隔离 | 睡眠、情绪、学业/人际压力、求助进展，以及有限的年级/专业背景      | 每轮回复后确定性抽取并写入；下一轮加载 | **是，且优先级最高**  |
+| **L3 会话摘要**       | `session_memories`；会话级                                                        | 历史对话压缩要点                             | 每轮追加并按字符预算裁剪        | 是，但可能含过期状态    |
+| **L4 原话窗口**       | `chat_messages`；会话级精确读取                                                       | 最近 `MEMORY_RECENT_MESSAGES` 条角色/内容原文 | 每轮加载，默认 15 条        | 是，用于贴近近期措辞    |
 
 #### L2：为什么要采用 SCD-2（有效期版本）
 
@@ -1893,7 +1860,7 @@ superseded_by  替代它的新事实 public_id
 
 这一细节避免同一句话既出现在“当前用户消息”又出现在“近期对话原文”中，降低模型重复回应的概率。
 
-### 9.6 vector\_store.py — 向量后端
+### 9.6 vector_store.py — 向量后端
 
 `build_vector_backend(settings)` 按配置返回：
 
@@ -1904,11 +1871,253 @@ superseded_by  替代它的新事实 public_id
   - `openai`（`Settings` 代码默认）：OpenAI 兼容 `/embeddings` API（需向量模型额度）。
 - `LocalVectorBackend`：哈希 bigram 伪向量 + 本地余弦；当向量已启用但 Chroma 不可用、或显式选择 local 回退时使用，不是 `VECTOR_ENABLED=false` 时的默认替代。
 
-`store.search_knowledge` 把 9.1–9.6 串成完整流水线（逐段源码走读见 9.8）：规则归一化查询 → 向量候选（可选，异常时降级；候选数 = min(`KNOWLEDGE_CANDIDATE_K`, `VECTOR_TOP_K`)）→ 元数据过滤 → BM25 → 双路融合（weighted / RRF）→ **重排槽位**（weighted 模式按引擎配置执行三引擎；RRF 模式下仅 `ce_fusion` 引擎可执行）→ 邻块扩展 → 截 top\_k。再次提醒：流水线第一步的「改写查询」是 chunking.py 的规则版 `rewrite_query`（见 9.3），不是 LLM 改写。
+`store.search_knowledge` 把 9.1–9.6 串成完整流水线（逐段源码走读见 9.8）：规则归一化查询 → 向量候选（可选，异常时降级；候选数 = min(`KNOWLEDGE_CANDIDATE_K`, `VECTOR_TOP_K`)）→ 元数据过滤 → BM25 → 双路融合（weighted / RRF）→ **重排槽位**（weighted 模式按引擎配置执行三引擎；RRF 模式下仅 `ce_fusion` 引擎可执行）→ 邻块扩展 → 截 top_k。再次提醒：流水线第一步的「改写查询」是 chunking.py 的规则版 `rewrite_query`（见 9.3），不是 LLM 改写。
 
+### 9.6.1 reranker.py — Cross-Encoder 精排引擎（ONNX）
 
+> 本节与 9.6.2 补齐 `rag/` 的两个模型侧模块。它们合计 219 行、占 `app/rag/` 的 **21%**，且都在当前生产链路上跑着（生产 `KNOWLEDGE_RERANK_ENGINE=ce_fusion` 会调用 `cross_encoder_rerank`），但 9.6 之前只用一句话带过。
+
+**它解决什么问题**：BM25 与向量召回是「双塔」（query 与 doc 各自编码，再比向量）；Cross-Encoder 是「单塔」——把 query 和 doc **拼成一对**同时送进模型，直接输出相关性分数。代价是没法预先把 doc 编码好缓存起来（编码依赖 query），所以只能对少量头部候选跑。**这正是 9.7.0 Q3「两段式精排」的物理原因**：词法公式几微秒可以全库跑，模型几十毫秒只能精排 head。
+
+**四个设计约定**（读代码时对照文件头注释）：
+
+```python
+# reranker.py:1-9（文件头docstring，即四条约定）
+1. 词法 rerank 保持「全库重打分」现状不变；本引擎只在 KNOWLEDGE_RERANK_ENGINE=cross_encoder 时被调用
+2. 模型文件按目录组织：model.onnx 或 model_quantized.onnx + tokenizer.json
+3. tokenizer.json 必须与 onnx 同源（含 pair 模板，用于 (query, doc) 成对编码）
+4. 任何加载/推理失败都向上抛异常，由调用方回退词法公式——检索永不因此中断
+```
+
+第4 条是理解整个 RAG 错误处理哲学的钥匙。注意它**不是**在 reranker.py 内部 try/except 吞掉异常，而是**主动上抛**，由 `store._apply_ce_fusion_rerank` / `_apply_cross_encoder_rerank` 捕获后回退词法并把原因写进 `self.vector_error`（管理端可见）。这样「模型不可用」这件事不会静默丢失。
+
+**加载与缓存（:36-63）**：
+
+```python
+def _load(model_dir: str) -> None:
+    if _SESSION is not None:
+        return# 已加载，直接复用（进程内单例）
+    if _LOAD_ERROR:
+        raise RuntimeError(_LOAD_ERROR)   # 曾经失败过 → 直接复用错误，不再重试磁盘
+    path = Path(model_dir)
+    onnx_path = path / "model_quantized.onnx"
+    if not onnx_path.exists():
+        onnx_path = path / "model.onnx"        # int8 优先，回退 fp32
+    tokenizer_path = path / "tokenizer.json"
+    if not onnx_path.exists() or not tokenizer_path.exists():
+        _LOAD_ERROR = "..."# 记住失败原因
+        raise RuntimeError(_LOAD_ERROR)
+```
+
+三个细节值得注意：
+
+- **量化优先**：先找 `model_quantized.onnx`（int8，约 23MB），没有才用 `model.onnx`（fp32，约 91MB）。生产用量化版，CPU 推理更快。
+- **失败被记忆**：`_LOAD_ERROR` 一旦写入就不会清空，同一进程内后续调用直接 raise 同一个错误。避免「每次查询都去磁盘试一遍」的延迟。代价是：**修好模型文件后必须重启进程**（`reset_cache()` 是给测试用的逃生门）。
+- **只加载一次**：`_SESSION` / `_TOKENIZER` 是模块级全局，检索放进程内复用，不每次查询重新 `InferenceSession`。
+
+**成对编码与手动 padding（:73-96）**：
+
+```python
+def _score_pairs(query: str, texts: list[str]) -> list[float]:
+    pair_inputs = [(query, text) for text in texts]      # ← 关键：二元组
+    try:
+        encodings = _TOKENIZER.encode_batch(pair_inputs)      # 用 tokenizer 的 pair 模板
+    except Exception:
+        encodings = [_TOKENIZER.encode(f"{query} [SEP] {text}") for text in texts]  # 退化：单序列拼接
+    max_len = max(len(e.ids) for e in encodings)
+    pad_id = _TOKENIZER.token_to_id("<pad>") or 1# or 兜底
+    input_ids = np.full((len(encodings), max_len), pad_id, dtype=np.int64)
+    attention_mask = np.zeros((len(encodings), max_len), dtype=np.int64)
+    for index, encoding in enumerate(encodings):
+        length = len(encoding.ids)
+        input_ids[index, :length] = encoding.ids# 右侧padding
+        attention_mask[index, :length] = encoding.attention_mask
+    available = {item.name for item in _SESSION.get_inputs()}
+    feed = {"input_ids": input_ids, "attention_mask": attention_mask}
+    feed = {name: value for name, value in feed.items() if name in available}  # 只喂模型声明要的
+    output = _SESSION.run(None, feed)[0]
+    logits = [float(row[0]) if hasattr(row, "__len__") else float(row) for row in output]
+    return [_sigmoid(value) for value in logits]
+```
+
+四个「为什么」：
+
+| 写法                          | 为什么                                                                                                         |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `encode_batch(pair_inputs)` | Cross-Encoder 必须成对编码。`try/except` 兜的是「tokenizer.json 里没有 pair 模板」的情况（导出时丢了模板），此时退化成 `[SEP]` 手工拼接——效果打折但不至于崩 |
+| 手动 `np.full` padding        | **onnxruntime 无法从锯齿状的 `list[list[int]]` 创建张量**，必须补成规整矩形。`attention_mask` 同步置 0，让模型知道哪些是padding              |
+| `feed` 按 `available` 过滤     | 不同导出版本的输入名可能不同（有 `token_type_ids` 的、没有的），只喂模型 `get_inputs()` 声明存在的那些，避免 `Invalid input name`                |
+| `_sigmoid(logit)`           | 模型输出是**未归一化的 logit**（可正可负），经 sigmoid 压到 (0,1)，才能和词法分在同一尺度上融合                                                |
+
+**对外接口（:99-111）**：
+
+```python
+def cross_encoder_rerank(query, ranked, model_dir) -> list[tuple[KnowledgeChunk, float]]:
+    if not ranked:
+        return []
+    _load(model_dir)
+    texts = [(chunk.content or "")[:2000] for chunk, _ in ranked]   # 截断 2000 字符
+    scores = _score_pairs(query, texts)
+    return [(chunk, score) for (chunk, _), score in zip(ranked, scores)]
+```
+
+注意它的**契约边界**：输入输出都是 `(chunk, score)` 元组列表，**分数被直接替换**为模型相关性分——它自己不判断「要不要保留原分」。所以「替换式 vs 融合式」的差异**不在这个文件里，而在 store.py**（`:942` 替换 vs `:964-969` 加权融合）。这是读代码时最容易搞混的归属：**引擎只产分，怎么用是仓储的事**。
+
+**动手试一试：加载模型并看分数梯度**（无需起服务）：
+
+```python
+# try_ce.py —— python try_ce.py
+from app.rag.reranker import cross_encoder_rerank, is_loaded, reset_cache
+from app.entities import KnowledgeChunk
+
+print(is_loaded())        # False —— 惰性加载，import 不碰模型
+mk = lambda i, c: KnowledgeChunk(id=i, source=f"s{i}.md", source_index=0, content=c)
+cands = [
+    mk(1, "考试焦虑可以用深呼吸、规律作息缓解，必要时寻求辅导员支持"),
+    mk(2, "校园心理咨询室位于图书馆三楼，工作日 8:30-17:00 开放"),
+    mk(3, "预算方案与时间管理方法"),
+]
+# ⚠️ 关键：ranked 必须是 (chunk, score) 元组列表，不是裸chunk 列表
+#    —— 契约见 cross_encoder_rerank 的签名与 :109 那行解包
+ranked = [(c, 0.0) for c in cands]
+
+out = cross_encoder_rerank("我最近压力很大睡不好", ranked, "data/models/bge-reranker-base-onnx")
+for chunk, score in out:
+    print(f"{score:.4f}  {chunk.content[:24]}")
+print(is_loaded())        # True
+# reset_cache() 可清缓存（测试用）
+```
+
+**实测输出**（本机 CPU，`data/models/bge-reranker-base-onnx`）：
+
+```text
+False                                              ← import 后未加载模型
+0.1626  考试焦虑可以用深呼吸、规律作息缓解，必要时寻求辅   ← 相关
+0.0001  校园心理咨询室位于图书馆三楼，工作日 8:30-← 弱相关
+0.0000  预算方案与时间管理方法                      ← 跑题
+True                                               ← 调用后才加载
+```
+
+三个值得注意的现象：
+
+1. **分数经sigmoid 后极度稀疏**：0.1626 / 0.0001 / 0.0000——两个跑题块几乎被压成 0。**这正是「替换式」引擎的危险之处**：CE 分直接覆盖词法分时，一个不相关的块可能被 CE 打成 0.0000，连词法原本给它的那点保底分（`base_score * 0.55`）一起丢掉。这就是 9.7.8(2) 里「替换式救回5 条同时丢掉 4 条」的微观机制，也正是 `ce_fusion` 融合式要解决的问题——用 `λ * norm(词法分)` 给词法信号留一份底。
+2. **`ranked` 必须是 `(chunk, score)` 元组列表**：直接传裸chunk 列表会报 `TypeError: cannot unpack non-iterable KnowledgeChunk object`（见 :109 `for chunk, _ in ranked`）。这个签名和 9.8 里 `store` 的用法一致，读代码时留意。
+3. **`is_loaded()` 前后翻转**：印证惰性加载——`import` 不碰模型磁盘，第一次 `cross_encoder_rerank` 才付初始化成本。
+
+> 与 9.6.2 同理：这里的耗时也被「首次 ONNX 会话初始化」主导。**单次推理**（head-16 一起打分）才是 CE 精排的真实成本，这也解释了为什么它会成为端到端延迟的主成本项而嵌入不会——详见 9.7.8 末尾的延迟归因。
+>
+> 读到这里可以回答一个常见面试追问：**「为什么 CE 只能精排 head-16，不能全库跑？」** —— 因为它是单塔模型，`encode_batch` 的输入是 `(query, doc)` 成对列表，570 块全量编码意味着一次前向要吞下 570 对长文本；而双塔嵌入可以预先把 570 个 doc 各自编码好缓存起来（入库时算一次），查询时只编码 1 条。**能否缓存，是两种架构最本质的差别。**
+
+### 9.6.2 zh_embedder.py — 本地中文嵌入引擎（ONNX）
+
+**它与 reranker.py 是同一套模式**，连文件头注释都对称写着「与 `app/rag/reranker.py` 同模式」。差别在**池化方式**：
+
+|       | reranker.py（Cross-Encoder） | zh_embedder.py（Embedding）                                 |
+| ----- | -------------------------- | --------------------------------------------------------- |
+| 编码对象  | `(query, doc)` 成对          | 单条文本（query 与 doc **共用**同一口径）                              |
+| 取哪个输出 | `[0]` 取 logits，过 sigmoid   | `outputs[0]` 取 `last_hidden_state`，取 **`[:, 0, :]`（CLS）** |
+| 输出维度  | 1 维分数                      | 512 维向量                                                   |
+| 模型    | bge-reranker-base          | **bge-small-zh-v1.5**（33M 参数）                             |
+| 目录布局  | `<dir>/model.onnx`（兼容量化版）  | `<dir>/onnx/model.onnx`，**兼容** `<dir>/model.onnx`         |
+
+**为什么嵌入取 CLS 而不是平均池化**：bge 系列官方检索用法就是 CLS + L2 归一化（对照 9.7.8(1) 的实测口径）。归一化之后，余弦相似度退化成点积，检索时少一次开方。
+
+**主函数（:77-97）**：
+
+```python
+def embed_texts(texts: list[str], model_dir: str) -> list[list[float]]:
+    if not texts:
+        return []
+    _load(model_dir)
+    import numpy as np                              # 函数内 import：非嵌入路径零开销
+    normalized = [text if text.strip() else " " for text in texts]   # 空串兜底成单个空格
+    encodings = _TOKENIZER.encode_batch(normalized)
+    input_ids = np.array([e.ids for e in encodings], dtype=np.int64)
+    attention_mask = np.array([e.attention_mask for e in encodings], dtype=np.int64)
+    feed = {"input_ids": input_ids, "attention_mask": attention_mask}
+    available = {item.name for item in _SESSION.get_inputs()}
+    if "token_type_ids" in available:
+        feed["token_type_ids"] = np.zeros_like(input_ids)      # ← 嵌入模型要补这一个
+    outputs = _SESSION.run(None, {k: v for k, v in feed.items() if k in available})
+    hidden = outputs[0]
+    cls = hidden[:, 0, :]                         # CLS 池化
+    norm = np.linalg.norm(cls, axis=1, keepdims=True)
+    vectors = cls / np.maximum(norm, 1e-12)        # L2 归一化；1e-12 防除零
+    return [[float(value) for value in row] for row in vectors]
+```
+
+对比 reranker.py 能看出**嵌入路径特有的三件事**：
+
+1. **`token_type_ids` 补零**（:90-91）——嵌入模型（BERT 架构）比 reranker 多一个 segment 输入声明，缺了会直接报 `Invalid input name`。代码用 `if ... in available` 做了防御。
+2. **`numpy` 循环外 import**——`import numpy as np` 在函数体内，不在模块顶层。理由是：走纯 BM25 路径（`VECTOR_ENABLED=false`，代码默认）时根本不会调用这个模块，用不着付 numpy 的导入成本。这是「可选依赖」在 import 层面的体现。
+3. **`np.maximum(norm, 1e-12)`**——空文本编码出全零向量时避免除零产生 `nan`。`nan` 会一路污染余弦相似度，最终让整条向量路静默失效。
+
+**pad token 的三级兜底（:57-64）**——这段值得单独看：
+
+```python
+pad_id = tokenizer.token_to_id("<pad>")
+pad_token = "<pad>"
+if pad_id is None:
+    pad_id = tokenizer.token_to_id("[PAD]"); pad_token = "[PAD]"   # ② 换写法
+if pad_id is None:
+    pad_id = 0; pad_token = tokenizer.id_to_token(0) or "[PAD]"    # ③ 兜底 id=0
+tokenizer.enable_padding(pad_id=pad_id, pad_token=pad_token)
+```
+
+不同模型导出方对 pad 的写法不统一（`<pad>` / `[PAD]` / 干脆 id 0）。这里三级兜底保证**不会因为一个 pad id 猜错就整个检索挂掉**——这类「外部资产格式不可控」的防御在 `vector_store.py:84-107` 初始化本地嵌入时也有同构逻辑。
+
+**缓存的一个差异**：`_load` 的短路条件是 `_SESSION is not None and _MODEL_DIR == model_dir`——**比 reranker.py 多了 model_dir 比对**。原因是可以同时挂多个嵌入模型（比如评测时切 bge-small 与其他尺寸对比），换模型必须重新加载；而 reranker 全局只有一个实例，不需要这层判断。
+
+**对外接口：两层**
+
+```python
+class LocalZhEmbeddingFunction:          # :100-108，可调用嵌入函数
+    def __init__(self, model_dir: str):
+        self.model_dir = model_dir
+        self.model_name = "bge-small-zh-v1.5"    # Chroma 持久化元数据里会记这个名字
+    def __call__(self, input: list[str]) -> list[list[float]]:
+        return embed_texts(list(input), self.model_dir)
+```
+
+这个类存在的唯一原因是**适配 chromadb 的 EmbeddingFunction 接口**——`vector_store.py` 把实例交给 Chroma，让它负责批量编码。**评测脚本绕开它，直接调 `embed_texts`**（见 9.7.8 的 `scripts/eval_bge_small_zh_recall.py`）。理解这一点就明白：Chroma 只是存储与检索的壳，**真正算向量的是这个 108 行的文件**。
+
+**动手试一试：验证语义梯度与单条延迟**（对应 9.7.8(1) 的 0.71 / 0.60 / 0.42 与 2.5ms）：
+
+```python
+# try_zh_embed.py —— python try_zh_embed.py
+import time, numpy as np
+from app.rag.zh_embedder import embed_texts
+
+MODEL_DIR = "data/models/bge-small-zh-onnx"
+# 梯度组：语义相近 → 远
+probe = ["失眠睡不着", "晚上翻来覆去很难入睡", "今天晚饭吃了火锅", "考研数学真题解析"]
+
+embed_texts(probe[:1], MODEL_DIR)          # ← 关键：先预热，把 ONNX 会话初始化成本排除
+t0 = time.perf_counter()
+vecs = embed_texts(probe, MODEL_DIR)
+cost = (time.perf_counter() - t0) / len(probe) * 1000
+
+v = np.array(vecs)
+print(f"维度={v.shape[1]}  单条≈{cost:.1f}ms")          # 实测：512 维、预热后≈2ms
+for i in range(1, len(probe)):
+    print(f"{probe[0]} ↔ {probe[i]}: {float(v[0] @ v[i]):.4f}")
+```
+
+**实测输出**（本机 CPU）：
+
+```text
+维度=512  单条≈2.3ms
+失眠睡不着 ↔ 晚上翻来覆去很难入睡: 0.6816← 同义，最高
+失眠睡不着 ↔ 今天晚饭吃了火锅:     0.3397      ← 无关
+失眠睡不着 ↔ 考研数学真题解析:     0.2473      ← 无关，最低
+```
+
+> **测延迟必须先预热**：不预热直接计时，**首条会是 ~95ms**——那不是模型慢，而是 `_load()` 里的 `ort.InferenceSession(...)` 首次初始化（读模型文件 + 建图）的一次性成本。`_SESSION` 会被缓存进模块级全局，第二次起才是真实推理速度（预热后 2.3ms，与 9.7.8(1) 实测的 2.5ms 吻合）。批量调用比逐条循环更快：4 条整批约 4.7ms，因为 `_score_pairs` 那类「一次成批送入矩阵」的做法摊薄了调用开销。
+>
+> 这也是 9.7.8 里「单条约 2.5ms」与「端到端平均 2.1s/条」能同时成立的原因——**检索延迟的大头从来不是嵌入，而是 CE 精排**。
 
 **学习要点**：RAG 不神秘，它是一条「分词→打分→融合→重排」的确定性流水线；每一环都可以单独替换成更强的实现（如 embedding 模型），这就是分层的好处。
+
 
 ### 9.7 混合检索深度剖析
 
@@ -1922,12 +2131,12 @@ superseded_by  替代它的新事实 public_id
 
 一句话：检索（Retrieval）是整条流水线的总称（RAG 的字母 R 指的就是它）；召回和重排是流水线的第一阶段与收官阶段，顺序固定为「召回 →（融合）→ 重排 → Top-K」，不可颠倒。
 
-| 词 | 层级 | 目标 |
-| --- | --- | --- |
-| 检索（Retrieval） | 总称 | 从用户一句话到选出 Top-4 塞进 prompt 的全过程 |
-| 召回（Recall） | 第 1 阶段 | 从全库粗找候选——「别漏」，宁多勿缺 |
-| 融合（Fusion） | 中转 | 把多路召回分数合成一个 base 分 |
-| 重排（Rerank） | 收官 | 在已召回候选里精选排序——「排准」，宁精勿滥 |
+| 词             | 层级     | 目标                             |
+| ------------- | ------ | ------------------------------ |
+| 检索（Retrieval） | 总称     | 从用户一句话到选出 Top-4 塞进 prompt 的全过程 |
+| 召回（Recall）    | 第 1 阶段 | 从全库粗找候选——「别漏」，宁多勿缺             |
+| 融合（Fusion）    | 中转     | 把多路召回分数合成一个 base 分             |
+| 重排（Rerank）    | 收官     | 在已召回候选里精选排序——「排准」，宁精勿滥         |
 
 顺序不可颠倒由数据依赖决定：重排的输入就是召回的输出，候选池未生成时重排无从下手。对应 `search_knowledge` 的实际执行序：改写查询（store.py:812）→ 向量召回（store.py:822-830）→ BM25 全库打分（store.py:839）→ 融合（store.py:851-902）→ 重排与排序（store.py:903-909）→ 取 Top-4 与邻块扩展（store.py:910-926）。
 
@@ -1941,42 +2150,42 @@ superseded_by  替代它的新事实 public_id
 
 一句话：配置层面有 4 条路，但「选路」发生在启动/部署时（`Settings` 一次性定死）；运行中每条消息不会动态选路，唯一的换路是故障自动回退。
 
-| 路 | 配置组合 | 链路 | 现状 |
-| --- | --- | --- | --- |
-| 1 | `VECTOR_ENABLED=false`（代码默认，config.py:57） | BM25 → 重排槽位（词法引擎）→ Top-4 | 零依赖兜底；代码默认路径 |
-| 2 | `vector=true` + `backend=local` | BM25 + hash 伪向量 → 融合 → rerank | 消融证实退化，不建议开 |
-| 3a | `vector=true` + `backend=chroma` + `EMBEDDING_PROVIDER=local` | BM25 + 英文 MiniLM 真向量 → 融合 → 重排 | 实测 66/77，被英文嵌入拖累，不用于中文（见 [ROUND-19](docs/records/ROUND-19-RAG-SEMANTIC-RERANK.md)） |
-| 3b | `vector=true` + `backend=chroma` + `EMBEDDING_PROVIDER=local-zh` | BM25 + 中文 bge-small-zh 真向量 → 融合 → 重排 | **当前生产配置**（+rrf+ce_fusion，窗口 128）：570 块扩库下宽松 63/77、严格 61/77（见 9.7.8） |
-| 4 | `vector=true` + `backend=chroma` + `EMBEDDING_PROVIDER=openai` | BM25 + 远程 API 向量 → 融合 → 重排 | 需 API key；曾用于效果上限对照，因数据出境与不可归因未采用 |
+| 路  | 配置组合                                                             | 链路                                   | 现状                                                                                 |
+| -- | ---------------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------- |
+| 1  | `VECTOR_ENABLED=false`（代码默认，config.py:57）                        | BM25 → 重排槽位（词法引擎）→ Top-4             | 零依赖兜底；代码默认路径                                                                       |
+| 2  | `vector=true` + `backend=local`                                  | BM25 + hash 伪向量 → 融合 → rerank        | 消融证实退化，不建议开                                                                        |
+| 3a | `vector=true` + `backend=chroma` + `EMBEDDING_PROVIDER=local`    | BM25 + 英文 MiniLM 真向量 → 融合 → 重排       | 实测 66/77，被英文嵌入拖累，不用于中文（见 [ROUND-19](docs/records/ROUND-19-RAG-SEMANTIC-RERANK.md)） |
+| 3b | `vector=true` + `backend=chroma` + `EMBEDDING_PROVIDER=local-zh` | BM25 + 中文 bge-small-zh 真向量 → 融合 → 重排 | **当前生产配置**（+rrf+ce_fusion，窗口 128）：570 块扩库下宽松 63/77、严格 61/77（见 9.7.8）               |
+| 4  | `vector=true` + `backend=chroma` + `EMBEDDING_PROVIDER=openai`   | BM25 + 远程 API 向量 → 融合 → 重排           | 需 API key；曾用于效果上限对照，因数据出境与不可归因未采用                                                  |
 
 每条向量路内部还有三个子开关：`KNOWLEDGE_FUSION_MODE = weighted | rrf`（config.py:48）、`KNOWLEDGE_RERANK_ENGINE = lexical | cross_encoder | ce_fusion`（config.py:44）与 `KNOWLEDGE_RERANK_ENABLED`（默认 true，config.py:42）。三者交互的关键规则（store.py:873-878）：**weighted 模式下按引擎配置执行重排；rrf 模式下仅 `ce_fusion` 引擎可执行（RRF 分数与词法/替换式口径不兼容），其余跳过**——所以「rerank 开关是 true」不代表所有组合都会执行重排。
 
 另有一个独立的**候选窗口**参数：`KNOWLEDGE_CANDIDATE_K` / `VECTOR_TOP_K`（两者取 min）决定向量路返回多少候选参与融合——窗口大小直接决定 RRF 里「有多少块能拿到向量排名分」，详见 Q3 的「两层窗口」与 9.7.8 的窗口实验。
 
-运行中的动态行为只有故障回退，不是「选路」：Chroma 初始化失败 → 降级 `LocalVectorBackend`（vector_store.py:327,333）；单次向量查询抛异常 → 本轮静默纯 BM25（store.py:825-829）。
+运行中的动态行为只有故障回退，不是「选路」：Chroma 初始化失败 → 降级 `LocalVectorBackend`（vector_store.py:344、:350）；单次向量查询抛异常 → 本轮静默纯 BM25（store.py:825-829）。
 
 **链路配置总表**（把上表各条路的完整配置与实测浓缩到一张表；实测口径与数据来源见 9.7.8）：
 
-| 路 | 召回层 | 嵌入（模型 / 维度 / 单条耗时） | 融合 | 精排 | 候选窗口 | 实测命中（宽松 · 严格） | 生产状态 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | BM25 | 不启用向量 | weighted | 词法公式 | 不适用 | 50 · 45（590 块库） | 零依赖兜底，代码默认 |
-| 2 | BM25 + 伪向量 | `crc32` 字符哈希 / 64 维 / ~0ms | weighted | 词法公式 | 16 | 消融实验退化（ROUND-12） | 不建议开启 |
-| 3a | BM25 + 英文向量 | all-MiniLM-L6-v2 / 384 维 / ~190ms | weighted | 词法公式 | 16 | 66/77（24 块库，历史对照） | 中文判别不足，未采用 |
-| **3b** | **BM25 + 中文向量** | **bge-small-zh-v1.5 / 512 维 / ~2.5ms** | **rrf** | **CE 融合式 λ=0.4** | **128** | **63 · 61（570 块库）= 0.818 / 0.792** | **✅ 当前生产配置** |
-| 4 | BM25 + 远程向量 | OpenAI 兼容 API | weighted | 词法公式 | 16 | 效果上限对照后弃用 | 数据出境、不可离线 |
+| 路      | 召回层             | 嵌入（模型 / 维度 / 单条耗时）                     | 融合       | 精排               | 候选窗口    | 实测命中（宽松 · 严格）                      | 生产状态         |
+| ------ | --------------- | -------------------------------------- | -------- | ---------------- | ------- | ---------------------------------- | ------------ |
+| 1      | BM25            | 不启用向量                                  | weighted | 词法公式             | 不适用     | 50 · 45（590 块库）                    | 零依赖兜底，代码默认   |
+| 2      | BM25 + 伪向量      | `crc32` 字符哈希 / 64 维 / ~0ms             | weighted | 词法公式             | 16      | 消融实验退化（ROUND-12）                   | 不建议开启        |
+| 3a     | BM25 + 英文向量     | all-MiniLM-L6-v2 / 384 维 / ~190ms      | weighted | 词法公式             | 16      | 66/77（24 块库，历史对照）                  | 中文判别不足，未采用   |
+| **3b** | **BM25 + 中文向量** | **bge-small-zh-v1.5 / 512 维 / ~2.5ms** | **rrf**  | **CE 融合式 λ=0.4** | **128** | **63 · 61（570 块库）= 0.818 / 0.792** | **✅ 当前生产配置** |
+| 4      | BM25 + 远程向量     | OpenAI 兼容 API                          | weighted | 词法公式             | 16      | 效果上限对照后弃用                          | 数据出境、不可离线    |
 
-> 读表要点：**只有向量路才有候选窗口与嵌入成本**；路 1 零依赖但没有语义召回；路 3a/4 的问题都出在嵌入（英文模型判别弱 / 数据出境），不是融合或精排——同一套 rrf + CE 融合式挂在路 3b 上才拿到当前成绩。
-**Q3 要用 Cross-Encoder 重排，是「第五条路」吗？**
+> 读表要点：**只有向量路才有候选窗口与嵌入成本**；路 1 零依赖但没有语义召回；路 3a/4 的问题都出在嵌入（英文模型判别弱 / 数据出境），不是融合或精排——同一套 rrf + CE 融合式挂在路 3b 上才拿到当前成绩。  
+> **Q3 要用 Cross-Encoder 重排，是「第五条路」吗？**
 
 一句话：不是。重排不是一条独立的「路」，而是链路末端的**一个槽位**；Cross-Encoder 是换进这个槽位的新引擎，路数不变。
 
 「路」描述的是召回层怎么找候选；重排描述的是候选找齐后怎么排座次。替换重排引擎不改变任何召回行为，因此它是每条路通用的插槽选择。三对关系只有一对是竞争：
 
-| 关系 | 性质 | 能否同时存在 |
-| --- | --- | --- |
-| 词法 rerank vs Cross-Encoder | 竞争：同一槽位，都负责产出「最终排序分」 | 否——一次检索只能按一种分数排序 |
-| 词法 rerank vs 向量嵌入（MiniLM / bge-small-zh） | 分工：一个在重排层排序，一个在召回层扩池 | 能，正常系统就是都要 |
-| Cross-Encoder vs 向量嵌入 | 分工：各守一层 | 能 |
+| 关系                                       | 性质                   | 能否同时存在           |
+| ---------------------------------------- | -------------------- | ---------------- |
+| 词法 rerank vs Cross-Encoder               | 竞争：同一槽位，都负责产出「最终排序分」 | 否——一次检索只能按一种分数排序 |
+| 词法 rerank vs 向量嵌入（MiniLM / bge-small-zh） | 分工：一个在重排层排序，一个在召回层扩池 | 能，正常系统就是都要       |
+| Cross-Encoder vs 向量嵌入                    | 分工：各守一层              | 能                |
 
 组合矩阵：**召回 4 种（BM25 / +英文 MiniLM / +中文 bge-small-zh / +hash 降级）× 重排 3 种（词法公式 / Cross-Encoder 替换式 / CE 融合式）**。当前生产格子 = 「BM25 + bge-small-zh（rrf 融合）→ CE 融合式精排」。
 
@@ -1984,10 +2193,10 @@ superseded_by  替代它的新事实 public_id
 
 这里要分清**两层不同的「窗口」**（务必别绕晕）：
 
-| 窗口 | 参数 | 作用 | 生产值 |
-| --- | --- | --- | --- |
+| 窗口                | 参数                                       | 作用                                   | 生产值 |
+| ----------------- | ---------------------------------------- | ------------------------------------ | --- |
 | 召回窗口（candidate_k） | `KNOWLEDGE_CANDIDATE_K` / `VECTOR_TOP_K` | 向量路返回多少候选参与融合；决定 RRF 里「有多少块能拿到向量排名分」 | 128 |
-| 精排窗口（head） | `KNOWLEDGE_RERANK_TOP_N` | 融合排序后的前 N 名交给 Cross-Encoder 打模型分 | 16 |
+| 精排窗口（head）        | `KNOWLEDGE_RERANK_TOP_N`                 | 融合排序后的前 N 名交给 Cross-Encoder 打模型分     | 16  |
 
 关键交互：**精排窗口只能触及召回窗口兜住的候选**。若召回窗口过小（曾用 16），大量正确文档拿不到向量排名分、融合分被压到 head-16 之外 → CE 再强也看不见（实测：窗口 16→128，宽松命中 0.740→0.818，完整实验见 9.7.8）。
 
@@ -2001,12 +2210,12 @@ superseded_by  替代它的新事实 public_id
 
 单进程实测四组对照：
 
-| 对照组 | 共同 bigram | 余弦 |
-| --- | --- | --- |
-| 睡不好 vs 失眠（同义！） | 无 | 0.0000 |
-| 睡不好 vs 睡不着 | 「睡不」（另有不同双字碰撞同桶） | 0.5000 |
-| 考试紧张 vs 考试焦虑 | 「考试」 | 0.3333 |
-| 考试紧张 vs 今天天气好 | 无 | 0.0000 |
+| 对照组            | 共同 bigram        | 余弦     |
+| -------------- | ---------------- | ------ |
+| 睡不好 vs 失眠（同义！） | 无                | 0.0000 |
+| 睡不好 vs 睡不着     | 「睡不」（另有不同双字碰撞同桶） | 0.5000 |
+| 考试紧张 vs 考试焦虑   | 「考试」             | 0.3333 |
+| 考试紧张 vs 今天天气好  | 无                | 0.0000 |
 
 三个缺陷：
 
@@ -2020,16 +2229,16 @@ superseded_by  替代它的新事实 public_id
 
 一句话：它是「已启用向量但 Chroma 不可用」时的应急备胎，与「关闭向量」是两回事；「默认」有代码默认与示例默认两套，且在 `embedding_provider` 上不一致。
 
-| 状态 | 向量组件 |
-| --- | --- |
-| `VECTOR_ENABLED=false`（关闭） | 整条向量链路不存在，与 local-hash 无关 |
-| 开向量 + Chroma 正常 | 真语义向量（MiniLM / bge-small-zh / API） |
-| 开向量 + Chroma 挂了（或显式选 local） | 降级成 local-hash 伪向量（vector_store.py:327,333） |
+| 状态                          | 向量组件                                         |
+| --------------------------- | -------------------------------------------- |
+| `VECTOR_ENABLED=false`（关闭）  | 整条向量链路不存在，与 local-hash 无关                    |
+| 开向量 + Chroma 正常             | 真语义向量（MiniLM / bge-small-zh / API）           |
+| 开向量 + Chroma 挂了（或显式选 local） | 降级成 local-hash 伪向量（vector_store.py:344、:350） |
 
 两种「默认」（9.6 后端清单的展开）：
 
 - 代码默认（app/config.py）：`vector_enabled=False`（:57）、`embedding_provider="openai"`（:16）；
-- 示例默认（.env.example）：`VECTOR_ENABLED=false`（:42）、`EMBEDDING_PROVIDER=local`（:8）。
+- 示例默认（.env.example）：`VECTOR_ENABLED=false`（:50）、`EMBEDDING_PROVIDER=local`（:8）。
 
 平时这个差异潜伏（向量关闭时 `embedding_provider` 根本不生效）；一旦把 `VECTOR_ENABLED=true`，从 `.env.example` 复制来的 `.env` 会让系统走**本地英文 MiniLM** 而不是代码默认的 openai——引用「默认」时务必说明是哪一套。**生产则显式选第三种**：`EMBEDDING_PROVIDER=local-zh`（中文 bge-small-zh）——它不属于任何「默认」，是明确写进 `.env` 的部署决策。
 
@@ -2048,6 +2257,7 @@ superseded_by  替代它的新事实 public_id
 #### 9.7.1 为什么需要混合检索
 
 **单一检索方式的局限**：
+
 - **纯 BM25（词频统计）**：只看字面匹配，"睡不好"检索不到"失眠"文档，因为词不重叠；对同义词、语义泛化无能为力。
 - **纯向量检索**：中文语义高度依赖嵌入模型质量，低质量模型会把"考试压力"和"焦虑失眠"判为远距离；且商业 API 需要额度，无 KEY 时完全不可用。
 
@@ -2056,6 +2266,7 @@ superseded_by  替代它的新事实 public_id
 #### 9.7.2 双路召回与融合策略
 
 **第 1 步：双路各自召回**
+
 ```python
 # BM25 路：对所有文档计算词频分数，取 top-N
 bm25_results = [(doc_id, bm25_score), ...]
@@ -2067,6 +2278,7 @@ vector_results = [(doc_id, cosine_score), ...]
 **第 2 步：分数融合（两种模式）**
 
 **加权融合（Weighted，默认）**：
+
 ```python
 # 各路分数先 min-max 归一化到 [0,1]
 normalized_bm25 = (score - min) / (max - min)
@@ -2080,6 +2292,7 @@ final_score = w_vector * normalized_vector + w_bm25 * normalized_bm25
 - **缺点**：对分数分布敏感，BM25 分数范围差异大时归一化会失真
 
 **RRF 融合（Reciprocal Rank Fusion）**：
+
 ```python
 # 不看分数，只看排名
 rrf_score(doc) = sum(1 / (k + rank_in_bm25), 1 / (k + rank_in_vector))
@@ -2103,6 +2316,7 @@ final = base_score * 0.55                          # 融合分保底
 ```
 
 **各信号解释**：
+
 - `cosine`：query 与 doc 的 bigram token 余弦相似度（本地计算，无需向量模型）。
 - `keyword`：查询 token 在内容中的命中比例，不要求 token 在 query 中重复出现。
 - `coverage`：被内容覆盖的查询 token 比例，即 `len(query_tokens ∩ content_tokens) / len(query_tokens)`；不是 Jaccard 的并集分母。
@@ -2115,6 +2329,7 @@ final = base_score * 0.55                          # 融合分保底
 **问题**：固定步长切块（512 字符，重叠 64）会把一段完整答案拦腰截断，用户看到的是"半句话"。
 
 **解决**：`expand_best_hit(ranked, chunks)`（scoring.py:114；入参是已排序的全部 `(chunk, score)` 列表与全量块，不是单个冠军块——冠军取 `ranked[0]`）
+
 ```python
 # 找到排名第一的块（冠军块）
 # 查找同源文件（source 相同）且位置相邻的块（offset 连续）
@@ -2130,11 +2345,13 @@ final = base_score * 0.55                          # 融合分保底
 **实现**：`app/evaluation/rag.py:run_ablation()` 提供消融跑批——固定查询集与知识库，只改配置（向量开关 / 融合方式 / 重排引擎），索引建在临时目录，不污染生产。
 
 **运行方式**：
+
 ```bash
 python -m app.evaluation.rag  # 输出双口径 HitRate + 消融对比
 ```
 
 **当前配置的实测结果**：见 9.7.8（六配置矩阵 + 候选窗口对照）。
+
 > 历史上的第一份消融基线（24 块库、`local-hash` 伪向量时代）的结论是「纯 BM25 优于混入伪向量」；完整数据见 [ROUND-12](docs/records/ROUND-12-RAG-ENHANCEMENT-BENCHMARK.md)。
 
 #### 9.7.6 查询缓存
@@ -2142,6 +2359,7 @@ python -m app.evaluation.rag  # 输出双口径 HitRate + 消融对比
 **动机**：RAG 检索不是廉价操作（BM25 路径约 20ms；启用 CE 精排后约 2s/条，见 9.7.8），重复查询浪费算力。
 
 **实现**：
+
 ```python
 # 有 Redis 时当前只写入 Redis（TTL=300s），知识检索的 read-through 读取仍走进程内 LRU；因此暂不能宣称跨进程 Redis 命中
 # 进程内 LRU：key=规范化查询+top_k+过滤条件
@@ -2149,6 +2367,7 @@ self._knowledge_cache: OrderedDict[str, tuple[datetime, list[dict]]] = ...
 ```
 
 **配置**：
+
 - `KNOWLEDGE_CACHE_ENABLED=true`（代码默认 `false`）
 - `KNOWLEDGE_CACHE_TTL_SECONDS=300`
 - `KNOWLEDGE_CACHE_MAX_ENTRIES=128`
@@ -2176,12 +2395,12 @@ self._knowledge_cache: OrderedDict[str, tuple[datetime, list[dict]]] = ...
 
 `app/rag/zh_embedder.py`（新增）以 reranker.py 同款模式加载 ONNX 中文嵌入（`BAAI/bge-small-zh-v1.5`，512 维，CLS 池化 + L2 归一化），经 `EMBEDDING_PROVIDER=local-zh` 接入。24 块库召回实测（scripts/eval_bge_small_zh_recall.py）：
 
-| 模式 | 英文 MiniLM（历史对照） | 中文 bge-small-zh（当前） |
-| --- | --- | --- |
-| hybrid（weighted） | 66 | 73（权重 0.2–0.5 稳定） |
-| hybrid_rerank | 67 | 73 |
-| **rrf** | **64** | **75（+11）** |
-| 单条延迟 | 190–500 ms | **16–32 ms** |
+| 模式               | 英文 MiniLM（历史对照） | 中文 bge-small-zh（当前） |
+| ---------------- | --------------- | ------------------- |
+| hybrid（weighted） | 66              | 73（权重 0.2–0.5 稳定）   |
+| hybrid_rerank    | 67              | 73                  |
+| **rrf**          | **64**          | **75（+11）**         |
+| 单条延迟             | 190–500 ms      | **16–32 ms**        |
 
 RRF 再次充当「嵌入质量晴雨表」：没有权重旋钮，弱嵌入垫底、强嵌入领先——9.7.0 Q2 的「RRF 反成最优说明嵌入过关」在此被完整验证。上表同库对照（24 块），+11 是纯嵌入增益。
 
@@ -2195,25 +2414,27 @@ final = λ · norm(词法链路分) + (1 − λ) · norm(CE 分)      # head top
 
 24 块库三口径对照（scripts/eval_ce_fusion.py → ce-fusion-report.json）：
 
-| 召回口径 | 词法链路 | 替换式 | 融合式 λ0.4 |
-| --- | --- | --- | --- |
-| A：BM25 | 72 | 76 | **77/77（满命中）** |
-| B：bge hybrid | 74 | — | 75 |
-| C：bge rrf | 75 | — | 76 |
+| 召回口径         | 词法链路 | 替换式 | 融合式 λ0.4       |
+| ------------ | ---- | --- | -------------- |
+| A：BM25       | 72   | 76  | **77/77（满命中）** |
+| B：bge hybrid | 74   | —   | 75             |
+| C：bge rrf    | 75   | —   | 76             |
 
 融合式在全部三口径 ≥ 替换式（均 +1）。机制证据：`lowmood-02` 被 CE 打 0.171（替换式会丢），融合式用词法分保住——**模型单点判断可以被融合权重约束**，即「保护式重排」思想的最小实现。
 
 **（3）真实扩库：590 块六配置对照**
 
+> **先说清两个库，避免读混**：本小节出现两个块数——**590 块**是 `data/scale-test/knowledge-v2/` 实验库（183 文件，本节六配置矩阵跑在它上面，用于横向比配置）；**570 块**是 `knowledge/` **生产库**（173 文件，(4)~(6) 的复评与bug 定位都跑在它上面）。两者语料同源、生产库是实验库去掉未入库部分后的结果，**故数据不可跨表直接比较**。
+
 语料从 24 块真实扩到 590 块（univs 65 篇 + 百科词条 84 条 + AI 样稿 10 篇 + 原 24），约 25 倍规模下重跑全矩阵（scripts/eval_v2_full.py → v2-full-report.json）：
 
-| 配置 | 宽松 | 严格 |
-| --- | --- | --- |
-| A_lexical（纯 BM25 + 词法） | 50 | 45 |
-| A_fusion | 58 | 54 |
-| C_lexical（rrf 召回 + 词法） | 59 | 55 |
-| C_replace（替换式） | 59 | 55 |
-| **C_fusion（融合式）** | **64** | **61** |
+| 配置                     | 宽松     | 严格     |
+| ---------------------- | ------ | ------ |
+| A_lexical（纯 BM25 + 词法） | 50     | 45     |
+| A_fusion               | 58     | 54     |
+| C_lexical（rrf 召回 + 词法） | 59     | 55     |
+| C_replace（替换式）         | 59     | 55     |
+| **C_fusion（融合式）**      | **64** | **61** |
 
 三条结论：① C_fusion 双料第一（宽松 0.8312 / 严格 0.7922）；② **融合式 > 替换式（64 vs 59）**——扩库后证据比 24 块库强得多；③ **扩库后纯词法召回塌陷**（严格 0.5844 vs rrf 的 0.7143）——规模化场景下语义向量召回从「可选增强」变成「必要前提」，正是 9.7.0 Q1「召回失败不可挽回」的现实版。
 
@@ -2234,11 +2455,11 @@ final = λ · norm(词法链路分) + (1 − λ) · norm(CE 分)      # head top
 
 同库（570 块）完整链路对照（scripts/eval_retrieval_window.py，可复跑）：
 
-| 候选窗口 | 宽松 | 严格 |
-| --- | --- | --- |
+| 候选窗口          | 宽松 | 严格 |
+| ------------- | -- | -- |
 | K=16（修复后当时配置） | 57 | 54 |
-| K=128 | 62 | 60 |
-| K=全库 | 63 | 61 |
+| K=128         | 62 | 60 |
+| K=全库          | 63 | 61 |
 
 **决策**：`KNOWLEDGE_CANDIDATE_K` / `VECTOR_TOP_K` 定为 **128**——对齐工业 RRF 窗口实践（Elasticsearch `rank_window_size` 默认 ≈100），已收敛到全库口径的 98%，同时保留 ANN 截断架构。
 
@@ -2252,14 +2473,284 @@ KNOWLEDGE_RERANK_ENGINE=ce_fusion      # λ=0.4
 KNOWLEDGE_CANDIDATE_K=128 / VECTOR_TOP_K=128
 ```
 
-| 阶段 | 库 | 宽松 | 严格 |
-| --- | --- | --- | --- |
-| 旧生产（MiniLM + weighted + 词法） | 24 块 | 0.870 | 0.792 |
-| 本轮修复前（ce_fusion bug） | 570 块 | 0.442 | 0.312 |
-| 修复后（窗口 16） | 570 块 | 0.740 | 0.701 |
-| **修复后（窗口 128，最终）** | **570 块** | **0.818** | **0.792** |
+| 阶段                          | 库         | 宽松        | 严格        |
+| --------------------------- | --------- | --------- | --------- |
+| 旧生产（MiniLM + weighted + 词法） | 24 块      | 0.870     | 0.792     |
+| 本轮修复前（ce_fusion bug）        | 570 块     | 0.442     | 0.312     |
+| 修复后（窗口 16）                  | 570 块     | 0.740     | 0.701     |
+| **修复后（窗口 128，最终）**          | **570 块** | **0.818** | **0.792** |
+
+> 该行是**生产路径黑盒复评**（`eval_production_check.py` → `production-check-report.json`：63/77、平均 2096.6ms），与(5) 窗口对照表中「K=全库 → 63/61」同值——因为窗口 128 在 570 块库上已**收敛到全库口径**（白盒 K=128 是 62/60，差的那1 条是边界题per-f-01），并非两套数据打架。
 
 规模放大 24 倍而严格口径与旧 24 块库生产基线持平；平均 2.1s/条（CE 精排为延迟主成本；BM25-only 路径约 20ms/条）。生产环境已核对：MySQL `knowledge_chunks` 570 块（id 422–991）与 Chroma `aegis_knowledge_zh` 570 条逐一对齐。数据链：production-check-report.json（最终）/ ce-fusion-report.json / v2-full-report.json / retrieval-window-report.json。
+
+#### 9.7.9 评测指标全景：7 个指标各自的含义与口径陷阱
+
+> 前面的 9.7.5 / 9.7.7 / 9.7.8 反复出现 HitRate（宽松 0.818 / 严格 0.792）。但`app/evaluation/rag.py` 实际输出的是**7 个指标**——为什么只讲HitRate？其余 5 个（Recall / Precision / MRR / NDCG / 首命中名次）分别回答不同的问题，且**有一个存在口径缺陷**。本节把7 个指标一次讲清，并指出每个指标「能说明什么 / 不能说明什么」。
+
+##### ① 代码里的 7 个指标（app/evaluation/rag.py:100-107）
+
+```python
+report = {
+    "recallAtK":   round(sum(item["recallAtK"] for item in results) / total, 4),
+    "precisionAtK": round(sum(item["precisionAtK"] for item in results) / total, 4),
+    "mrr":         round(sum(item["reciprocalRank"] for item in results) / total, 4),
+    "ndcgAtK":     round(sum(item["ndcgAtK"] for item in results) / total, 4),
+    "hitRate":     round(len(hits) / total, 4),
+    "hitRateStrict": round(len(strict_hits) / total, 4),
+    "averageFirstRelevantRank": round(sum(item["firstRelevantRank"] for item in hits) / max(1, len(hits)), 4),
+}
+```
+
+逐题侧的定义在 `evaluate_case`（:160-173），**这四个公式决定了一切**：
+
+```python
+"recallAtK":    1.0 if hit else 0.0,                      # ← 命中即满分，不看漏了几个
+"precisionAtK": round(relevant_count / max(1, top_k), 4),  # ← 分母固定 top_k
+"reciprocalRank": round(1.0 / first_rank, 4) if hit else 0.0,
+"ndcgAtK":      round(ndcg(items), 4),
+```
+
+| 指标              | 公式（本项目实现）                | 回答什么问题               | 局限                                                                              |
+| --------------- | ------------------------ | -------------------- | ------------------------------------------------------------------------------- |
+| **HitRate**     | 命中题数 / 总题数               | 「答对了吗」——**最适合单答案问答** | 只看有没有，不看排第几                                                                     |
+| **Recall@K**    | `1.0 if hit else 0.0`    | 「期望源进了候选池吗」          | **名不副实**：真Recall 应是 `召回数/期望总数`，这里退化成「至少召回到一个」= HitRate（实测 67/77 与 HitRate 完全相等） |
+| **Precision@K** | `relevant_count / top_k` | 「返回的几条里几条有用」         | **分母固定 top_k=4，每题只有 1~~2 个期望源 → 理论上限仅 0.25~~0.5**，跨数据集不可比（见 ③）                  |
+| **MRR**         | `1 / 首命中名次`，未命中记 0       | 「正确文档排得够靠前吗」         | 只看第一个命中，后面的名次全丢                                                                 |
+| **NDCG@K**      | 按名次折损的相关性增益归一化           | 「整体排序质量如何」           | 需要「逐条相关性等级」，本项目只有 0/1，故与 MRN 高度相关（0.7604 vs 0.7338）                             |
+| **首命中平均名次**     | 命中题的 `first_rank` 均值     | 「平均排在第几位」            | 仅统计命中的题（分母是 `hits` 而非 `total`），**未命中的题不计入**——所以 1.4776 配0.818 命中率读，单独看会高估       |
+
+**为什么正文只强调 HitRate**：心理支持场景的 77 条查询每题只有 **1~2 个期望源**（实测 55 题 1 个、22 题 2 个），本质是**单答案问答**。这种场景下「有没有答对」比「排第几」更贴近用户体感，所以 HitRate 是主指标；MRR/NDCG 是**补充视角**（排序质量），Recall/Precision 因口径退化只能作参考。
+
+##### ② 实测数据（`data/eval/rag-eval-report.json`）
+
+**当前生产配置实测（2026-11-11 实跑 `python -m app.evaluation.rag`，耗时 12 分 49 秒）**
+
+配置已核对 `retrievalConfig`：`local-zh`（bge-small-zh-v1.5）+ `rrf` + `ce_fusion` + topK=4 —— 与 9.7.8(6) 完全一致。
+
+| 指标 | 值 | 说明 |
+| --- | --- | --- |
+| totalCases | 77 | 全部 RAG 查询 |
+| recallAtK | **0.8182** | = 63/77，**与 HitRate 完全相等** → 再次印证它退化成 HitRate |
+| precisionAtK | **0.2857** | 分母固定 top_k=4 的窄口径（见 ③） |
+| mrr | **0.6656** | — |
+| ndcgAtK | **0.6997** | 与 MRR 同向 |
+| hitRate（宽松） | **0.8182** | 63/77 |
+| hitRateStrict | **0.7922** | 61/77，仅来源命中 |
+| averageFirstRelevantRank | **1.5079** | 命中的题平均排在第 1.51 位 |
+
+> **★ 强交叉验证**：本次 `hitRate`/`hitRateStrict` = **63/77 / 61/77**，与 9.7.8(6) 生产路径黑盒复评的数字**完全一致**。两条独立代码路径（生产 `store.search_knowledge` vs 评测框架 `evaluate()`）得到同一结果，说明检索链路可复现、评测没测错东西。
+>
+> 注：同一配置曾跑出62/77（见下表旧配置行对比），差 1 条源于 Chroma 向量后端的近似检索非确定性，属正常抖动而非配置差异。
+
+**六组消融（同库 570 块、同 77 题、真正切换重排引擎）**
+
+| 模式 | 向量 | 融合 | 重排引擎 | HitRate | 命中 | 平均延迟 |
+| --- | --- | --- | --- | --- | --- | --- |
+| **`rrf_ce`（= 生产配置）** | ✓ | rrf | **ce_fusion** | **0.8182** | **63/77** | 1995ms |
+| `rrf` | ✓ | rrf | 无 | 0.7922 | 61/77 | **329ms** |
+| `hybrid` | ✓ | weighted | 无 | 0.7532 | 58/77 | 306ms |
+| `hybrid_rerank` | ✓ | weighted | **lexical** | 0.7532 | 58/77 | 745ms |
+| `hybrid_ce` | ✓ | weighted | **ce_fusion** | 0.7273 | 56/77 | 2005ms |
+| `bm25_only` | ✗ | weighted | **lexical** | 0.6753 | 52/77 | 501ms |
+
+**这张表读出五个结论，每个都能对照 9.7.8：**
+
+1. **`rrf_ce` 就是当前最优（63/77）**，等于主指标那一行的值，也等于 9.7.8(6) 的生产复评值——**三处独立数字互相吻合**。
+2. **融合方式比精排引擎更关键**：`rrf_ce`(0.8182) vs `hybrid_ce`(0.7273) **差 9 条**——同样用 CE 融合式精排，**仅换融合方式就差 9 条**；反过来 `rrf`(0.7922) vs `hybrid`(0.7532) 只差 3 条。**结论：先定融合（rrf），再定精排（ce_fusion）**——这就是 9.7.8 的选型顺序。
+3. **词法重排确实零增益**：`hybrid`(0.7532 / 306ms) → `hybrid_rerank`(0.7532 / 745ms)，**一条不多、慢2.4 倍**。纯 Python 四路词法信号在 570 块 + 中文嵌入下已经榨干；真正带来增益的是 CE 融合式（`rrf`→`rrf_ce`：61→63）。
+4. **关向量最差**：`bm25_only`仅 0.6753（52/77）——570 块规模下纯 BM25 天花板远低于混合检索，**语义召回是规模化的必要前提**（9.7.8(3) 结论的独立复现）。
+5. **有一项违反直觉**：`hybrid_ce` 比 `hybrid` **还差 2 条**——加精排反而变差。这个反常项不是噪声，根因是 weighted 与 rrf 的**候选池规模差异**，完整机制见下方「反常项深挖」。
+
+##### 反常项深挖：为什么 weighted 下加 CE 精排反而掉 2 条
+
+上表有唯一一项**违反直觉**：
+
+```text
+hybrid      0.7532 (58/77)   weighted 融合 + 无重排
+hybrid_ce   0.7273 (56/77)   weighted 融合 + CE 融合式精排      Δ = −2 条
+```
+
+按理说「加一个精排引擎」不该让结果变差。**这一项不解释清楚，整张表的说服力就打折**，所以单独挖一遍。
+
+**第一步：先排除「配置没生效」的误判。**
+
+最容易的解释是这组的 CE 根本没跑（就像 9.7.8(4) 那个排序 bug 一样静默失效）。用延迟反证：
+
+| 模式 | 延迟 | 相对同融合无重排组的增量 |
+| --- | --- | --- |
+| `hybrid`（无重排） | 306ms | — |
+| `hybrid_ce`（CE） | 2005ms | **+1699ms** |
+| `rrf`（无重排） | 329ms | — |
+| `rrf_ce`（CE） | 1995ms | **+1666ms** |
+
+两组增量几乎相同（1699 vs 1666），**证明 CE 在 weighted 和 rrf 下都真实执行了**——不是漏跑、不是回退到词法。这个排除很重要，否则后面所有推理都站不住。
+
+**第二步：定位到两个分支的守卫差异。**
+
+回看 `search_knowledge` 的候选池构建（`store.py:886-893`），两条分支**跳过块的条件不同**：
+
+```python
+if fusion_mode == "rrf":
+    ...
+    if v_rank is None and b_rank is None:
+        continue# ← 两路都没进榜才跳过
+    ...
+else:                                          # weighted
+    ...
+    if base_bm25 <= 0 and base_vector <= 0:
+        continue                    # ← 只要不是「双零」就保留
+```
+
+| 融合模式 | 候选池（`ranked`）实际规模 | 原因 |
+| --- | --- | --- |
+| **weighted** | **≈ 全库 570 块** | 向量分或 BM25 分任一非零即保留；实测570 块里绝大多数至少有一路有分 |
+| **rrf** | **≈ 128 + BM25 命中数**（远小于 570） | 必须至少进一路榜单（向量 top-128 或 BM25 有分）才保留 |
+
+**第三步：机制解释。**
+
+`ce_fusion` 引擎的做法是「取 `ranked[:16]` 作 head，对head 内分数做 min-max 归一后加权」（见 9.7.8(2)）。问题出在**这16 条从哪儿来**：
+
+- **rrf 路径**：候选池小（~200 块），且全是「两路都进过榜」的强候选。RRF 分是 `1/(60+rank)`，天然分层清晰——第 1 名和第 50 名差距明显。所以 `ranked[:16]` 确实是**语义上最强的 16 条**，CE 在这上面打分，可信度高。
+- **weighted 路径**：候选池几乎是全库。融合分 `0.65×向量 + 0.35×BM25` 经 `normalize_scores` 做min-max 归一后，**长尾被拉平**——大量中等质量块的分数挤在一起，头部 16 条与第 17~50 条的差距远小于 RRF 那种阶梯状分布。于是 `ranked[:16]` 未必是真正相关的 16 条，**CE 在一个噪声较大的 head 上打分，归一化加权反而把噪声一起放大**，把原本正确的排序带偏 2 条。
+
+**结论：这不是 bug，是 weighted 融合的固有弱点。** 它给出一条反直觉但可验证的经验：
+
+> **检索链路上，「融合方式的选择」比「精排引擎的选择」更能决定最终效果。**换融合方式差 9 条（rrf_ce vs hybrid_ce），换精排引擎只差 2 条（hybrid vs hybrid_ce）。**融合决定了候选池的质量上限，精排只能在这个池子里挑，挑不出池子没有的东西。** 这正是 9.7.0 Q1「召回失败不可挽回」在融合层的具体体现。
+
+**如果要让 weighted + CE 也work**，可行的方向是：① 在 weighted 分支引入类似 RRF 的「至少进一路榜单」守卫，先把候选池收窄；② 或在归一化时改用 z-score / 秩归一化而非 min-max，减少长尾拉平。这两条本项目都未实测，属于遗留改进项——**写在这里是为了说明「为什么生产选 rrf」，而不是断言「weighted 一定不行」**。
+
+**与旧配置的对照（不可相减）**
+
+| 指标 | 旧：MiniLM + weighted + lexical（24 块） | 当前：bge-zh + rrf + ce_fusion（570 块） |
+| --- | --- | --- |
+| hitRate | 0.8701 | 0.8182 |
+| strict | 0.7922 | 0.7922 |
+| mrr | 0.7338 | 0.6656 |
+| ndcgAtK | 0.7604 | 0.6997 |
+
+旧配置的报告已归档为 `rag-eval-report.minilm-archive.json`。**HitRate 从 0.870 降到 0.818 不是「检索变差」，而是「库大了 24 倍、干扰变多」**——两个数字跑在难度完全不同的库上，不可直接相减。真正可比的是同库消融（上表）。
+
+> **⚠️ 这张消融表曾因代码缺陷给出错误结论（2026-11 已修复）**：修复前 `run_ablation` 只切 `rerank_enabled` / `fusion_mode` / `vector_enabled`，**从不切 `knowledge_rerank_engine`**——于是所有 `rerank_enabled=True` 的组实际跑的都是生产值 `ce_fusion`，而非模式声称的「词法重排」。当时据此写下的「hybrid_rerank 零增益 → 词法重排是纯亏组合」**结论碰巧正确但证据是错的**。现已修复：每个模式显式声明 `engine`、在 `finally` 中还原、在 `config.rerankEngine` 里留痕（见 `app/evaluation/rag.py:255-262`）。
+>
+> **教训（值得记住）**：消融实验的正确性不取决于模式名写得多清楚，而取决于**被测变量是否真的被切换**。只看报告里的模式名而不去读「到底改了哪些 settings」，就会把功劳记到错误的引擎上。这与 9.7.8(4) 的「评测脚本正确 ≠ 生产路径正确」是同一类错误的两个方向。
+
+
+##### ③ 一个真实的口径陷阱：Precision@K 为什么会超过理论上限
+
+上面precision@K = 0.3117，严格说「每题期望源≤2、top_k=4 → 单题precision 应≤0.5」，而 23 题的precision 达到了 0.5~0.75。为什么？
+
+看 `rag-anx-03`（问「求职面试前焦虑得睡不着」，`expectedSources=['anxiety.md']`）实际返回：
+
+```text
+rank1  relevant=True   career-anxiety.md       ← 期望源是 anxiety.md，但这条也「相关」
+rank2  relevant=False  sleep.md
+rank3  relevant=False  perfectionism.md
+rank4  relevant=True   learned-helplessness.md ← 同样被判相关
+```
+
+`is_relevant`（:176-188）的宽松口径&#x662F;**「source 命中 OR 任一 expected term 出现在内容」**。`career-anxiety.md` 的正文里出现了 expectedTerms 中的「求职」，于是被判relevant，`relevant_count=2`，precision=2/4=0.5。
+
+**这暴露了指标定义的问题**：`precision_at_k` 衡量的是「返回块里有几条命中宽松词表」，但宽松词表会误召**同主题的不同文档**。在心理支持语料里，「求职焦虑」「learned-helplessness」都可能是合理答案——检索把它们召回**不是错**，但precision 会因此「虚高」。同理，一个只有 1 个期望源的问题，上限本应是 0.25，实际却拿到 0.75（4条里3 条都沾了term）。
+
+> **工程结论**：本项目的 Precision@K **不是标准 IR 意义的 precision**（标准定义分母是「该query 相关的全部文档数」，此处分母固定 top_k 且相关性用宽松词表判），跨数据集或与其他系统比较时**不可直接引用**。若要修正，方向是：① 用严格 source 命中替代宽松 term 判定相关；② 分母改为「min(top_k, 相关文档总数)」；③ 或干脆弃用 precision，只保留 HitRate + MRR + NDCG 这三个口径清晰的指标。本项目选择①的折中：HitRate 分宽松/严格双口径并列输出（9.7.7），避免单一口径误导。
+
+##### 动手试一试：算一次 MRR 和 NDCG
+
+```python
+# try_metrics.py —— python try_metrics.py
+import json
+r = json.load(open("data/eval/rag-eval-report.json", encoding="utf-8"))["results"]
+
+# MRR 复算：平均 1/首命中名次（未命中记0）
+mrr = sum(x["reciprocalRank"] for x in r) / len(r)
+print("MRR", round(mrr, 4))                # 0.6656 —— 与报告一致（当前生产配置）
+
+# 首命中名次分布：命中的题里，rank1 占多少（解释 MRR 为何高）
+ranks = [x["firstRelevantRank"] for x in r if x["hit"]]   # 63 题（当前生产配置）
+rank1 = sum(1 for v in ranks if v == 1)
+print(f"命中 {len(ranks)} 题，其中 rank1 就占 {rank1} 题（{rank1/len(ranks):.0%}）→ 所以 MRR 偏高")  # 实测：43/63 ≈ 68%
+
+# NDCG 理解：只判 0/1 相关时，理想排序（相关全在前面）的 NDCG 接近 1
+# 看一条真实排序：rank1 就是期望源 → NDCG 高
+hit1 = [x for x in r if x["hit"] and x["firstRelevantRank"] == 1]
+print("首条即命中的题数：", len(hit1))# 50 —— 命中率 0.818 里的大头是「第一条就对」
+```
+
+**记住这个判断顺序**：看一个RAG 系统的数，先问三件事——① 什么口径（宽松/严格）？② 什么配置（向量开没开、什么融合、什么嵌入）？③ 样本多大（77 条）？**三问不过，数字没有意义。** 本节所有数字都标了配置与来源，正是这个原则。
+
+
+#### 9.7.10 两个读者一定会问的问题
+
+> 本节回答学RAG 时最常卡住的两个问题：**① 「词法」到底是什么意思？② 这些数字跑出来可信吗、符合直觉吗？** 这两问都不是术语表能解决的，必须配实测。
+
+##### ① 「词法」（lexical）到底指什么
+
+**一句话：只看字面有没有对上，不理解意思。** 词根 lexical = 词汇的。
+
+最直观的对照：
+
+| | 打个比方 | 本项目实现 | 拿「失眠」查「睡不着」的文档 |
+| --- | --- | --- | --- |
+| **词法匹配** | 像用 `grep` 搜关键词 | `rerank_score` 四路信号、BM25 | **0.000**（一个共同字都没有） |
+| **语义匹配** | 像读完两句话判断是不是一回事 | `zh_embedder.py` 向量 | **0.68**（读出「都是睡眠问题」） |
+
+`rerank_score`（`scoring.py:48`）的四路信号**全是纯字面计算，没有模型、没有向量**：
+
+```python
+final = base_score * 0.55                          # 融合分保底
+      + (余弦 * 0.75 + 关键词 * 0.25) * 0.25       # token 集合的交并比
+      + 覆盖率 * 0.15                              # 查询词有多少出现在文档里
+      + 短语命中 * 0.05                            # 完整 query 是子串则 1
+```
+
+**实跑一遍就懂了**——查询「睡不着」被 `tokenize` 切成 `['睡','不','着','睡不','不着']`：
+
+| 候选文档 | cosine | 关键词 | 覆盖 | 短语 |
+| --- | --- | --- | --- | --- |
+| 睡眠困扰建议：睡前放松训练… | 0.196 | 0.200 | 0.200 | 0.0 |
+| 考试焦虑的应对方法 | **0.000** | **0.000** | **0.000** | 0.0 |
+
+第一行那个 0.196 **不是模型判断的**，纯粹因为两边都含「睡」字、且 bigram「睡不」恰好也撞上了——**这叫「碰运气得分」**。而拿「失眠」去查「睡不着」的文档，分数是**恰好 0.0000**——这就是词法最致命的短板：**同义词直接归零**。
+
+**那为什么还要保留词法？** 两个向量做不到的事：
+
+1. **精确命中**：查 `crc32` 这种专有名词、代码片段、人名，embedding 会把它和相近的东西混在一起，字面匹配一下就锁死了；
+2. **零成本**：纯 Python 一次几微秒，向量查询要毫秒级——570 块全库跑一遍词法毫无压力，模型跑不起。
+
+**混合检索的本质就是：词法保精确 + 向量保泛化。**
+
+> **⚠️ 别把两件事混起来**：9.7.9 实测的「词法重排零增益」说的是**在已有向量召回的前提下，再叠一层词法精排没意义**（精确命中的活儿 BM25 召回阶段已经干完了），**不是词法本身没用**。「词法重排没增益」≠「词法没用」。
+
+##### ② 这些数字可信吗、符合直觉吗
+
+拿到一份检索评测报告，**不要只看它给出的数字，按这四步验一遍**：
+
+**第 1 步：内部自洽性**——明细能不能对上汇总？用报告自带的 `results` 独立复算 NDCG，与顶层 `ndcgAtK` 比对。本项目实测两者差 **5e-6**（纯舍入），说明 `results` 与聚合逻辑一致，不是拼凑的数字。
+
+**第 2 步：数学关系**——各指标之间符不符合应有的数学约束？例如 `reciprocalRank` 必须等于 `1/首命中名次`、`hit` 必须等价于 `首命中名次 > 0`。本项目 77/77 题全部通过。
+
+**第 3 步：单调关系**——符合直觉的方向对不对？本项目四条，全部 ✓：
+
+| 检查项 | 实测 | 是否符合直觉 |
+| --- | --- | --- |
+| 宽松 HitRate ≥ 严格 HitRate | 62 ≥ 60 | ✓ 宽松定义更宽，必然更大 |
+| 生产配置 ≥ 任何消融组 | 0.8182 最高 | ✓ 加了精排不该变差 |
+| 关向量最差 | `bm25_only` 0.6753 最低 | ✓ 570 块下纯 BM25 天花板低 |
+| RRF ≥ weighted | 0.7922 > 0.7532 | ✓ 排名融合更抗分数尺度 |
+
+**第 4 步：交叉验证**——**最关键的一步**。同一件事用两条独立代码路径各测一遍，看数字是否吻合。本项目 `rrf_ce` 消融组 = 评测主指标 = 9.7.8(6) 生产黑盒复评 = **63/77 / 61/77 三处完全一致**——这比任何单个数字都有说服力，说明检索链路可复现、评测没测错东西。
+
+**四步都过了，还可能出现「反直觉但正确」的结果。** 本项目就有一个：`weighted` 模式下加 CE 精排反而**掉 2 条**（0.7532→ 0.7273）。直觉上「加精排不该变差」，但追下去发现是候选池规模差异（weighted 只跳过双零块 ⇒ 池子 ≈ 全库 570；rrf 须进过一路榜单 ⇒ 池子 ≈ 128 + BM25 命中数），weighted 的融合分经 min-max 后长尾被拉平，head-16 质量差，CE 反而在噪声上做加权把排序带偏。完整机制见 9.7.9「反常项深挖」。
+
+> **判断一条检索数字可不可用，就问三件事**：
+>
+> **① 什么口径？** 宽松还是严格？本项目 Recall（实现为 `1.0 if hit else 0.0`）与 Precision（分母固定 top_k + 宽松词表判相关）**都不是标准 IR 语义，跨系统不可引用**。
+> **② 什么配置？** 向量开没开、什么融合、什么精排、候选窗口多大？
+> **③ 样本多大？** 本项目 77 题 Top-4——77 题只能支撑到「几个百分点」的结论，**不足以区分 1~2 条的差异**。
+>
+> 三问不过，数字没有意义。这是 9.7 全节反复强调的口径纪律，也是 9.7.5 消融存在的意义：**把「看起来有用」和「实际有用」分开**。
+
 
 ### 9.8 search_knowledge 总装走读（store.py:804-970）
 
@@ -2842,10 +3333,10 @@ print("有 report 事件?", "report" in names_high, "| 最后:", names_high[-1])
 
 **工程化 Agent 项目的标志**：效果不是「看着不错」，而是可重复度量。
 
-- `evaluation/runner.py`：真实指标——路由/风险判定准确率、高风险召回率、误报率、HitRate/Recall@4/Precision@4/MRR/NDCG@4、技能选择、安全泄漏检查、多轮一致性、150 条规模化基准；如实标注样本量、数据来源与验证日期（含 95% 置信区间），不再为满分筛选样本。**150 条规模化基准按 `layer` 字段双层拆分**：`base`（基础层·贴近主流场景）/ `stress`（压力层·边界探测），runner 分别输出两套独立指标（`scaled_benchmark.base` / `scaled_benchmark.stress`），零删改、不凑分——既保住“代表性”卖点，也主动暴露规则通道的边界缺口。
+- `evaluation/runner.py`：真实指标——路由/风险判定准确率、高风险召回率、误报率、RAG 检索指标（HitRate/Recall@4/Precision@4/MRR/NDCG@4，口径与陷阱见 9.7.9）、技能选择、安全泄漏检查、多轮一致性、150 条规模化基准；如实标注样本量、数据来源与验证日期（含 95% 置信区间），不再为满分筛选样本。**150 条规模化基准按 `layer` 字段双层拆分**：`base`（基础层·贴近主流场景）/ `stress`（压力层·边界探测），runner 分别输出两套独立指标（`scaled_benchmark.base` / `scaled_benchmark.stress`），零删改、不凑分——既保住“代表性”卖点，也主动暴露规则通道的边界缺口。
 - `evaluation/datasets.py`：加载 `eval/fixtures/representative_corpus.json`（150 条人工构造、人工标注、贴近校园心理求助语料的代表性金标样本，**每条含 `layer`（base/stress）与 `source`（synthetic-representative/synthetic-boundary）字段**，含隐式高危与第三人称干扰）、`rag_queries.json`（77 条自然语言 RAG 问句）、`multi_turn_corpus.json`（8 组多轮场景）；并提供基于种子哈希排序的可复现抽样工具。
 - `evaluation/report_html.py`：单文件 HTML 报告（内联 CSS），管理端一键可看。
-- `app/evaluation/rag.py`：RAG 专项（HitRate/Recall@4/Precision@4/MRR/NDCG@4，独立运行改用一次性 SQLite 评测库、不依赖 MySQL/pymysql），数据集在 `eval/fixtures/rag_queries.json`（77 条自然语言问句；知识库已由 24 篇扩至 173 篇 / 570 块，最新评测数据链见 docs/records/ROUND-21-RAG-LOCAL-UPGRADE.md）。
+- `app/evaluation/rag.py`：RAG 专项（独立运行改用一次性 SQLite 评测库、不依赖 MySQL/pymysql），数据集在 `eval/fixtures/rag_queries.json`（77 条自然语言问句；知识库已由 24 篇扩至 173 篇 / 570 块，最新评测数据链见 docs/records/ROUND-21-RAG-LOCAL-UPGRADE.md）。**它输出 7 个指标（Recall@K / Precision@K / MRR / NDCG@K / HitRate / HitRateStrict / 首命中平均名次）**并附 6 组消融（同库 570 块 / 77 题，逐组切换向量·融合·重排引擎）。生产配置实测（2026-11-11）：HitRate **0.8182** / 严格 **0.7922** / MRR 0.6656 / NDCG 0.6997 / Precision 0.2857。**三个口径提醒**：① Recall 实现为 `1.0 if hit else 0.0`，已退化成 HitRate；② Precision 分母固定 top_k 且用宽松词表判相关，**非标准 IR 语义、跨系统不可引用**；③ 仅 HitRate 与 MRR/NDCG 口径清晰，是可对外引用的主指标。公式、完整数值表、消融结论与一次已修复的消融引擎缺陷见 → [9.7.9](#station-9)。
 - `app/evaluation/harness/runner.py` + `factory.py`：工程级场景回放——8 套件（risk/routing/skills/rag/api/tool-queue/scaled/runtime-ab）验证端到端行为（如“审批后 5 个工具任务全部 success”“死信被正确创建”），失败退出码 1，可接 CI。`factory.py` 是重构产物：harness 与 `eval/run_eval.py` 共用一个装配工厂，消除两份漂移的样板。
 - `eval/run_eval.py`：综合评测 CLI（仅 22 行）——`build_harness_orchestrator(data_dir)` 用与 harness 同一个装配工厂造出 mock、隔离 SQLite 的编排器，再调 `run_evaluation(orchestrator, store, eval/fixtures, data/eval)`（`evaluation/runner.py` 的总入口，依次跑路由/风险/安全/技能/150 条双层基准/多轮一致性并汇总），最后打印 summary。与 harness 的分工：harness 断言「端到端行为对不对」（回归视角），run_eval 产出「能力指标好不好」（度量视角）——一个管回归、一个管度量，共用同一套装配，这就是 4.7 两条命令背后其实只有一个装配事实的原因。
 - `scripts/eval_risk_dual_path.py`（历史实验）：风险 LLM 通道双路径评测——同 150 条语料分别跑 baseline（MockLLM + channel OFF）与 llm_stub（`MetaphorAwareStubClient` + channel ON），直调 `RiskGuardianAgent.assess()` 避免 response 生成/judge 等额外 LLM 调用；另有真实 GLM-4.7-flash 的 25 条扩展 best-effort probe。产出 `data/eval/risk_dual_path.json`。当前生产模型验收结论以训练仓 `reports/V9-TRAINING-EVAL-SUMMARY.md` 为准（原始 JSON 未随训练仓保留；仓库内转载见 [`docs/training/V9-ACCEPTANCE.md`](docs/training/V9-ACCEPTANCE.md)）。
@@ -3425,6 +3916,7 @@ L1 管 Agent 协作内务；L2 管「用户现在是什么状态」（SCD-2 有�
 > 清点：20 张表 / 172 个 `mapped_column` 列。
 
 <a id="appendix-c"></a>
+
 
 # 附录 C：Settings 全量字段表（config.py · 96 项 · 复现配置用）
 

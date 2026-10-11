@@ -2003,7 +2003,7 @@ superseded_by  替代它的新事实 public_id
 2. **哈希碰撞制造假相似**：64 个桶要装下近乎无限的 bigram 组合，不同双字常撞进同一桶，无关文本可能被算出相似度；
 3. ~~跨进程不可复现~~（**已于 2026-10-10 修复**）：原实现用 Python 内置 `hash()`，默认随 `PYTHONHASHSEED` 随机化、换进程重跑分桶即变；现改为 `zlib.crc32`（vector_store.py:367），跨进程分桶一致、评测可复现。
 
-因此 9.7.5 消融里 hybrid 的退化（0.8312 vs 0.9351）说明的是「local-hash 不适合做高权重语义召回」，**不能据此否定真实语义向量**（MiniLM / bge-small-zh / OpenAI embedding）的价值——正是用真中文嵌入把 rrf 召回从 64 拉回 75（9.7.8）。
+消融里 local-hash 伪向量让命中下降（数据见 [ROUND-12](docs/records/ROUND-12-RAG-ENHANCEMENT-BENCHMARK.md)），说明的是「伪向量不适合做高权重语义召回」，**不能据此否定真实语义向量**（MiniLM / bge-small-zh / OpenAI embedding）的价值——正是用真中文嵌入把 rrf 召回从 64 拉回 75（9.7.8）。
 
 **Q5 LocalVectorBackend 到底是「降级」还是「替代」？「默认」为什么有两个？**
 
@@ -2114,32 +2114,21 @@ final = base_score * 0.55                          # 融合分保底
 
 #### 9.7.5 消融实验（Ablation Study）
 
-`app/evaluation/rag.py:run_ablation()` 提供消融跑批，在**同一 77 条查询**上对比 4 种检索配置：
+**为什么需要消融**：混合检索的每个组件（向量路、融合方式、重排槽位、候选窗口）都可能「看起来有用、实际拖后腿」。消融就是在**同一知识库、同一 77 条查询**上逐个改变一个变量，对比双口径 HitRate@4 与延迟——用数据而不是直觉决定配置。本项目所有检索改动（嵌入选型、融合式精排、窗口调优）都由此验证。
 
-| 配置 | 说明 | HitRate@4 | 平均延迟(ms) |
-| --- | --- | --- | --- |
-| `bm25_only` | 关向量，开 rerank | **0.9351** | 20.59 |
-| `hybrid` | 开 local-hash 向量，关 rerank | 0.8312 | 7.73 |
-| `hybrid_rerank` | 开向量 + rerank（向量开启的可选生产配置，不是代码默认） | 0.8052 | 19.14 |
-| `rrf` | RRF 融合 | 0.7662 | 8.16 |
-
-**结论（如实呈现）**：
-- 在**零依赖的 `local-hash` 词法向量**下，纯 BM25 已足够强，混入哈希向量反而稀释分数
-- hybrid / RRF 的增量价值需要**真实语义向量**（Chroma + MiniLM / OpenAI embeddings）才能体现
-- 这一结果明确了“演示默认 `VECTOR_ENABLED=false` 时走 BM25 路径；生产若启用语义向量应重新评测”的配置边界。
-> [!NOTE]
-> 下表为历史基线（24 块库、local-hash 时代）的消融数据，用于示范**消融方法论**本身；当前配置（570 块库 + 中文嵌入）的六配置对照见 9.7.8。
-
-> 复现提示：消融数字随代码与语料版本漂移（如 2026-08-30 落盘报告与逐条复跑之间存在出入）。引用任何一组数字时注明对应日期与版本，不要把旧汇总当当前值。当前的全量最新对照（中文嵌入 / CE 融合 / 570 块扩库 / 窗口 128）见 9.7.8。
+**实现**：`app/evaluation/rag.py:run_ablation()` 提供消融跑批——固定查询集与知识库，只改配置（向量开关 / 融合方式 / 重排引擎），索引建在临时目录，不污染生产。
 
 **运行方式**：
 ```bash
 python -m app.evaluation.rag  # 输出双口径 HitRate + 消融对比
 ```
 
+**当前配置的实测结果**：见 9.7.8（六配置矩阵 + 候选窗口对照）。
+> 历史上的第一份消融基线（24 块库、`local-hash` 伪向量时代）的结论是「纯 BM25 优于混入伪向量」；完整数据见 [ROUND-12](docs/records/ROUND-12-RAG-ENHANCEMENT-BENCHMARK.md)。
+
 #### 9.7.6 查询缓存
 
-**动机**：RAG 检索（尤其向量 + rerank）延迟 15-20ms，重复查询浪费算力。
+**动机**：RAG 检索不是廉价操作（BM25 路径约 20ms；启用 CE 精排后约 2s/条，见 9.7.8），重复查询浪费算力。
 
 **实现**：
 ```python
@@ -2155,10 +2144,7 @@ self._knowledge_cache: OrderedDict[str, tuple[datetime, list[dict]]] = ...
 
 **当前实现边界**：有效命中来自进程内 LRU；Redis 缓存键会被写入以预留后续能力，但 `_check_cache()` 尚未读取 Redis，因此当前没有跨进程查询缓存。
 
-**效果**：
-- 冷查询 avg ~18-20ms
-- 命中后 <0.01ms，**加速约 3 个数量级**
-- 命中率 0.667（30 条 warmup + 60 次命中，基准测试数据）
+**效果**：命中后 <0.01ms，相对冷查询加速约 3 个数量级（基准测试数据见 `data/eval/benchmark.json`）。
 
 #### 9.7.7 双口径评测
 
@@ -2169,10 +2155,7 @@ self._knowledge_cache: OrderedDict[str, tuple[datetime, list[dict]]] = ...
 
 **报告新增**：`hitRateStrict` / `strictSourceMatches`，同时输出两口径值。
 
-**历史基线实测（77 条查询，Top-4）**：
-- 宽松口径 HitRate@4：**0.9351**（72/77）
-- 严格口径 HitRateStrict：**0.8831**（68/77）
-- MRR / NDCG@4：0.8203 / 0.8323
+**当前实测**（570 块库、生产配置，见 9.7.8）：宽松 HitRate@4 **0.818**（63/77）、严格来源命中 **0.792**（61/77）。
 
 #### 9.7.8 当前生产实测：RAG 本地化全链升级（中文嵌入 / CE 融合 / 570 块扩库）
 
@@ -2265,7 +2248,7 @@ KNOWLEDGE_CANDIDATE_K=128 / VECTOR_TOP_K=128
 | 修复后（窗口 16） | 570 块 | 0.740 | 0.701 |
 | **修复后（窗口 128，最终）** | **570 块** | **0.818** | **0.792** |
 
-规模放大 24 倍而严格口径与旧 24 块库生产基线持平；平均 2.1s/条（CE 精排为延迟主成本，与历史 CE 实测的 850ms 量级一致）。生产环境已核对：MySQL `knowledge_chunks` 570 块（id 422–991）与 Chroma `aegis_knowledge_zh` 570 条逐一对齐。数据链：production-check-report.json（最终）/ ce-fusion-report.json / v2-full-report.json / retrieval-window-report.json。
+规模放大 24 倍而严格口径与旧 24 块库生产基线持平；平均 2.1s/条（CE 精排为延迟主成本；BM25-only 路径约 20ms/条）。生产环境已核对：MySQL `knowledge_chunks` 570 块（id 422–991）与 Chroma `aegis_knowledge_zh` 570 条逐一对齐。数据链：production-check-report.json（最终）/ ce-fusion-report.json / v2-full-report.json / retrieval-window-report.json。
 
 ### 9.8 search_knowledge 总装走读（store.py:804-970）
 
@@ -2882,7 +2865,7 @@ python -m app.evaluation.harness.runner --suite risk
 
 - **只看「通过率」，不看样本量与置信区间**：runner 如实标注样本来源与区间；「150 条上 FPR=0」与「10 条上 FPR=0」不是一个量级的证据。
 - **评测时开着自动蒸馏 / 查询缓存**：会写使用统计、污染基线（4.9 第 5 条）；hermetic 评测先关 `SKILL_DISTILL_ENABLED`。
-- **把文中引用的数字当当前承诺**：本指南出现的所有指标（0.9351、0.67→0.94 等）都对应特定分支 / 日期 / 配置；自己机器上以现跑为准。
+- **把文中引用的数字当当前承诺**：本指南出现的所有指标（0.818、0.67→0.94 等）都对应特定分支 / 日期 / 配置；自己机器上以现跑为准。
 - **用真模型跑安全主链评测**：mock 保证「测系统不测模型运气」；真模型只应进入 LLM-as-Judge 等质量通道，且结果要标注随机性与日期。
 
 #### 练习
@@ -2958,7 +2941,7 @@ python -m pytest tests/test_assessment.py -q
 
 **Q4：RAG 为什么默认关向量？开了不更强吗？**
 
-代码默认仍关向量（`VECTOR_ENABLED=false` → 纯 BM25 + 条件精排，零依赖即可跑通）——这是历史决策：当时能用的「本地向量」只有 local-hash 伪向量与英文 MiniLM，9.7.5 消融显示二者都让 BM25 精确信号被稀释（0.9351 → 0.83），「开了反而更差」。
+代码默认仍关向量（`VECTOR_ENABLED=false` → 纯 BM25 + 条件精排，零依赖即可跑通）——这是历史决策：当时能用的「本地向量」只有 local-hash 伪向量与英文 MiniLM，当时的消融显示二者都让 BM25 精确信号被稀释、「开了反而更差」（数据见 [ROUND-12](docs/records/ROUND-12-RAG-ENHANCEMENT-BENCHMARK.md)）。
 
 **结论已翻转**：换成真中文嵌入（`local-zh` / bge-small-zh-v1.5）后 rrf 召回 64 → 75；再叠加 CE 融合式精排与候选窗口 128，570 块扩库下宽松命中 0.818 / 严格 0.792（9.7.8）。「默认关」现在只适用于零依赖最小路径，生产配置已启用向量——复现时按 9.7.8 的配置与 `scripts/eval_retrieval_window.py` 验证。
 

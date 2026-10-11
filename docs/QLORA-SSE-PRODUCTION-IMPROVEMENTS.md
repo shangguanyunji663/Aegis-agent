@@ -261,6 +261,8 @@ BM25 + 向量 + Reranker
 
 比较 HitRate@4、Recall@4、MRR、NDCG、P95 和 token 成本。
 
+> **状态（2026-10-11）：已完成并超出原范围。** 第十九轮完成 Cross-Encoder 首轮消融（含上述四组对照）；第二十一轮扩展为六配置 × 双口径矩阵（BM25 全库 + 三路向量召回 × 词法/CE 替换式/CE 融合式精排），并完成 24 → 570 块真实扩库验证与生产落地（全本地 ONNX 组件、零外部 API，宽松 0.818 / 严格 0.792）。核心结论：CE 精排的增益以召回质量为前提（召回决定上限）；融合式精排全面优于替换式。数据链见 `docs/records/ROUND-21-RAG-LOCAL-UPGRADE.md`、`data/eval/v2-full-report.json`、`data/eval/production-check-report.json`。
+
 ### 5.3 GraphRAG
 
 GraphRAG 适合作为独立实验，不建议直接替换当前 RAG。可以先针对：
@@ -279,7 +281,7 @@ GraphRAG 适合作为独立实验，不建议直接替换当前 RAG。可以先�
 4. MCP 权限矩阵、工具状态机、幂等和死信。
 5. 并发压测和 GPU/P95 监控。
 6. vLLM/SGLang/KV Cache 对比。
-7. Reranker 消融实验。
+7. Reranker 消融实验（**已完成**：ROUND-19 首轮消融；ROUND-21 扩展为六配置 × 双口径 + 570 块扩库，见 5.2 状态）。
 8. 小型 GraphRAG 实验。
 9. 最后再考虑 WebSocket 和 A2A。
 

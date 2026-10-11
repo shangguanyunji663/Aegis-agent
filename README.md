@@ -70,7 +70,7 @@
 
 | 项 | 数值 |
 | :--- | :--- |
-| 内置知识库 | 24 篇 Markdown 文档 |
+| 内置知识库 | 173 篇 Markdown 文档（约 570 个检索块） |
 | 人工策展 Skill | 8 个（另有运行时自动蒸馏产物） |
 | 评测金标集 | 150 条代表性样本（基础层 63 / 压力层 87）+ 77 条 RAG 问句 + 8 组多轮场景 |
 | 测试覆盖 | 15 个 pytest 模块，覆盖路由 / 风险 / 记忆 / API / MCP / 三运行时 A/B（`app/` 源码 75 个模块） |
@@ -87,7 +87,7 @@
 | Agent Runtime Harness | Agent 调用、上下文注入、风险报告与工具计划散落业务代码将难以审计 | `AegisAgentHarness` 统一封装输入脱敏、运行时调用、trace 保存、消息持久化、报告生成与工具计划 |
 | 自治多 Agent 协作 | 单个 Lead Agent 串行分派容易沦为「伪协作」 | 默认 `autonomous` 运行时基于 append-only blackboard 实现任务发布、Agent claim、artifact 产出、风险 override 与最终验收；可切换 LangGraph 或 ordered 运行时 |
 | 分层 MemoryAgent | 心理支持需要连续性，单轮回复无法体现对用户状态变化的理解 | L1 Agent 私有记忆 + L2 跨会话结构化用户事实 + L3 会话滚动摘要 + L4 最近原话窗口；L2 以有效期截断处理状态冲突，并优先于可能过期的摘要注入 Prompt |
-| Agentic RAG | 全量检索会引入噪声，陪伴类对话尤其易被知识文档带偏 | 通过 CHAT / CONSULT / RISK 意图路由决定是否检索；多路召回（BM25 + 可选向量）+ 加权/RRF 融合 + 条件 rerank + 邻块扩展 |
+| Agentic RAG | 全量检索会引入噪声，陪伴类对话尤其易被知识文档带偏 | 通过 CHAT / CONSULT / RISK 意图路由决定是否检索；多路召回（BM25 + 向量，可开关）+ 加权/RRF 融合 + 三引擎精排（词法公式 / Cross-Encoder / CE 融合）+ 邻块扩展 |
 | 工具治理与 MCP | 高风险预警、Excel 记录、邮件通知不可由模型越权直接执行 | 工具调用先生成 `ToolJob`，经角色、风险等级、审批、脱敏与审计后进入队列；支持 internal 与 FastMCP 双后端 |
 | 后台 Tool Queue | 外部工具慢、失败或限流时不应阻塞学生端流式回复 | 独立 worker 支持依赖调度、重试退避、邮件限流、dead letter、`ExcelRecord` 与 `AlertRecord` 持久化 |
 | 工程 Harness | Agent 项目只看 demo 容易高估完成度 | pytest 单元/接口测试、RAG eval、综合 eval（含 LLM-as-Judge）、harness 8 套件、三运行时 A/B、本地 benchmark |
@@ -112,7 +112,7 @@ flowchart LR
     Runtime --> Counselor["CounselorAgent"]
     Runtime --> Companion["CompanionAgent"]
 
-    Knowledge --> RAG["Hybrid RAG<br/>BM25 + 可选 Vector + Rerank"]
+    Knowledge --> RAG["Hybrid RAG<br/>BM25 + 本地向量 + 三引擎精排"]
     Harness --> Store["SQLite / MySQL / 可选 PostgreSQL<br/>messages, memory, reports, traces"]
     Harness --> ToolPlan["Governed ToolJob"]
     ToolPlan --> Queue["Tool Queue Worker"]
@@ -273,16 +273,17 @@ RISK_QLORA_TIMEOUT_SECONDS=8
 │   ├── api/                     # HTTP 路由：schemas | deps | middleware | pages | system | auth_routes | chat | admin
 │   ├── evaluation/              # 评测：runner | rag | datasets | report_html | runtime_ab | judge + harness/
 │   └── mcp/                     # MCP 边界：server（FastMCP 服务）| client（stdio 客户端）
-├── knowledge/                   # 内置心理支持知识库（当前 24 篇 .md）
+├── knowledge/                   # 内置心理支持知识库（当前 173 篇 .md）
 ├── eval/                        # 评测 CLI 与 fixtures（路由 / 风险 / 安全 / 多轮 / 检索 / RAG 数据集）
 ├── skills/                      # 人工策展 Skill 规范；运行时可在 skills/auto/ 生成 auto Skill
 ├── frontend/                    # 前端：Vite + React 19 + TS（src/ 三概念 × 三页 + shared/ + lib/），产物 dist/ 由 FastAPI 同源托管
-├── tests/                       # pytest 测试（15 个模块）
+├── tests/                       # pytest 测试（16 个模块）
 ├── scripts/                     # 启动/联调/诊断：start-local | start-compose | smoke_chat | probe_glm
 │                                #                migrate_sqlite_to_mysql | eval_risk_dual_path | run_benchmark | analyze_layers
 │                                #                eval_minilm_ablation_tmp | eval_ce_tmp（第十九轮 RAG 对照评测）
+│                                #                eval_bge_small_zh_recall | eval_ce_fusion | eval_v2_full | eval_retrieval_window（第二十一轮 RAG 对照评测）
 ├── docs/                        # 架构、安全、演示、教师手册与前端学习文档
-│   └── records/                 # 迭代记录（第 1 ~ 20 轮）
+│   └── records/                 # 迭代记录（第 1 ~ 21 轮）
 ├── Dockerfile
 ├── docker-compose.yml
 └── requirements.txt
@@ -432,7 +433,7 @@ python -m app.mcp.server --list
 | 数据集 | 规模与来源 | 落盘产物 / 日期 |
 | :--- | :--- | :--- |
 | 路由 / 风险 / 规模化基准 | `eval/fixtures/representative_corpus.json`，150 条人工构造金标样本，含 `layer`（base / stress）与 `source` 双层拆分标记 | `data/eval/latest.json`，2026-08-19 |
-| RAG 检索 | `eval/fixtures/rag_queries.json`，77 条自然语言问句，基于 24 篇知识文档 | `data/eval/rag-eval-report.json`，2026-08-20 |
+| RAG 检索 | `eval/fixtures/rag_queries.json`，77 条自然语言问句，基于内置知识库 | `data/eval/rag-eval-report.json`，2026-08-20 |
 | RAG 语义重排与真向量实测（第十九轮） | 同 77 条问句；Chroma+MiniLM 嵌入与 bge-reranker-base Cross-Encoder 逐条对照 | `data/eval/minilm-eval-report.json` / `data/eval/ce-eval-report.json`，2026-09-29 |
 | 多轮回归 | `eval/fixtures/multi_turn_corpus.json`，8 组多轮场景 | `data/eval/latest.json`，2026-08-19 |
 | 三运行时 A/B | 10 条代表性消息 | `data/harness/runtime-ab-report.md`，2026-08-20 |
@@ -446,8 +447,9 @@ python -m app.mcp.server --list
 | 150 条规模化基准（双层拆分） | 基础层 63 条 + 压力层 87 条，runner 分别输出两套独立指标 | **2026-08-19**：整体联合准确率 **0.63**、意图 **0.63**、风险 **0.81**、高风险召回 **0.60**、误报率 **0.00**；基础层准确率 **0.97** / 风险 **1.00** / 高召回 **1.00**；压力层准确率 **0.39** / 风险 **0.67** / 高召回 **0.52** |
 | 风险双通道 + QLoRA 微调 | 历史规则/stub/GLM sanity 与当前真实 v9 QLoRA 冻结 stress 87 条验收 | **当前以 v9 QLoRA 为准**：`RISK_QLORA_ENABLED=true` 时八门槛全过 |
 | 多轮回归 | 8 组多轮场景（含升级到中/高风险、第三人称转自身） | **2026-08-19**：最终关键内容命中率 **0.875**（7/8） |
-| RAG 检索 | 77 条问句 Top-4；专项消融使用 local-hash 向量配置 | **2026-08-20**：宽松 HitRate@4 **0.935**、严格来源命中 **0.883**、Recall@4 **0.935**、Precision@4 **0.351**、MRR **0.820**、NDCG@4 **0.832** |
-| RAG 语义重排（第十九轮实测） | 同 77 条问句：BM25+Cross-Encoder 精排、Chroma+MiniLM 真向量混合 | **2026-09-29**：BM25+Cross-Encoder **0.948**（73/77，历史最优）；真 MiniLM 混合 **0.857**（被英文嵌入模型拖累，暂不启用，需换中文嵌入模型重测）；CE 延迟 ~850ms/条（CPU int8） |
+| RAG 检索（双口径 + 消融） | 77 条问句 Top-4；消融走真实嵌入配置（2026-10-10 修复：继承生产配置、临时目录隔离、逐模式记录生效后端） | **2026-10-10**：主口径（chroma+MiniLM、hybrid_rerank）宽松 HitRate@4 **0.870**、严格来源命中 **0.792**、MRR **0.734**、NDCG@4 **0.760**；词法基线 bm25_only **0.935**（72/77）；完整报告 `data/eval/rag-eval-report.json` |
+| RAG 中文语义嵌入实测（嵌入 × 权重 × 融合对照） | 同 77 条问句：智谱 embedding-3（中文，OpenAI 兼容 API）× 融合权重 sweep × hybrid / hybrid_rerank / rrf | **2026-10-10**：智谱 embedding-3 混合 **0.987**（76/77，历史最优；hybrid_rerank 在 w≥0.35 与 rrf 同达，相对 bm25_only 零损失纯增益，约 300ms/条）；MiniLM 最优权重实为 **w=0.2**（0.961，74/77，旧 0.65 权重为其次优根源）；BM25+Cross-Encoder 旧最优 0.948（73/77）。报告见 `data/eval/embedding-compare-report.json`、`fusion-tuning-report{,-openai}.json` |
+| RAG 本地化检索链路（第二十一轮 · 当前生产配置） | 77 条问句 Top-4；全本地 ONNX 组件（bge-small-zh-v1.5 召回 + bge-reranker-base 融合式 CE 精排）+ RRF + 候选窗口 128；知识库真实扩至 570 块 | **2026-10-11**：宽松 HitRate@4 **0.818**（63/77）、严格来源命中 **0.792**（61/77），约 2.1s/条（CE 精排为延迟主成本）；规模放大 24 倍而严格口径与旧 24 块库生产基线持平，零外部 API；含生产精排链路 bug 修复（修复前后宽松 0.442→0.740）与窗口对照实验（16→128：0.740→0.818，可复跑 `scripts/eval_retrieval_window.py`）。报告 `data/eval/production-check-report.json`；完整数据链见 [ROUND-21](docs/records/ROUND-21-RAG-LOCAL-UPGRADE.md) |
 | 三运行时 A/B | langgraph / autonomous / ordered 对比延迟、trace 步数、LLM 调用数与判定一致性 | **2026-08-20**：三运行时判定完全一致；意图准确率 **0.8**、风险准确率 **0.9**，含 1 条规则引擎漏判的隐式高危边界样本 |
 | Harness 验证 | Risk Safety、Agent Routing、Standard Skills、RAG、API、Tool Queue、Runtime A/B 等链路（验证工程行为，不强制满分） | **历史快照**：`data/harness/current-verification.json` 为 **8/8 通过**；`latest.json` 是旧的 7-suite 存档，建议重跑后覆盖 |
 | 本地性能 benchmark | MockLLM 确定性环境，20 条代表性消息 × 并发 [1,4,8] | **2026-08-20**：并发 1 → avg 66ms / P95 71ms / 15.1 req/s；并发 4 → avg 316ms / P95 729ms / 12.3 req/s；并发 8 → avg 517ms / P95 1260ms / 13.5 req/s。缓存命中 <0.01ms；ToolJob 5/5 成功、0 死信 |
@@ -583,6 +585,7 @@ python -m app.mcp.server --list
 | 第十八轮 | 前端多主题切换与零闪烁注入 | [ROUND-18-THEME-SWITCHER.md](docs/records/ROUND-18-THEME-SWITCHER.md) |
 | 第十九轮 | RAG 语义重排引擎（Cross-Encoder）与真 MiniLM 实测 | [ROUND-19-RAG-SEMANTIC-RERANK.md](docs/records/ROUND-19-RAG-SEMANTIC-RERANK.md) |
 | 第二十轮 | 前端三概念主题系统（Vite + React + TS）与浏览器取色驱动的主题化 | [ROUND-20-FRONTEND-SCENE-DRIVEN.md](docs/records/ROUND-20-FRONTEND-SCENE-DRIVEN.md) |
+| 第二十一轮 | RAG 本地化升级（bge-small-zh 嵌入 + CE 融合精排 + 570 块规模化落地 + 生产 bug 修复） | [ROUND-21-RAG-LOCAL-UPGRADE.md](docs/records/ROUND-21-RAG-LOCAL-UPGRADE.md) |
 
 </details>
 

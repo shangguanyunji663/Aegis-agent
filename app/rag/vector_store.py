@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import shutil
+import zlib
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
@@ -124,8 +125,13 @@ class ChromaVectorBackend(VectorSearchBackend):
         self.collection = None
         self.persist_dir: Path | None = None
         self._local_ef = None
-        self.use_local_embedding = settings.embedding_provider.strip().lower() == "local"
-        self.embedding_model = "local-minilm" if self.use_local_embedding else settings.openai_embedding_model
+        provider = settings.embedding_provider.strip().lower()
+        self.use_local_embedding = provider in {"local", "local-zh"}
+        self._local_embedding_provider = provider
+        self.embedding_model = {
+            "local": "local-minilm",
+            "local-zh": "bge-small-zh-v1.5",
+        }.get(provider, settings.openai_embedding_model)
 
         if not settings.vector_enabled:
             self.last_error = "Chroma 向量库未启用"
@@ -144,11 +150,22 @@ class ChromaVectorBackend(VectorSearchBackend):
         self._init_remote_collection()
 
     def _init_local_embedding(self) -> None:
-        """本地嵌入模式:chromadb 自带 MiniLM 嵌入函数,离线可用、无需 API key。"""
-        try:
-            from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
+        """本地嵌入模式,离线可用、无需 API key。
 
-            self._local_ef = DefaultEmbeddingFunction()
+        - local: chromadb 自带 MiniLM 嵌入函数(英文模型)
+        - local-zh: bge-small-zh-v1.5 ONNX(本地中文嵌入,CPU 推理)
+        """
+        try:
+            if self._local_embedding_provider == "local-zh":
+                from app.rag.zh_embedder import LocalZhEmbeddingFunction
+
+                self._local_ef = LocalZhEmbeddingFunction(
+                    str(self.settings.resolve_path(self.settings.zh_embedding_model_dir))
+                )
+            else:
+                from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
+
+                self._local_ef = DefaultEmbeddingFunction()
             # 预热一次,触发模型下载/加载失败时走降级
             self._local_ef(["warmup"])
             self._open_collection()
@@ -336,13 +353,18 @@ def build_vector_backend(settings: Settings) -> VectorSearchBackend:
 
 
 def embed_text(text: str, size: int = 64) -> list[float]:
+    """确定性字符 bigram 哈希向量(轻量兜底/降级路径)。
+
+    使用 zlib.crc32 而非内置 hash():后者受 PYTHONHASHSEED 随机盐影响,
+    跨进程结果不一致,导致评测不可复现、入库向量与运行时查询无法对齐。
+    """
     vector = [0.0] * size
     compact = "".join(ch.lower() for ch in text if ch.strip())
     if not compact:
         return vector
     for index in range(max(1, len(compact) - 1)):
         gram = compact[index:index + 2]
-        bucket = hash(gram) % size
+        bucket = zlib.crc32(gram.encode("utf-8")) % size
         vector[bucket] += 1.0
     norm = math.sqrt(sum(value * value for value in vector)) or 1.0
     return [value / norm for value in vector]

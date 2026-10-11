@@ -293,14 +293,15 @@ flowchart TD
 | `LANGGRAPH_CHECKPOINT_ENABLED` | `true`                                   | LangGraph checkpoint 持久化                              |
 | `AGENT_RUNTIME`                | `autonomous`                             | 默认 Agent 编排器                                          |
 
-### 9.8 检索重排双引擎（第十九轮）
+### 9.8 检索重排引擎与本地化检索（第十九 / 二十一轮）
 
-重排槽位支持两种引擎，由 `KNOWLEDGE_RERANK_ENGINE` 切换（默认 `lexical`，行为与历史版本完全一致）：
+重排槽位支持三种引擎，由 `KNOWLEDGE_RERANK_ENGINE` 切换（默认 `lexical`，行为与历史版本完全一致）：
 
 - **词法引擎（默认）**：四路词面信号加权（base*0.55 + 词面*0.25 + 覆盖率*0.15 + 短语*0.05），纯 Python、全库重打分、零模型成本；
-- **Cross-Encoder 引擎**：`app/rag/reranker.py` 加载 ONNX 模型（bge-reranker-base int8，`RERANKER_MODEL_DIR`），按融合分截取 top-N（`KNOWLEDGE_RERANK_TOP_N=16`）做两段式精排；模型缺失/推理失败自动回退词法公式并记录 `vector_error`，检索永不中断。
+- **Cross-Encoder 引擎（替换式）**：`app/rag/reranker.py` 加载 ONNX 模型（bge-reranker-base int8，`RERANKER_MODEL_DIR`），按融合分截取 top-N（`KNOWLEDGE_RERANK_TOP_N=16`）做两段式精排；模型缺失/推理失败自动回退词法公式并记录 `vector_error`，检索永不中断；
+- **ce_fusion（融合式，第二十一轮）**：`final = λ·norm(词法分) + (1−λ)·norm(CE 分)`（`KNOWLEDGE_CE_FUSION_LAMBDA=0.4`），保留词法信号权重、CE 只作第二信号；扩库场景下全面优于替换式（570 块库融合 64 vs 替换 59）。检索链路另支持本地中文嵌入 `EMBEDDING_PROVIDER=local-zh`（bge-small-zh-v1.5 ONNX）与 RRF 候选窗口 `KNOWLEDGE_CANDIDATE_K`（建议 ≥96，窗口过小会使期望源拿不到向量侧排名分）。
 
-实测（77 条问句，2026-09-29）：BM25+Cross-Encoder **73/77 (0.948)** 为历史最优；真 MiniLM 混合召回 **66/77** 被英文嵌入模型拖累、暂不启用（需换中文嵌入模型重测）。逐条报告见 `data/eval/ce-eval-report.json` / `minilm-eval-report.json`，迭代记录见 [ROUND-19](records/ROUND-19-RAG-SEMANTIC-RERANK.md)。
+实测（77 条问句，Top-4）：**2026-09-29** BM25+Cross-Encoder 73/77 (0.948) 为当时最优，真 MiniLM 混合 66/77 被英文嵌入拖累。**2026-10-10 复测**（消融链路修复 + 嵌入/权重对照，全部隔离在临时环境）：中文智谱 embedding-3 混合召回 **76/77 (0.987)** 刷新最优——hybrid_rerank 在 `vector_weight≥0.35` 以及 rrf 均达 76/77，hybrid_rerank 相对 bm25_only 72/77 为零损失纯增益；MiniLM 的最优权重实为 0.2（74/77），历史 0.65 权重是其此前的次优根源。逐条报告见 `data/eval/embedding-compare-report.json`、`fusion-tuning-report{,-openai}.json`，历史报告见 `ce-eval-report.json` / `minilm-eval-report.json`，迭代记录见 [ROUND-19](records/ROUND-19-RAG-SEMANTIC-RERANK.md)。**2026-10-11 本地化落地**（第二十一轮）：弃外部嵌入 API，改用本地 ONNX 组件（bge-small-zh-v1.5 召回 + bge-reranker-base 融合式精排）+ `KNOWLEDGE_FUSION_MODE=rrf` + 候选窗口 128，知识库真实扩至 570 块——宽松 HitRate@4 **0.818**、严格来源命中 **0.792**，规模放大 24 倍而严格口径与旧 24 块库生产基线持平；本轮同时修复生产检索路径「精排 head 取自未排序候选」的 bug（修复前后宽松 0.442→0.740），窗口对照（16→128：0.740→0.818）可复跑 `scripts/eval_retrieval_window.py`。完整数据链见 [ROUND-21](records/ROUND-21-RAG-LOCAL-UPGRADE.md)，报告见 `data/eval/production-check-report.json`、`v2-full-report.json`、`ce-fusion-report.json`。
 
 ## 10. 前端主题系统（第十五 ~ 二十轮）
 

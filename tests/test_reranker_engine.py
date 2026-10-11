@@ -26,7 +26,8 @@ def build_store(tmp_path: Path, **overrides) -> DatabaseStore:
         "openai_api_key": "",
     }
     params.update(overrides)
-    settings = Settings(**params)
+    # _env_file=None:单元测试按代码默认值(lexical/weighted)验证,不受宿主 .env 生产配置影响
+    settings = Settings(_env_file=None, **params)
     engine = create_engine(settings.database_url, connect_args={"check_same_thread": False})
     Base.metadata.create_all(bind=engine)
     session_factory = sessionmaker(bind=engine, autoflush=False, autocommit=False)

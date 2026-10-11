@@ -871,8 +871,11 @@ class DatabaseStore:
             )
 
             rerank_engine = ""
-            if fusion_mode != "rrf" and self.settings.knowledge_rerank_enabled:
-                rerank_engine = str(getattr(self.settings, "knowledge_rerank_engine", "lexical") or "lexical")
+            if self.settings.knowledge_rerank_enabled:
+                candidate_engine = str(getattr(self.settings, "knowledge_rerank_engine", "lexical") or "lexical")
+                # rrf 分数与词法/替换式口径不兼容,仅 ce_fusion 可在 rrf 下启用;其余保持原行为(rrf 跳过重排)
+                if fusion_mode != "rrf" or candidate_engine == "ce_fusion":
+                    rerank_engine = candidate_engine
             for chunk in chunks:
                 if chunk.id is None:
                     continue
@@ -882,7 +885,7 @@ class DatabaseStore:
                     b_rank = bm25_rank_map.get(chunk_id)
                     if v_rank is None and b_rank is None:
                         continue
-                    score = rrf_fused_score(v_rank, b_rank)
+                    score = rrf_fused_score(v_rank, b_rank, k=max(1, int(self.settings.knowledge_rrf_k)))
                 else:
                     base_bm25 = normalized_bm25.get(chunk_id, 0.0)
                     base_vector = normalized_vector.get(chunk_id, 0.0)
@@ -897,8 +900,12 @@ class DatabaseStore:
                 if rerank_engine == "lexical":
                     score = rerank_score(rewritten_query, chunk.content, score)
                 ranked.append((chunk, score))
+            # 精排引擎只处理候选池头部:必须先按分排序,否则 head 取到的是数据库插入顺序
+            ranked.sort(key=lambda item: item[1], reverse=True)
             if rerank_engine == "cross_encoder":
                 ranked = self._apply_cross_encoder_rerank(rewritten_query, ranked)
+            if rerank_engine == "ce_fusion":
+                ranked = self._apply_ce_fusion_rerank(rewritten_query, ranked)
             ranked.sort(key=lambda item: item[1], reverse=True)
             ranked = expand_best_hit(ranked, chunks)
             results = []
@@ -934,6 +941,34 @@ class DatabaseStore:
             self.vector_error = f"cross-encoder rerank failed, fallback to lexical: {exc}"
             return [(chunk, rerank_score(query, chunk.content, score)) for chunk, score in ranked]
         return reranked + tail
+
+    def _apply_ce_fusion_rerank(self, query: str, ranked: list) -> list:
+        """融合式精排:head top-N 的词法分与 Cross-Encoder 分加权融合后重排,tail 原序拼接。
+
+        与"替换式"(CE 分直接覆盖原分)不同:融合式保留词法信号权重,CE 只作为第二信号。
+        实测在扩库场景下明显优于替换式(590 块库:融合 64/77 vs 替换 59/77)。
+        权重:final = lambda * 归一化词法分 + (1 - lambda) * 归一化 CE 分。
+        """
+        from app.rag.reranker import cross_encoder_rerank
+
+        top_n = max(1, int(getattr(self.settings, "knowledge_rerank_top_n", 16) or 16))
+        head, tail = ranked[:top_n], ranked[top_n:]
+        try:
+            model_dir = str(getattr(self.settings, "reranker_model_dir", "") or "")
+            ce_scores = cross_encoder_rerank(query, head, model_dir)
+        except Exception as exc:  # noqa: BLE001 - 模型缺失时检索不中断,退化为词法排序
+            self.vector_error = f"ce fusion rerank failed, fallback to lexical: {exc}"
+            return [(chunk, rerank_score(query, chunk.content, score)) for chunk, score in ranked]
+        lam = float(getattr(self.settings, "knowledge_ce_fusion_lambda", 0.4) or 0.0)
+        lam = min(1.0, max(0.0, lam))
+        n_lex = normalize_scores({int(chunk.id): score for chunk, score in head if chunk.id is not None})
+        n_ce = normalize_scores({int(chunk.id): score for chunk, score in ce_scores if chunk.id is not None})
+        fused = []
+        for chunk, _ in head:
+            chunk_id = int(chunk.id)
+            fused.append((chunk, lam * n_lex.get(chunk_id, 0.0) + (1.0 - lam) * n_ce.get(chunk_id, 0.0)))
+        fused.sort(key=lambda item: item[1], reverse=True)
+        return fused + tail
 
     def _check_cache(self, key: str) -> list[dict] | None:
         if not self.settings.knowledge_cache_enabled:

@@ -55,7 +55,7 @@
 | [第七部分](#part-7) | 总结与自检清单 | 「怎么确认自己学会了？」 |
 | [附录 A](#appendix-a) | 后端 API 契约总表（48 端点） | 「复现后端时怎么逐端点验收？」 |
 | [附录 B](#appendix-b) | 数据模型字段总表（20 张表 172 列） | 「建表时每张表有哪些列？」 |
-| [附录 C](#appendix-c) | Settings 全量字段表（90 项） | 「每个配置项的默认值与环境变量名？」 |
+| [附录 C](#appendix-c) | Settings 全量字段表（95 项） | 「每个配置项的默认值与环境变量名？」 |
 
 快速跳转：[第〇章 学习路线总览](#station-0) · [第 1 站](#station-1) · [第 2 站](#station-2) · [第 3 站](#station-3) · [第 4 站](#station-4) · [第 5 站](#station-5) · [第 6 站](#station-6) · [第 7 站](#station-7) · [第 8 站](#station-8) · [第 9 站](#station-9) · [第 10 站](#station-10) · [第 11 站](#station-11) · [第 12 站](#station-12) · [第 13 站](#station-13) · [第 14 站](#station-14) · [术语表](#glossary) · [FAQ](#faq)
 
@@ -95,7 +95,7 @@
 - **RAG（检索增强生成）**：回答前先从知识库检索相关片段，把片段连同问题一起喂给模型——让模型「开卷考试」。流水线 = 分词 → 召回（BM25/向量）→ 融合 → 重排。→ 第 9 站。
 - **BM25**：经典词频打分算法：查询词在某文档出现越多、且该词越稀有，得分越高。可解释、零成本、零延迟。→ 9.2。
 - **嵌入 / 向量检索**：把文字压成一串数字（向量），语义相近的文字向量距离近，用余弦相似度检索；能命中「睡不好 ↔ 失眠」这类词面不重叠的同义表达。→ 9.6 / 9.7。
-- **Rerank（重排）**：对召回候选做精细二次排序，把最相关的顶到最前。本项目用纯 Python 四路词法信号加权实现。它与嵌入向量检索是「分工」还是「竞争」、Cross-Encoder 为什么不是第五条路——这些易混点集中澄清见 → 9.7.0。
+- **Rerank（重排）**：对召回候选做精细二次排序，把最相关的顶到最前。本项目默认用纯 Python 四路词法信号加权实现，重排槽位另可换本地 Cross-Encoder（替换式）或 CE 融合式引擎。它与嵌入向量检索是「分工」还是「竞争」、Cross-Encoder 为什么不是第五条路——这些易混点集中澄清见 → 9.7.0，最新实测见 9.7.9。
 - **SSE（Server-Sent Events）**：服务器向浏览器单向持续推送文本的 HTTP 协议，聊天「打字机效果」的标准做法。→ 第三部分 SSE 条目、2.2。
 - **ORM**：把数据库表映射成 Python 类，用对象而非 SQL 字符串读写数据。本项目用 SQLAlchemy 2.0。→ 1.3 / 1.4。
 - **依赖注入**：模块不自己 new 依赖，而是「从外面递进来」——测试时递假的进去就能隔离。本项目随处可见（`SkillRegistry` 的回调、FastAPI 的 `Depends`）。→ 第 4 站、12.2。
@@ -125,7 +125,7 @@
 | 术语 | 对应代码 / 配置 | 在本项目中的含义 |
 | --- | --- | --- |
 | 知识块 | `KnowledgeChunk` | 知识文档切块后的最小检索单元，带元数据与可选向量（1.3） |
-| 混合检索 | `KNOWLEDGE_FUSION_MODE` | BM25 + 向量双路召回 → weighted / RRF 融合 → rerank（9.7；小白概念地图与「四条路」见 9.7.0） |
+| 混合检索 | `KNOWLEDGE_FUSION_MODE` | BM25 + 向量双路召回 → weighted / RRF 融合 → 重排（三引擎：词法公式 / Cross-Encoder / CE 融合式；9.7；小白概念地图与「四条路」见 9.7.0，最新实测见 9.7.9） |
 | 邻块扩展 | `expand_best_hit` | 把冠军块的同源相邻块拼回来，防答案被「拦腰截断」（9.7.4） |
 | 记忆四层 | L1~L4 | Agent 私有 / 用户事实（SCD-2）/ 会话摘要 / 原话窗口（9.5） |
 | 滚动摘要 | `build_memory_summary` | 每轮一行、超字符预算丢最旧（9.4） |
@@ -465,18 +465,19 @@ settings → engine/会话工厂 → create_schema
 - **替代**：单 Lead 串行分派（伪协作、无中间产物）、纯 LangGraph（也支持，但自研版更易做教学演示与对照评测）。
 - **代价/取舍**：自研调度逻辑需要自己保证终止（轮次/每轮认领/单 Agent 认领三道预算护栏）；`force_response` 保证学生端永远有答案。
 
-### BM25 + Chroma 本地 MiniLM + Rerank（混合 RAG）
+### 本地化混合 RAG（BM25 + 本地中文嵌入 + CE 融合精排）
 
-- **选了**：BM25（词频，中文用 bigram）与可选向量检索融合，Chroma 作向量库；启用 Chroma 时可选 chromadb 内置 MiniLM 本地嵌入（`EMBEDDING_PROVIDER=local`）或 OpenAI 兼容嵌入，最后用纯 Python 四路词法信号加权 rerank。
+- **选了**：BM25（词频，中文用 bigram）+ 向量检索双路召回 + Chroma 向量库 + **本地 ONNX 组件全栈**（第二十一轮落地的生产配置）：召回层 `bge-small-zh-v1.5`（`EMBEDDING_PROVIDER=local-zh`，512 维，本地 CPU 推理），融合 RRF（`KNOWLEDGE_FUSION_MODE=rrf`），精排 **CE 融合式引擎**（`KNOWLEDGE_RERANK_ENGINE=ce_fusion`，Cross-Encoder 分与词法分加权融合），候选窗口 `KNOWLEDGE_CANDIDATE_K=128`。
 - **为什么**：
   - BM25 可解释、零成本、零延迟，且中文补二元组后词频统计更准（不引 jieba 的轻量取舍）。
-  - 本地 MiniLM 可让「向量库是真的、嵌入是离线的」；不需要向量模型额度。
+  - 本地嵌入可让「向量库是真的、嵌入是离线的」；不需要向量模型额度，且中文查询用中文小模型（`local-zh`）有实测判别力保障（9.7.9）。
   - rerank 用 `base*0.55 + (余弦*0.75+关键词*0.25)*0.25 + 覆盖率*0.15 + 短语命中*0.05`，纯 Python，零额外模型成本。
 - **替代**：
   - 纯向量检索：中文语义高度依赖嵌入模型质量——不同模型对中文的理解差异很大（如「考试压力」和「焦虑失眠」在低质量嵌入中可能距离很远），且商业向量模型需要 API 额度，无 KEY 时完全不可用；
   - 纯 BM25：只做词频匹配，缺乏语义泛化能力——学生说「我最近睡不好」，可能无法命中包含「失眠」「睡眠质量」的知识块；
   - 引入 jieba/重模型：依赖与成本上升。
-- **代价/取舍**：`VECTOR_ENABLED=false`（代码默认）时整条向量链路不存在，检索即 BM25 + 条件 rerank；`LocalVectorBackend` 是「已启用向量但 Chroma 不可用」时的降级备胎，与「关闭向量」是两回事；`embedding_provider` 的代码默认（`openai`）与 `.env.example` 示例（`local`）不一致，属潜伏差异。这两个易混点的完整展开（含 local-hash 伪向量实测、「Cross-Encoder 是不是第五条路」、升级顺序建议）→ 9.7.0。
+  - 外部嵌入 API（如智谱 embedding-3）：效果最优，但引入网络依赖与数据出境，「技术增量」也不可归因于本项目（第二十一轮明确弃用，见 9.7.9）。
+- **代价/取舍**：`VECTOR_ENABLED=false`（代码默认）时整条向量链路不存在，检索即 BM25 + 条件 rerank；`LocalVectorBackend` 是「已启用向量但 Chroma 不可用」时的降级备胎，与「关闭向量」是两回事；`embedding_provider` 的代码默认（`openai`）、`.env.example` 示例（`local`）与生产取值（`local-zh`）三者并存，属潜伏差异（9.7.0 Q5）。CE 精排的硬前提是「召回候选中必须含正确文档」（召回决定上限），且精排 head 只能是候选池头部——两层窗口的交互详见 9.7.0 Q3 与 9.7.9。
 
 ### Redis（可选，限流/锁）
 
@@ -615,9 +616,10 @@ RISK_QLORA_TIMEOUT_SECONDS=8
 | 风险  | `RISK_LLM_CHANNEL_ENABLED`                                   | 通用 LLM 风险通道；`RISK_QLORA_ENABLED=true` 时由 QLoRA 接管 | `true`                           |
 | 风险  | `RISK_QLORA_ENABLED` / `RISK_QLORA_URL` / `RISK_QLORA_TIMEOUT_SECONDS` | v9 QLoRA 隔离服务开关 / 地址 / 超时 | `false` / `https://qlora-endpoint.example.invalid` / `8` |
 | 技能  | `FUNCTION_CALLING_ENABLED`                                   | 模型在白名单内自主选技能                       | `true`                           |
-| 检索  | `EMBEDDING_PROVIDER`                                         | `openai`（代码默认）/ `local`（离线 MiniLM 示例）      | `openai`（`.env.example` 推荐 `local`）                          |
+| 检索  | `EMBEDDING_PROVIDER`                                         | `openai`（代码默认）/ `local`（离线英文 MiniLM）/ `local-zh`（离线中文 bge-small-zh，生产在用） | `openai`（`.env.example` 推荐 `local`）                          |
 | 检索  | `VECTOR_ENABLED` / `VECTOR_BACKEND`                          | 是否启用向量 / 后端                        | `false` / `chroma`               |
-| 检索  | `KNOWLEDGE_FUSION_MODE` / `KNOWLEDGE_CACHE_ENABLED`          | 加权/RRF 融合 / 进程内缓存开关              | `weighted` / `false`             |
+| 检索  | `KNOWLEDGE_FUSION_MODE` / `KNOWLEDGE_CACHE_ENABLED`          | 加权/RRF 融合 / 进程内缓存开关              | `weighted` / `false`（生产用 `rrf`）             |
+| 检索  | `KNOWLEDGE_CANDIDATE_K` / `VECTOR_TOP_K` / `KNOWLEDGE_RERANK_ENGINE` | RRF 候选窗口 / 向量返回条数（两者取 min 生效）/ 重排引擎（`lexical`/`cross_encoder`/`ce_fusion`） | `16` / `16` / `lexical`（生产用 `128` / `128` / `ce_fusion`） |
 | 记忆  | `MEMORY_RECENT_MESSAGES` / `MEMORY_SUMMARY_MAX_CHARS`        | L4 原话窗口 / L3 摘要上限                  | 15 / 3000                        |
 | 技能  | `SKILL_DISTILL_ENABLED` / `SKILL_DISTILL_MIN_REPEAT` / `SKILL_DISTILL_DIR` | 是否蒸馏 / 重复阈值 / 输出目录 | `true` / 3 / `skills/auto` |
 | 运行时 | `AGENT_RUNTIME`                                              | `autonomous`/`ordered`/`langgraph` | `autonomous`                     |
@@ -641,7 +643,7 @@ DATABASE_URL=mysql+pymysql://root:你的密码@localhost:3306/aegis?charset=utf8
 
 ## 4.4 初始化到底做了什么
 
-`python -m app.init_db` → `create_schema()` 惰性导入全部 ORM 实体后 `create_all`；`DatabaseStore` 在 `create_app` 时还会 `ensure_default_users()`（建演示账号）与 `seed_knowledge_dir()`（遍历 `knowledge/` 下的 `.md`/`.txt`，当前仓库提交 24 篇 Markdown 文档，切块、可选嵌入、写入 `KnowledgeChunk`）。所以「启动即带知识库」。
+`python -m app.init_db` → `create_schema()` 惰性导入全部 ORM 实体后 `create_all`；`DatabaseStore` 在 `create_app` 时还会 `ensure_default_users()`（建演示账号）与 `seed_knowledge_dir()`（遍历 `knowledge/` 下的 `.md`/`.txt`，当前仓库 173 篇 Markdown 文档（约 570 个检索块），切块、可选嵌入、写入 `KnowledgeChunk`）。所以「启动即带知识库」。
 
 ## 4.5 验证：三步跑通闭环
 
@@ -655,7 +657,7 @@ DATABASE_URL=mysql+pymysql://root:你的密码@localhost:3306/aegis?charset=utf8
 docker compose up --build
 ```
 
-Compose 启动 app + MySQL 8.0 + Redis + Chroma。若要在容器里启用向量检索，在 `.env` 设 `VECTOR_ENABLED=true`、`VECTOR_BACKEND=chroma`、`EMBEDDING_PROVIDER=local`；若使用 OpenAI 兼容嵌入，再额外注入 `OPENAI_API_KEY`。PostgreSQL 驱动可供自行部署的数据库使用，但不在当前 Compose 拓扑内。访问地址同 4.2。
+Compose 启动 app + MySQL 8.0 + Redis + Chroma。若要在容器里启用向量检索，在 `.env` 设 `VECTOR_ENABLED=true`、`VECTOR_BACKEND=chroma`、`EMBEDDING_PROVIDER=local`（英文 MiniLM；中文嵌入用 `local-zh` 并把 `data/models/bge-small-zh-onnx` 挂载进容器）；若使用 OpenAI 兼容嵌入，再额外注入 `OPENAI_API_KEY`。PostgreSQL 驱动可供自行部署的数据库使用，但不在当前 Compose 拓扑内。访问地址同 4.2。
 
 ## 4.7 常用命令速查
 
@@ -1896,12 +1898,13 @@ superseded_by  替代它的新事实 public_id
 `build_vector_backend(settings)` 按配置返回：
 
 - `VECTOR_ENABLED=false`（代码默认）：返回禁用向量后端，检索仍继续执行 BM25、加权融合/条件 rerank 和邻块扩展，只是不产生向量候选。
-- `ChromaVectorBackend`：真向量库，chromadb 持久化（cosine 空间），支持快照。嵌入有两种来源，由 `EMBEDDING_PROVIDER` 决定：
-  - `local`（`.env.example` 的推荐示例）：chromadb 内置 MiniLM 本地嵌入——离线、零 KEY、零费用；
+- `ChromaVectorBackend`：真向量库，chromadb 持久化（cosine 空间），支持快照。嵌入有三种来源，由 `EMBEDDING_PROVIDER` 决定：
+  - `local`（`.env.example` 的推荐示例）：chromadb 内置英文 MiniLM 本地嵌入——离线、零 KEY、零费用，但中文判别力弱（9.7.8 实测 66/77），仅宜离线演示；
+  - `local-zh`（**第二十一轮起的生产配置**）：`app/rag/zh_embedder.py` 本地加载 ONNX 中文嵌入 bge-small-zh-v1.5（512 维，CLS 池化 + L2 归一化；模型目录 `ZH_EMBEDDING_MODEL_DIR`）——离线、中文可用、单条约 2.5ms；
   - `openai`（`Settings` 代码默认）：OpenAI 兼容 `/embeddings` API（需向量模型额度）。
 - `LocalVectorBackend`：哈希 bigram 伪向量 + 本地余弦；当向量已启用但 Chroma 不可用、或显式选择 local 回退时使用，不是 `VECTOR_ENABLED=false` 时的默认替代。
 
-`store.search_knowledge` 把 9.1–9.6 串成完整流水线（逐段源码走读见 9.8）：规则归一化查询 → 向量候选（可选，异常时降级）→ 元数据过滤 → BM25 → 双路融合 → **weighted 模式才执行本地 rerank** → 邻块扩展 → 截 top\_k。RRF 模式走“排名融合 + 邻块扩展”，当前不会继续叠加 `rerank_score()`。再次提醒：流水线第一步的「改写查询」是 chunking.py 的规则版 `rewrite_query`（见 9.3），不是 LLM 改写。
+`store.search_knowledge` 把 9.1–9.6 串成完整流水线（逐段源码走读见 9.8）：规则归一化查询 → 向量候选（可选，异常时降级；候选数 = min(`KNOWLEDGE_CANDIDATE_K`, `VECTOR_TOP_K`)）→ 元数据过滤 → BM25 → 双路融合（weighted / RRF）→ **重排槽位**（weighted 模式按引擎配置执行三引擎；RRF 模式下仅 `ce_fusion` 引擎可执行）→ 邻块扩展 → 截 top\_k。再次提醒：流水线第一步的「改写查询」是 chunking.py 的规则版 `rewrite_query`（见 9.3），不是 LLM 改写。
 
 
 
@@ -1909,11 +1912,11 @@ superseded_by  替代它的新事实 public_id
 
 ### 9.7 混合检索深度剖析（第十二轮扩充）
 
-#### 9.7.0 小白防绕晕：概念地图与「四条路」（第十九轮增补）
+#### 9.7.0 小白防绕晕：概念地图与「四条路」（第十九轮增补 · 第二十一轮修订）
 
 > 本节集中回答初学者理解检索子系统时最容易绕晕的六个问题。先读这一节，再看 9.7.1-9.7.7 的实现细节，很多困惑会提前消失。所有结论都带代码锚点，可自行核对。
 >
-> **本站阅读路径**：9.7.0（先建立概念地图）→ 9.7.1-9.7.2（为什么混合、怎么融合）→ 9.7.3-9.7.4（重排与邻块扩展）→ 9.7.5-9.7.7（消融、缓存、双口径评测）→ 9.7.8（第十九轮实测验证）→ 9.8（总装走读）。初学者按序通读，进阶者可跳读。
+> **本站阅读路径**：9.7.0（先建立概念地图）→ 9.7.1-9.7.2（为什么混合、怎么融合）→ 9.7.3-9.7.4（重排与邻块扩展）→ 9.7.5-9.7.7（消融、缓存、双口径评测）→ 9.7.8（第十九轮实测）→ 9.7.9（第二十一轮本地化实测·当前生产配置）→ 9.8（总装走读）。初学者按序通读，进阶者可跳读。
 
 **Q1 「检索」「召回」「重排」是什么关系？顺序是什么？**
 
@@ -1926,7 +1929,7 @@ superseded_by  替代它的新事实 public_id
 | 融合（Fusion） | 中转 | 把多路召回分数合成一个 base 分 |
 | 重排（Rerank） | 收官 | 在已召回候选里精选排序——「排准」，宁精勿滥 |
 
-顺序不可颠倒由数据依赖决定：重排的输入就是召回的输出，候选池未生成时重排无从下手。对应 `search_knowledge` 的实际执行序：改写查询（store.py:811）→ 向量召回（store.py:821-829）→ BM25 全库打分（store.py:838）→ 融合（store.py:851-892）→ 重排与排序（store.py:893-896）→ 取 Top-4 与邻块扩展（store.py:897-910）。
+顺序不可颠倒由数据依赖决定：重排的输入就是召回的输出，候选池未生成时重排无从下手。对应 `search_knowledge` 的实际执行序：改写查询（store.py:812）→ 向量召回（store.py:822-830）→ BM25 全库打分（store.py:839）→ 融合（store.py:851-902）→ 重排与排序（store.py:903-909）→ 取 Top-4 与邻块扩展（store.py:910-926）。
 
 各阶段失败的后果不同，这是理解全局的钥匙：
 
@@ -1940,12 +1943,15 @@ superseded_by  替代它的新事实 public_id
 
 | 路 | 配置组合 | 链路 | 现状 |
 | --- | --- | --- | --- |
-| 1 | `VECTOR_ENABLED=false`（代码默认，config.py:50） | BM25 → 词法 rerank → Top-4 | 当前每次对话实际走的 |
+| 1 | `VECTOR_ENABLED=false`（代码默认，config.py:57） | BM25 → 重排槽位（词法引擎）→ Top-4 | 零依赖兜底；代码默认路径 |
 | 2 | `vector=true` + `backend=local` | BM25 + hash 伪向量 → 融合 → rerank | 消融证实退化，不建议开 |
-| 3 | `vector=true` + `backend=chroma` + `EMBEDDING_PROVIDER=local` | BM25 + MiniLM 真向量 → 融合 → rerank | 第十九轮已实测：66/77，被英文嵌入模型拖累，暂不启用（见 9.7.8） |
-| 4 | `vector=true` + `backend=chroma` + `EMBEDDING_PROVIDER=openai` | BM25 + 远程 API 向量 → 融合 → rerank | 需 API key |
+| 3a | `vector=true` + `backend=chroma` + `EMBEDDING_PROVIDER=local` | BM25 + 英文 MiniLM 真向量 → 融合 → 重排 | 第十九轮实测 66/77，被英文嵌入拖累，不用于中文（见 9.7.8） |
+| 3b | `vector=true` + `backend=chroma` + `EMBEDDING_PROVIDER=local-zh` | BM25 + 中文 bge-small-zh 真向量 → 融合 → 重排 | **第二十一轮起的生产配置**（+rrf+ce_fusion，窗口 128）：570 块扩库下宽松 63/77、严格 61/77（见 9.7.9） |
+| 4 | `vector=true` + `backend=chroma` + `EMBEDDING_PROVIDER=openai` | BM25 + 远程 API 向量 → 融合 → 重排 | 需 API key；曾用于效果上限对照，因数据出境与不可归因未采用 |
 
-每条向量路（2/3/4）内部还有两个子开关：`KNOWLEDGE_FUSION_MODE = weighted | rrf`（config.py:42）与 `KNOWLEDGE_RERANK_ENABLED`（默认 true，config.py:41）。两者交互的关键规则（store.py:893）：**只有 weighted 模式才叠加词法 rerank，rrf 模式直接跳过**——所以「rerank 开关是 true」不代表所有融合模式都会执行 rerank。
+每条向量路内部还有三个子开关：`KNOWLEDGE_FUSION_MODE = weighted | rrf`（config.py:48）、`KNOWLEDGE_RERANK_ENGINE = lexical | cross_encoder | ce_fusion`（config.py:44）与 `KNOWLEDGE_RERANK_ENABLED`（默认 true，config.py:42）。三者交互的关键规则（store.py:873-878）：**weighted 模式下按引擎配置执行重排；rrf 模式下仅 `ce_fusion` 引擎可执行（RRF 分数与词法/替换式口径不兼容），其余跳过**——所以「rerank 开关是 true」不代表所有组合都会执行重排。
+
+另有一个独立的**候选窗口**参数：`KNOWLEDGE_CANDIDATE_K` / `VECTOR_TOP_K`（两者取 min）决定向量路返回多少候选参与融合——窗口大小直接决定 RRF 里「有多少块能拿到向量排名分」，详见 Q3 的「两层窗口」与 9.7.9 的窗口实验。
 
 运行中的动态行为只有故障回退，不是「选路」：Chroma 初始化失败 → 降级 `LocalVectorBackend`（vector_store.py:327,333）；单次向量查询抛异常 → 本轮静默纯 BM25（store.py:825-829）。
 
@@ -1958,20 +1964,29 @@ superseded_by  替代它的新事实 public_id
 | 关系 | 性质 | 能否同时存在 |
 | --- | --- | --- |
 | 词法 rerank vs Cross-Encoder | 竞争：同一槽位，都负责产出「最终排序分」 | 否——一次检索只能按一种分数排序 |
-| 词法 rerank vs MiniLM 向量 | 分工：一个在重排层排序，一个在召回层扩池 | 能，正常系统就是都要 |
-| Cross-Encoder vs MiniLM | 分工：各守一层 | 能 |
+| 词法 rerank vs 向量嵌入（MiniLM / bge-small-zh） | 分工：一个在重排层排序，一个在召回层扩池 | 能，正常系统就是都要 |
+| Cross-Encoder vs 向量嵌入 | 分工：各守一层 | 能 |
 
-组合矩阵：**召回 3 种（BM25 / +MiniLM / +hash 降级）× 重排 2 种（词法 / Cross-Encoder）**。当前格子 = 「BM25 + 词法」。
+组合矩阵：**召回 4 种（BM25 / +英文 MiniLM / +中文 bge-small-zh / +hash 降级）× 重排 3 种（词法公式 / Cross-Encoder 替换式 / CE 融合式）**。当前生产格子 = 「BM25 + bge-small-zh（rrf 融合）→ CE 融合式精排」。
 
-换 Cross-Encoder 必须连带改一个架构点：当前词法 rerank 对**全库所有基础分非零的块**逐个重打分（store.py:872-895 的 for 循环）——纯公式每块几微秒，全量算得起；Cross-Encoder 一次推理几十毫秒，全库跑不起。所以必须先按融合分截取 top-N（`KNOWLEDGE_CANDIDATE_K=16` 正好），再对 16 个候选做模型重排——从「全量重打分」改成「粗排 → 精排」两段式。
+换 Cross-Encoder 必须连带改一个架构点：词法 rerank 对**全库所有基础分非零的块**逐个重打分（store.py:879-902 的 for 循环内）——纯公式每块几微秒，全量算得起；Cross-Encoder 一次推理几十毫秒，全库跑不起。所以必须先按融合分截取头部候选，再对它们做模型重排——从「全量重打分」改成「粗排 → 精排」两段式。
 
-升级顺序建议：先实测召回层（MiniLM，路 3）确认增益，再考虑重排层（Cross-Encoder）。重排引擎再强也只能在召回来的候选里挑，救不了漏召回。**第十九轮实测已回填**：两者同轮完成——CE 增益为正（73/77 历史最优）、MiniLM 增益为负（66/77，英文模型拖累），印证「先召回后重排」的前提是召回信号本身质量过关（见 9.7.8）。
+这里要分清**两层不同的「窗口」**（第二十一轮踩坑后总结，务必别绕晕）：
+
+| 窗口 | 参数 | 作用 | 生产值 |
+| --- | --- | --- | --- |
+| 召回窗口（candidate_k） | `KNOWLEDGE_CANDIDATE_K` / `VECTOR_TOP_K` | 向量路返回多少候选参与融合；决定 RRF 里「有多少块能拿到向量排名分」 | 128 |
+| 精排窗口（head） | `KNOWLEDGE_RERANK_TOP_N` | 融合排序后的前 N 名交给 Cross-Encoder 打模型分 | 16 |
+
+关键交互：**精排窗口只能触及召回窗口兜住的候选**。若召回窗口过小（曾用 16），大量正确文档拿不到向量排名分、融合分被压到 head-16 之外 → CE 再强也看不见（第二十一轮实测：窗口 16→128，宽松命中 0.740→0.818，完整实验见 9.7.9）。
+
+升级顺序建议：先实测召回层（路 3；现行生产为 3b：local-zh）确认增益，再考虑重排层（Cross-Encoder）。重排引擎再强也只能在召回来的候选里挑，救不了漏召回。**第十九轮实测已回填**：两者同轮完成——CE 增益为正（73/77 历史最优）、MiniLM 增益为负（66/77，英文模型拖累），印证「先召回后重排」的前提是召回信号本身质量过关（见 9.7.8）。
 
 **Q4 LocalVectorBackend 的「hash 伪向量」具体怎么算？为什么说它「伪」？**
 
 一句话：把文本拆成相邻双字（bigram），每个双字用 Python 内置 `hash()` 扔进 64 个桶之一，数每个桶命中几次，得到 64 维计数向量再归一化——本质是字符 n-gram 直方图，不含任何语义。
 
-五步流程（vector_store.py:338-354）：清洗（去空白转小写，:340）→ 滑窗切 bigram（:343-344）→ 哈希分桶 `hash(gram) % 64`（:345）→ 桶计数（:346）→ L2 归一化（:347-348，此后余弦即点积，:351-354）。
+五步流程（vector_store.py:355-370）：清洗（去空白转小写，:362）→ 滑窗切 bigram（:365-366）→ 哈希分桶 `crc32(gram) % 64`（:367）→ 桶计数（:368）→ L2 归一化（:369-370，此后余弦即点积）。
 
 单进程实测四组对照：
 
@@ -1986,7 +2001,7 @@ superseded_by  替代它的新事实 public_id
 
 1. **零语义泛化**：「睡不好」与「失眠」无共同双字 → 向量正交 → 余弦恰为 0；对语义改写的盲区与 BM25 完全一样；
 2. **哈希碰撞制造假相似**：64 个桶要装下近乎无限的 bigram 组合，不同双字常撞进同一桶，无关文本可能被算出相似度；
-3. **跨进程不可复现**：Python 字符串哈希默认随 `PYTHONHASHSEED` 随机化，换进程重跑分桶即变，消融结果随之漂移。
+3. ~~跨进程不可复现~~（**已于 2026-10-10 修复**）：原实现用 Python 内置 `hash()`，默认随 `PYTHONHASHSEED` 随机化、换进程重跑分桶即变；现改为 `zlib.crc32`（vector_store.py:367），跨进程分桶一致、评测可复现。
 
 因此 9.7.5 消融里 hybrid 的退化（0.8312 vs 0.9351）说明的是「local-hash 不适合做高权重语义召回」，**不能据此否定真实语义向量**（MiniLM / OpenAI embedding）的价值。
 
@@ -1997,27 +2012,29 @@ superseded_by  替代它的新事实 public_id
 | 状态 | 向量组件 |
 | --- | --- |
 | `VECTOR_ENABLED=false`（关闭） | 整条向量链路不存在，与 local-hash 无关 |
-| 开向量 + Chroma 正常 | 真 MiniLM / API 语义向量 |
+| 开向量 + Chroma 正常 | 真语义向量（MiniLM / bge-small-zh / API） |
 | 开向量 + Chroma 挂了（或显式选 local） | 降级成 local-hash 伪向量（vector_store.py:327,333） |
 
 两种「默认」（9.6 后端清单的展开）：
 
-- 代码默认（app/config.py）：`vector_enabled=False`（:50）、`embedding_provider="openai"`（:16）；
-- 示例默认（.env.example）：`VECTOR_ENABLED=false`（:41）、`EMBEDDING_PROVIDER=local`（:8）。
+- 代码默认（app/config.py）：`vector_enabled=False`（:57）、`embedding_provider="openai"`（:16）；
+- 示例默认（.env.example）：`VECTOR_ENABLED=false`（:42）、`EMBEDDING_PROVIDER=local`（:8）。
 
-平时这个差异潜伏（向量关闭时 `embedding_provider` 根本不生效）；一旦把 `VECTOR_ENABLED=true`，从 `.env.example` 复制来的 `.env` 会让系统走**本地 MiniLM** 而不是代码默认的 openai——引用「默认」时务必说明是哪一套。
+平时这个差异潜伏（向量关闭时 `embedding_provider` 根本不生效）；一旦把 `VECTOR_ENABLED=true`，从 `.env.example` 复制来的 `.env` 会让系统走**本地英文 MiniLM** 而不是代码默认的 openai——引用「默认」时务必说明是哪一套。**生产（第二十一轮起）则显式选第三种**：`EMBEDDING_PROVIDER=local-zh`（中文 bge-small-zh）——它不属于任何「默认」，是明确写进 `.env` 的部署决策。
 
 **Q6 检索能力应该按什么顺序升级？**
 
 召回层 → 重排层，不要反过来：
 
 1. 先确认召回信号质量：local-hash 有跨进程不稳定问题时，先关闭向量或换真嵌入；
-2. 接入真 MiniLM（路 3），用 9.7.5 的消融方法跑 `bm25_only` vs `hybrid` 同配置对照，确认增益为正再启用；
+2. 接入真嵌入模型（路 3），用 9.7.5 的消融方法跑 `bm25_only` vs `hybrid` 同配置对照，确认增益为正再启用；
 3. 前两步有结论后，再评估 Cross-Encoder 精排收益——它只能优化「池内座次」，池子的缺口要靠召回层补。
 
 > 第十九轮实测回填：本节建议的顺序在实作中因需求并行而调整（CE 与 MiniLM 同轮完成）。结果为 CE **+1**（73/77 历史最优）、MiniLM **-6**（66/77，路 3 暂不启用）——「召回质量过关后再动重排」的结论不变，且 CE 在 BM25 召回（上限 72）之上证明重排层确有独立增益空间。
+>
+> **第二十一轮实测回填**：升级顺序最终被完整走通——先换中文嵌入（召回层，24 块库 rrf 召回 64→75），再做 CE 融合式重构（重排层，24 块库 76→77），最后扩库到 570 块并把两层组合调优（窗口 128 + ce_fusion：宽松 63/77、严格 61/77）。顺序结论再次被验证：扩库后纯词法召回塌陷（严格 0.58），语义召回是规模化的必要前提（见 9.7.9）。
 
-**本节小结**：召回决定「能不能找到」（上限），重排决定「排得靠不靠前」（座次），融合是两路信号的中转；四条路由启动配置定死，运行时只有故障回退；Cross-Encoder 是重排槽位的第二个引擎选项，不是第五条路。
+**本节小结**：召回决定「能不能找到」（上限），重排决定「排得靠不靠前」（座次），融合是两路信号的中转；四条路由启动配置定死，运行时只有故障回退；重排槽位现有三个引擎（词法公式 / Cross-Encoder 替换式 / CE 融合式），都不是「第五条路」；两个窗口（召回 candidate_k 与精排 head）各管一段，精排只能看见召回兜住的候选。
 
 #### 9.7.1 为什么需要混合检索
 
@@ -2062,8 +2079,8 @@ rrf_score(doc) = sum(1 / (k + rank_in_bm25), 1 / (k + rank_in_vector))
 
 - **优点**：对分数尺度鲁棒，只依赖相对排名，企业 RAG 高频选择。
 - **缺点**：丢失绝对分数信息（如 BM25=0.01 和 0.9 都只看排名）。
-- **当前分支行为**：`KNOWLEDGE_FUSION_MODE=rrf` 时，仓储在 RRF 融合后直接做邻块扩展，不叠加本地 `rerank_score()`；因此 RRF 和 weighted+rerank 的结果应分开评测，不应假设它们走同一重排链路。
-- **配置**：`KNOWLEDGE_FUSION_MODE=rrf` 切换（默认 `weighted`）。
+- **当前分支行为**：`KNOWLEDGE_FUSION_MODE=rrf` 时，仓储默认在 RRF 融合后直接做邻块扩展（词法/替换式引擎与 RRF 分数口径不兼容而被跳过）；**例外**：第二十一轮起 `KNOWLEDGE_RERANK_ENGINE=ce_fusion` 可在 rrf 下执行（融合式对 head 内分数做 min-max 归一化，与原始分数口径无关）。因此 RRF 和 weighted+词法 rerank 的结果应分开评测，不应假设它们走同一重排链路。
+- **配置**：`KNOWLEDGE_FUSION_MODE=rrf` 切换（默认 `weighted`；第二十一轮起生产用 `rrf` + `ce_fusion`，见 9.7.9）。
 
 #### 9.7.3 Rerank 四路词法信号
 
@@ -2082,7 +2099,7 @@ final = base_score * 0.55                          # 融合分保底
 - `coverage`：被内容覆盖的查询 token 比例，即 `len(query_tokens ∩ content_tokens) / len(query_tokens)`；不是 Jaccard 的并集分母。
 - `phrase_bonus`：规整后的**完整 query**是内容子串时为 1，否则为 0；不是累计多个 2-gram 的出现次数。
 
-**为什么默认用词法而非模型 rerank**：纯 Python 零成本零延迟，实测已显著改善排序（见消融实验）。第十九轮起重排槽位已支持第二引擎——Cross-Encoder 精排（`KNOWLEDGE_RERANK_ENGINE=cross_encoder`，两段式 top-N 架构），实测把基准推到 73/77 历史最优，见 9.7.0 Q3 与 9.7.8。
+**为什么默认用词法而非模型 rerank**：纯 Python 零成本零延迟，实测已显著改善排序（见消融实验）。重排槽位此后扩展为三引擎：Cross-Encoder 替换式（`cross_encoder`，第十九轮，73/77 历史最优）与 **CE 融合式**（`ce_fusion`，第二十一轮，`final = λ·norm(词法链路分) + (1−λ)·norm(CE 分)`，λ=0.4；融合式修掉了替换式「CE 压低词法强项」的缺陷——24 块库满命中 77/77、570 块库 64 vs 59 全面优于替换式）。三引擎对比与选型详见 9.7.0 Q3、9.7.8、9.7.9。
 
 #### 9.7.4 邻块扩展（Expand Best Hit）
 
@@ -2112,7 +2129,7 @@ final = base_score * 0.55                          # 融合分保底
 - 在**零依赖的 `local-hash` 词法向量**下，纯 BM25 已足够强，混入哈希向量反而稀释分数
 - hybrid / RRF 的增量价值需要**真实语义向量**（Chroma + MiniLM / OpenAI embeddings）才能体现
 - 这一结果明确了“演示默认 `VECTOR_ENABLED=false` 时走 BM25 路径；生产若启用语义向量应重新评测”的配置边界。
-> 复现提示：消融数字随代码与语料版本漂移（如 2026-08-30 落盘报告与逐条复跑之间存在出入）。引用任何一组数字时注明对应日期与版本，不要把旧汇总当当前值。
+> 复现提示：消融数字随代码与语料版本漂移（如 2026-08-30 落盘报告与逐条复跑之间存在出入）。引用任何一组数字时注明对应日期与版本，不要把旧汇总当当前值。第二十一轮的全量最新对照（中文嵌入 / CE 融合 / 570 块扩库 / 窗口 128）见 9.7.9。
 
 **运行方式**：
 ```bash
@@ -2186,9 +2203,104 @@ self._knowledge_cache: OrderedDict[str, tuple[datetime, list[dict]]] = ...
 - `.env.example`：三个新配置示例；`tests/test_reranker_engine.py`：5 项单测（分数替换/top-N 两段式/失败回退/模型缺失报错），检索回归 16 项全过；
 - 逐条报告：`data/eval/minilm-eval-report.json`、`data/eval/ce-eval-report.json`。
 
-### 9.8 search_knowledge 总装走读（store.py:803-935）
+> 注：本节为第十九轮（2026-09-29）时点快照；其中「路 3 暂不启用」「候选窗口 16」等结论已被第二十一轮部分更新——最新实测（中文嵌入、CE 融合式、570 块扩库、窗口 128）见 9.7.9。
 
-前面九小节讲的是「每一环的算法」，本节走读「把这些环串起来的那段代码」——`store.search_knowledge`（store.py:803-918，约 115 行；随后的 `_apply_cross_encoder_rerank` 在 :920）。第十九轮起重排支持双引擎，摘录已同步。这也是 RAG 子系统从「知识」变成「服务」的装配点：
+#### 9.7.9 第二十一轮实测：本地化全链升级（中文嵌入 / CE 融合 / 570 块扩库 / 生产落地）
+
+> 本节是 9.7.0 概念框架的第二次全面实测落地，也是**当前生产配置的快照**（2026-10-11）。与 9.7.8（第十九轮）相比，三个变量同时变化：嵌入层从英文模型换成中文模型、精排从「替换式」改为「融合式」、知识库从 24 块真实扩到 570 块；全链路为本地 ONNX 组件（onnxruntime CPU 推理），零外部 API。迭代记录见 docs/records/ROUND-21-RAG-LOCAL-UPGRADE.md。
+
+**（1）召回层：中文嵌入 bge-small-zh-v1.5 替换英文 MiniLM**
+
+`app/rag/zh_embedder.py`（新增）以 reranker.py 同款模式加载 ONNX 中文嵌入（`BAAI/bge-small-zh-v1.5`，512 维，CLS 池化 + L2 归一化），经 `EMBEDDING_PROVIDER=local-zh` 接入。24 块库召回实测（scripts/eval_bge_small_zh_recall.py）：
+
+| 模式 | 英文 MiniLM（9.7.8） | 中文 bge-small-zh |
+| --- | --- | --- |
+| hybrid（weighted） | 66 | 73（权重 0.2–0.5 稳定） |
+| hybrid_rerank | 67 | 73 |
+| **rrf** | **64** | **75（+11）** |
+| 单条延迟 | 190–500 ms | **16–32 ms** |
+
+RRF 再次充当「嵌入质量晴雨表」：没有权重旋钮，弱嵌入垫底、强嵌入领先——9.7.0 Q2 的「RRF 反成最优说明嵌入过关」在此被完整验证。上表与 9.7.8 同库（24 块），+11 是纯嵌入增益。
+
+**（2）精排层：CE「替换式」→「融合式」**
+
+9.7.8 暴露过替换式的缺陷：CE 分直接覆盖融合分，救回 5 条的同时丢掉 4 条（净 +1）。融合式把两种信号加权保留：
+
+```
+final = λ · norm(词法链路分) + (1 − λ) · norm(CE 分)      # head top-16 内;λ=0.4(网格搜索最优)
+```
+
+24 块库三口径对照（scripts/eval_ce_fusion.py → ce-fusion-report.json）：
+
+| 召回口径 | 词法链路 | 替换式 | 融合式 λ0.4 |
+| --- | --- | --- | --- |
+| A：BM25 | 72 | 76 | **77/77（满命中）** |
+| B：bge hybrid | 74 | — | 75 |
+| C：bge rrf | 75 | — | 76 |
+
+融合式在全部三口径 ≥ 替换式（均 +1）。机制证据：`lowmood-02` 被 CE 打 0.171（替换式会丢），融合式用词法分保住——**模型单点判断可以被融合权重约束**，即「保护式重排」思想的最小实现。
+
+**（3）真实扩库：590 块六配置对照**
+
+语料从 24 块真实扩到 590 块（univs 65 篇 + 百科词条 84 条 + AI 样稿 10 篇 + 原 24），约 25 倍规模下重跑全矩阵（scripts/eval_v2_full.py → v2-full-report.json）：
+
+| 配置 | 宽松 | 严格 |
+| --- | --- | --- |
+| A_lexical（纯 BM25 + 词法） | 50 | 45 |
+| A_fusion | 58 | 54 |
+| C_lexical（rrf 召回 + 词法） | 59 | 55 |
+| C_replace（替换式） | 59 | 55 |
+| **C_fusion（融合式）** | **64** | **61** |
+
+三条结论：① C_fusion 双料第一（宽松 0.8312 / 严格 0.7922）；② **融合式 > 替换式（64 vs 59）**——扩库后证据比 24 块库强得多；③ **扩库后纯词法召回塌陷**（严格 0.5844 vs rrf 的 0.7143）——规模化场景下语义向量召回从「可选增强」变成「必要前提」，正是 9.7.0 Q1「召回失败不可挽回」的现实版。
+
+**（4）生产落地与 bug 修复（一次教科书式的工程故事）**
+
+把上述配置写进 `.env` 后，生产路径黑盒复评（570 块）却只得宽松 34/77（0.44），远低于实验的 0.83——**评测脚本正确 ≠ 生产路径正确**。三层诊断（向量/BM25/对齐逐项排除 → 融合链白盒复现 → monkey-patch 追踪）定位到真凶：
+
+> `store.search_knowledge` 中候选列表 `ranked` 仅按数据库插入顺序 append，而 `ranked.sort()` 位于精排调用**之后**——于是两个精排引擎的 head 永远取到「最早入库的 16 条」，与融合分无关。症状：任何主题的查询，top-1 都是同一批字母序靠前的老文档。
+
+修复即「把排序挪到精排调用之前」；修复后复评 0.44 → 0.74（+23 条）。**教训**：任何「两段式精排」都必须保证 head 是「按分排序后的前 N 名」（9.8 决策点 4 的输入契约）；新增检索分发分支上线前，必须走**生产路径黑盒复评**——独立实验脚本跑得通，不代表生产链路对。
+
+**（5）窗口诊断：candidate_k 从 16 到 128**
+
+修复后生产（57/54）与实验（64/61）仍差 7 条，逐题 diff 全部指向同一个机制（即 Q3 的「两层窗口」）：
+
+- 向量路只返回 top-16 候选 → **全库向量排名 19–82 的期望源拿不到 RRF 的 v 项**（1/(k+v_rank)），融合分被压出 head-16；
+- 典型：危机题（自伤求助）的 `crisis.md` 全库向量排名 28——窗口 16 下 RRF 排第 27（CE 看不见），窗口 128 下排第 9（CE 融合后命中）。
+
+同库（570 块）完整链路对照（scripts/eval_retrieval_window.py，可复跑）：
+
+| 候选窗口 | 宽松 | 严格 |
+| --- | --- | --- |
+| K=16（修复后当时配置） | 57 | 54 |
+| K=128 | 62 | 60 |
+| K=全库 | 63 | 61 |
+
+**决策**：`KNOWLEDGE_CANDIDATE_K` / `VECTOR_TOP_K` 定为 **128**——对齐工业 RRF 窗口实践（Elasticsearch `rank_window_size` 默认 ≈100），已收敛到全库口径的 98%，同时保留 ANN 截断架构。
+
+**（6）当前生产配置与最终数据链**
+
+```bash
+EMBEDDING_PROVIDER=local-zh            # bge-small-zh-v1.5 ONNX(512 维)
+CHROMA_COLLECTION_NAME=aegis_knowledge_zh
+KNOWLEDGE_FUSION_MODE=rrf
+KNOWLEDGE_RERANK_ENGINE=ce_fusion      # λ=0.4
+KNOWLEDGE_CANDIDATE_K=128 / VECTOR_TOP_K=128
+```
+
+| 阶段 | 库 | 宽松 | 严格 |
+| --- | --- | --- | --- |
+| 旧生产（MiniLM + weighted + 词法） | 24 块 | 0.870 | 0.792 |
+| 本轮修复前（ce_fusion bug） | 570 块 | 0.442 | 0.312 |
+| 修复后（窗口 16） | 570 块 | 0.740 | 0.701 |
+| **修复后（窗口 128，最终）** | **570 块** | **0.818** | **0.792** |
+
+规模放大 24 倍而严格口径与旧 24 块库生产基线持平；平均 2.1s/条（CE 精排为延迟主成本，与 9.7.8 的 850ms 量级一致）。生产环境已核对：MySQL `knowledge_chunks` 570 块（id 422–991）与 Chroma `aegis_knowledge_zh` 570 条逐一对齐。数据链：production-check-report.json（最终）/ ce-fusion-report.json / v2-full-report.json / retrieval-window-report.json。
+
+### 9.8 search_knowledge 总装走读（store.py:804-970）
+
+前面九小节讲的是「每一环的算法」，本节走读「把这些环串起来的那段代码」——`store.search_knowledge`（store.py:804-926，约 120 行；随后两个精排方法：`_apply_cross_encoder_rerank` 在 :928、`_apply_ce_fusion_rerank` 在 :945）。第十九 / 二十一轮起重排支持三引擎（lexical / cross_encoder / ce_fusion），摘录已同步。这也是 RAG 子系统从「知识」变成「服务」的装配点：
 
 ```python
 def search_knowledge(self, query, top_k=3, topic=None, risk_level=None, audience=None) -> list[dict]:
@@ -2224,14 +2336,17 @@ def search_knowledge(self, query, top_k=3, topic=None, risk_level=None, audience
         vector_by_db_id = {int(i["db_id"]): float(i["score"]) for i in vector_results if i.get("db_id") is not None}
         vector_by_source_key = {f"{i.get('source')}:{i.get('source_index')}": float(i["score"]) ...}
 
-        rerank_engine = ""                                # ⑧b 重排引擎判定(第十九轮):lexical | cross_encoder
-        if fusion_mode != "rrf" and self.settings.knowledge_rerank_enabled:
-            rerank_engine = str(getattr(self.settings, "knowledge_rerank_engine", "lexical") or "lexical")
+        rerank_engine = ""                                # ⑧b 重排引擎判定(第十九/二十一轮):lexical | cross_encoder | ce_fusion
+        if self.settings.knowledge_rerank_enabled:
+            candidate_engine = str(getattr(self.settings, "knowledge_rerank_engine", "lexical") or "lexical")
+            # rrf 分数与词法/替换式口径不兼容,仅 ce_fusion 可在 rrf 下启用;其余保持原行为(rrf 跳过重排)
+            if fusion_mode != "rrf" or candidate_engine == "ce_fusion":
+                rerank_engine = candidate_engine
         for chunk in chunks:
             if fusion_mode == "rrf":                      # ⑦ RRF:只看两路排名,rrf_fused_score(k=60)(9.7.2)
                 if vector_rank_map.get(id) is None and bm25_rank_map.get(id) is None:
                     continue                              #    两路都没进榜单的块不参与(否则零分充数)
-                score = rrf_fused_score(vector_rank_map.get(chunk_id), bm25_rank_map.get(chunk_id))
+                score = rrf_fused_score(vector_rank_map.get(chunk_id), bm25_rank_map.get(chunk_id), k=max(1, int(self.settings.knowledge_rrf_k)))
             else:                                         # ⑧ weighted:两路分数各自归一后线性加权(9.7.2)
                 if base_bm25 <= 0 and base_vector <= 0:
                     continue                              #    双零块跳过:小语料下防止 0 分块凑满 top_k
@@ -2239,9 +2354,14 @@ def search_knowledge(self, query, top_k=3, topic=None, risk_level=None, audience
                 if rerank_engine == "lexical":
                     score = rerank_score(rewritten_query, chunk.content, score)  # 词法引擎:全库重打分(行为与历史一致)
             ranked.append((chunk, score))
+        # 精排引擎只处理候选池头部:必须先按分排序,否则 head 取到的是数据库插入顺序(第二十一轮修复,见 9.7.9)
+        ranked.sort(key=lambda item: item[1], reverse=True)
         if rerank_engine == "cross_encoder":
             ranked = self._apply_cross_encoder_rerank(rewritten_query, ranked)
-            # CE 引擎(9.7.0 Q3/9.7.8):按融合分取 top-16 交模型精排,失败回退词法;未进 top-N 的候选保留融合分垫底
+            # 替换式(9.7.0 Q3/9.7.8):按融合分取 head top-16 交模型精排,失败回退词法;未进 head 的候选保留融合分垫底
+        if rerank_engine == "ce_fusion":
+            ranked = self._apply_ce_fusion_rerank(rewritten_query, ranked)
+            # 融合式(第二十一轮,9.7.9):head 内 final = λ·norm(词法分) + (1−λ)·norm(CE分),λ=0.4
         ranked.sort(key=lambda item: item[1], reverse=True)
         ranked = expand_best_hit(ranked, chunks)          # ⑨ 邻块扩展:冠军块拼回同源相邻块(9.7.4)
         results = [组装 chunk_id/source/content/snippet/metadata/score
@@ -2255,8 +2375,9 @@ def search_knowledge(self, query, top_k=3, topic=None, risk_level=None, audience
 
 1. **向量异常的两档处置**（③）：`vector_required=false`（代码默认）时向量挂了只记原因、BM25 继续服务——检索是「可用性优先」的组件；`vector_required=true` 才让向量故障升级为请求失败。这是「可选依赖语义一致降级」哲学在 RAG 内部的再现。
 2. **双 key 匹配**（⑥）：`db_id` 与 `source:index` 两张映射是**防御性冗余**——常规入库路径两个标识都写入（LocalVectorBackend 传 chunk_ids 时同样带 `db_id`，Chroma 返回里也带 `source/source_index`），双 map 保证任何一个标识缺失/类型不符时融合仍能对上号，而不是「两种后端标识不同」。
-3. **融合与重排的耦合边界**（⑦⑧⑧b）：重排只在 weighted 分支叠加，RRF 分支直接邻块扩展——对应 9.7.5 消融里「hybrid_rerank 与 rrf 是两条独立链路，不应假设同构」。第十九轮起重排进一步拆为双引擎：词法引擎维持全库重打分，Cross-Encoder 引擎走「融合分粗排 top-16 → 模型精排」两段式（`_apply_cross_encoder_rerank`，store.py:920）——两段式的必要性见 9.7.0 Q3。另注意 ⑦⑧ 的 `continue` 守卫：**两路都没命中的块不会进入候选**——没有这两条，小语料下 0 分块会凑满 top_k，把「确实没命中」伪装成「检索到低分结果」。
-4. **缓存读写点不对称**（②⑪）：读只走进程内 LRU，Redis 只写不读（预留跨进程能力）——多进程部署不要指望 Redis 命中（9.7.6 的边界声明）。
+3. **融合与重排的耦合边界**（⑦⑧⑧b）：重排引擎的启用与融合模式耦合——weighted 分支按配置执行三引擎；RRF 分支默认跳过（分数口径不兼容），仅 `ce_fusion` 例外（融合式对 head 内分数做 min-max 归一化，与原始分数口径无关）。对应 9.7.5 消融里「hybrid_rerank 与 rrf 是两条独立链路，不应假设同构」。第十九轮起重排拆为两段式（粗排 head → 模型精排），现有两个模型引擎：`_apply_cross_encoder_rerank`（替换式，:928）与 `_apply_ce_fusion_rerank`（融合式，:945）——两段式的必要性见 9.7.0 Q3。另注意 ⑦⑧ 的 `continue` 守卫：**两路都没命中的块不会进入候选**——没有这两条，小语料下 0 分块会凑满 top_k，把「确实没命中」伪装成「检索到低分结果」。
+4. **精排 head 的输入契约（第二十一轮修复）**：`ranked.sort()` 必须发生在精排调用**之前**——两个精排引擎内部都取 `ranked[:top_n]` 作 head，只有「已按分排序」才能保证 head 是真正的 top-N。此契约缺失过一次（排序写在精排调用之后），head 恒为「数据库插入顺序」，570 块库复评掉到 0.44；修复后 0.74，窗口调优后 0.82（完整故事见 9.7.9）。这是「同一份数据经多次加工时，每一步都要明确输入约定」的典型案例。
+5. **缓存读写点不对称**（②⑪）：读只走进程内 LRU，Redis 只写不读（预留跨进程能力）——多进程部署不要指望 Redis 命中（9.7.6 的边界声明）。
 
 顺手跑一次：同一查询在两种融合模式下的对比（接 `try_station8.py` 的 `store`，或按同法重建；改 settings 属性仅为演示，正式切换用 `KNOWLEDGE_FUSION_MODE` 环境变量）：
 
@@ -2761,11 +2882,12 @@ print("有 report 事件?", "report" in names_high, "| 最后:", names_high[-1])
 - `evaluation/runner.py`：真实指标——路由/风险判定准确率、高风险召回率、误报率、HitRate/Recall@4/Precision@4/MRR/NDCG@4、技能选择、安全泄漏检查、多轮一致性、150 条规模化基准；如实标注样本量、数据来源与验证日期（含 95% 置信区间），不再为满分筛选样本。**150 条规模化基准按 `layer` 字段双层拆分**：`base`（基础层·贴近主流场景）/ `stress`（压力层·边界探测），runner 分别输出两套独立指标（`scaled_benchmark.base` / `scaled_benchmark.stress`），零删改、不凑分——既保住“代表性”卖点，也主动暴露规则通道的边界缺口。
 - `evaluation/datasets.py`：加载 `eval/fixtures/representative_corpus.json`（150 条人工构造、人工标注、贴近校园心理求助语料的代表性金标样本，**每条含 `layer`（base/stress）与 `source`（synthetic-representative/synthetic-boundary）字段**，含隐式高危与第三人称干扰）、`rag_queries.json`（77 条自然语言 RAG 问句）、`multi_turn_corpus.json`（8 组多轮场景）；并提供基于种子哈希排序的可复现抽样工具。
 - `evaluation/report_html.py`：单文件 HTML 报告（内联 CSS），管理端一键可看。
-- `app/evaluation/rag.py`：RAG 专项（HitRate/Recall@4/Precision@4/MRR/NDCG@4，独立运行改用一次性 SQLite 评测库、不依赖 MySQL/pymysql），数据集在 `eval/fixtures/rag_queries.json`（77 条自然语言问句，基于当前 24 篇知识文档）。
+- `app/evaluation/rag.py`：RAG 专项（HitRate/Recall@4/Precision@4/MRR/NDCG@4，独立运行改用一次性 SQLite 评测库、不依赖 MySQL/pymysql），数据集在 `eval/fixtures/rag_queries.json`（77 条自然语言问句；知识库已由 24 篇扩至 173 篇 / 570 块，最新评测数据链见 docs/records/ROUND-21-RAG-LOCAL-UPGRADE.md）。
 - `app/evaluation/harness/runner.py` + `factory.py`：工程级场景回放——8 套件（risk/routing/skills/rag/api/tool-queue/scaled/runtime-ab）验证端到端行为（如“审批后 5 个工具任务全部 success”“死信被正确创建”），失败退出码 1，可接 CI。`factory.py` 是重构产物：harness 与 `eval/run_eval.py` 共用一个装配工厂，消除两份漂移的样板。
 - `eval/run_eval.py`：综合评测 CLI（仅 22 行）——`build_harness_orchestrator(data_dir)` 用与 harness 同一个装配工厂造出 mock、隔离 SQLite 的编排器，再调 `run_evaluation(orchestrator, store, eval/fixtures, data/eval)`（`evaluation/runner.py` 的总入口，依次跑路由/风险/安全/技能/150 条双层基准/多轮一致性并汇总），最后打印 summary。与 harness 的分工：harness 断言「端到端行为对不对」（回归视角），run_eval 产出「能力指标好不好」（度量视角）——一个管回归、一个管度量，共用同一套装配，这就是 4.7 两条命令背后其实只有一个装配事实的原因。
 - `scripts/eval_risk_dual_path.py`（第十一轮历史实验）：风险 LLM 通道双路径评测——同 150 条语料分别跑 baseline（MockLLM + channel OFF）与 llm_stub（`MetaphorAwareStubClient` + channel ON），直调 `RiskGuardianAgent.assess()` 避免 response 生成/judge 等额外 LLM 调用；另有真实 GLM-4.7-flash 的 25 条扩展 best-effort probe。产出 `data/eval/risk_dual_path.json`。当前生产模型验收结论以训练仓 `reports/V9-TRAINING-EVAL-SUMMARY.md` 为准（原始 JSON 未随训练仓保留；仓库内转载见 [`docs/training/V9-ACCEPTANCE.md`](docs/training/V9-ACCEPTANCE.md)）。
 - `scripts/probe_glm.py`（第十一轮新增）：GLM 端点探针——验证 endpoint/model/api_key 可用性，不打印 API key，退出码 0=可用。
+- 第二十一轮 RAG 对照评测脚本：`scripts/eval_bge_small_zh_recall.py`（中文嵌入召回对照）、`scripts/eval_ce_fusion.py`（CE 替换/融合三口径）、`scripts/eval_v2_full.py`（590 块扩库六配置对照）、`scripts/eval_retrieval_window.py`（候选窗口对照，可复跑）；生产重建用 `scripts/rebuild_production_knowledge.py`。数据链见 `docs/records/ROUND-21-RAG-LOCAL-UPGRADE.md`。
 - `eval/fixtures/`：路由/风险/安全/多轮小型金标集 + `representative_corpus.json`（150 条）/ `rag_queries.json`（77 条）/ `multi_turn_corpus.json`（8 组）人工构造、人工标注的代表性数据集。
 
 
@@ -2814,7 +2936,7 @@ python -m app.evaluation.harness.runner --suite risk
   - **构建与托管**：`npm run build`（`tsc -b && vite build`）出 `dist/`，由 FastAPI 同源托管（入口页 `pages.py` 注入主题，`main.py` 挂载静态资源）——前后端同源，无 CORS。`dist` 缺失时页面返回构建指引而非 500（见 12.5）。
   - 提交前须 `cd frontend && npm run lint && npm run build`，并把 `dist/` 一起提交。
   - 前端实现详解见《[前端学习指南](docs/frontend-learning-guide.md)》（已随第二十轮重写为 Vite + React + TS 版）。
-- `tests/` 当前包含多个模块化测试文件：orchestrator（提供 `build_orchestrator` 给其他测试复用）、api（TestClient 全链）、agent\_runtime、retrieval\_eval、mcp\_tools、harness、assessment、risk\_dual\_channel（双通道，覆盖 corp-106..130 隐喻双路径并含 `MetaphorAwareStubClient`）、risk\_qlora\_channel（QLoRA 风险通道：升级/不降级/回退/非法 JSON/URL 防护/默认关闭）、function\_calling（FC）、runtime\_ab（A/B）、judge（LLM 评审）、langgraph\_runtime、langgraph\_checkpoint（跨进程恢复）、reply\_style（真人化提示词与模板标签守护）。历史“约 71 项通过”应附带日期与环境，执行时统一使用 `python -m pytest tests -q`（历史上位于根目录的联调脚本 `test_chat.py` 已迁至 `scripts/smoke_chat.py`，不再参与 pytest 收集）。
+- `tests/` 当前包含多个模块化测试文件：orchestrator（提供 `build_orchestrator` 给其他测试复用）、api（TestClient 全链）、agent\_runtime、retrieval\_eval、reranker\_engine（CE 重排引擎：分数替换/top-N 两段式/失败回退/模型缺失报错）、mcp\_tools、harness、assessment、risk\_dual\_channel（双通道，覆盖 corp-106..130 隐喻双路径并含 `MetaphorAwareStubClient`）、risk\_qlora\_channel（QLoRA 风险通道：升级/不降级/回退/非法 JSON/URL 防护/默认关闭）、function\_calling（FC）、runtime\_ab（A/B）、judge（LLM 评审）、langgraph\_runtime、langgraph\_checkpoint（跨进程恢复）、reply\_style（真人化提示词与模板标签守护）。历史“约 71 项通过”应附带日期与环境，执行时统一使用 `python -m pytest tests -q`（历史上位于根目录的联调脚本 `test_chat.py` 已迁至 `scripts/smoke_chat.py`，不再参与 pytest 收集）。
 - 第十三轮新增的 L2/L4 与 auto Skill 已做烟雾验证，但尚缺少专门 pytest 回归：SCD-2 冲突截断、匿名命名空间隔离、三运行时 L4 去重、仅 L2/L4 时 LangGraph `memory_used`、第 3 次自动蒸馏及 auto Skill 防递归等都应补成独立用例。
 
 #### 动手试一试：给测试「上保险」
@@ -3339,9 +3461,11 @@ L1 管 Agent 协作内务；L2 管「用户现在是什么状态」（SCD-2 有�
 
 <a id="appendix-c"></a>
 
-# 附录 C：Settings 全量字段表（config.py · 90 项 · 复现配置用）
+# 附录 C：Settings 全量字段表（config.py · 95 项 · 复现配置用）
 
 > 环境变量名 = 字段名大写（`model_config` 未设 env_prefix；`.env` 由 pydantic-settings 自动加载，`extra=ignore`）。带「路径」标记的字段经 `resolve_path()` 解析（相对路径锚定项目根）。节选自第 4.3 节的常用项此处不再重复解释。
+>
+> **第二十一轮生产覆盖**：`EMBEDDING_PROVIDER=local-zh`、`KNOWLEDGE_CANDIDATE_K=VECTOR_TOP_K=128`、`KNOWLEDGE_FUSION_MODE=rrf`、`KNOWLEDGE_RERANK_ENGINE=ce_fusion`、`CHROMA_COLLECTION_NAME=aegis_knowledge_zh`（表内为代码默认值；生产取值见 9.7.9）。
 
 | 字段 | 类型 | 默认值 | 环境变量 |
 | --- | --- | --- | --- |
@@ -3352,6 +3476,7 @@ L1 管 Agent 协作内务；L2 管「用户现在是什么状态」（SCD-2 有�
 | `openai_model` | str | `"gpt-4o-mini"` | `OPENAI_MODEL` |
 | `openai_embedding_model` | str | `"text-embedding-3-small"` | `OPENAI_EMBEDDING_MODEL` |
 | `embedding_provider` | str | `"openai"  # openai(兼容API) | local(chromadb 本地嵌入,零外部依赖)` | `EMBEDDING_PROVIDER` |
+| `zh_embedding_model_dir` | str | `"data/models/bge-small-zh-onnx"` | `ZH_EMBEDDING_MODEL_DIR` |
 | `embedding_timeout_seconds` | float | `30.0` | `EMBEDDING_TIMEOUT_SECONDS` |
 | `ollama_base_url` | str | `"http://127.0.0.1:11434"` | `OLLAMA_BASE_URL` |
 | `ollama_model` | str | `"qwen3:4b"` | `OLLAMA_MODEL` |
@@ -3374,10 +3499,12 @@ L1 管 Agent 协作内务；L2 管「用户现在是什么状态」（SCD-2 有�
 | `knowledge_hybrid_vector_weight` | float | `0.65` | `KNOWLEDGE_HYBRID_VECTOR_WEIGHT` |
 | `knowledge_hybrid_bm25_weight` | float | `0.35` | `KNOWLEDGE_HYBRID_BM25_WEIGHT` |
 | `knowledge_rerank_enabled` | bool | `True` | `KNOWLEDGE_RERANK_ENABLED` |
-| `knowledge_rerank_engine` | str | `"lexical"  # lexical | cross_encoder` | `KNOWLEDGE_RERANK_ENGINE` |
+| `knowledge_rerank_engine` | str | `"lexical"  # lexical | cross_encoder | ce_fusion` | `KNOWLEDGE_RERANK_ENGINE` |
 | `knowledge_rerank_top_n` | int | `16` | `KNOWLEDGE_RERANK_TOP_N` |
+| `knowledge_ce_fusion_lambda` | float | `0.4  # 词法分权重(1-lambda 给 CE 分)` | `KNOWLEDGE_CE_FUSION_LAMBDA` |
 | `reranker_model_dir` | str | `"data/models/bge-reranker-base-onnx"` | `RERANKER_MODEL_DIR` |
 | `knowledge_fusion_mode` | str | `"weighted"  # weighted | rrf` | `KNOWLEDGE_FUSION_MODE` |
+| `knowledge_rrf_k` | int | `60  # RRF 平滑常数` | `KNOWLEDGE_RRF_K` |
 | `knowledge_cache_enabled` | bool | `False` | `KNOWLEDGE_CACHE_ENABLED` |
 | `knowledge_cache_ttl_seconds` | int | `300` | `KNOWLEDGE_CACHE_TTL_SECONDS` |
 | `knowledge_cache_max_entries` | int | `128` | `KNOWLEDGE_CACHE_MAX_ENTRIES` |

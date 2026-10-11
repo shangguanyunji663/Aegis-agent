@@ -13,7 +13,8 @@ class Settings(BaseSettings):
     openai_base_url: str = "https://api.openai.com/v1"
     openai_model: str = "gpt-4o-mini"
     openai_embedding_model: str = "text-embedding-3-small"
-    embedding_provider: str = "openai"  # openai(兼容API) | local(chromadb 本地嵌入,零外部依赖)
+    embedding_provider: str = "openai"  # openai(兼容API) | local(chromadb 本地嵌入) | local-zh(bge-small-zh ONNX 本地中文嵌入)
+    zh_embedding_model_dir: str = "data/models/bge-small-zh-onnx"  # local-zh 模式的模型目录
     embedding_timeout_seconds: float = 30.0
     ollama_base_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "qwen3:4b"
@@ -39,11 +40,13 @@ class Settings(BaseSettings):
     knowledge_hybrid_vector_weight: float = 0.65
     knowledge_hybrid_bm25_weight: float = 0.35
     knowledge_rerank_enabled: bool = True
-    # 重排引擎:lexical(默认,纯 Python 词法公式,全库重打分) | cross_encoder(ONNX 模型精排,两段式 top-N)
+    # 重排引擎:lexical(默认,纯 Python 词法公式,全库重打分) | cross_encoder(ONNX CE 替换式精排) | ce_fusion(CE 分与词法分融合,生产配置)
     knowledge_rerank_engine: str = "lexical"
     knowledge_rerank_top_n: int = 16
+    knowledge_ce_fusion_lambda: float = 0.4  # ce_fusion 引擎中词法分权重(1-lambda 给 CE 分,实测 0.4 最优)
     reranker_model_dir: str = "data/models/bge-reranker-base-onnx"
     knowledge_fusion_mode: str = "weighted"  # weighted | rrf
+    knowledge_rrf_k: int = 60  # RRF 平滑常数:小候选池(百块以内)宜用小值,使排名差异更显著
     knowledge_cache_enabled: bool = False
     knowledge_cache_ttl_seconds: int = 300
     knowledge_cache_max_entries: int = 128

@@ -2,7 +2,7 @@
 
 > 本文记录 Aegis 风险 QLoRA 模型的**微调参数与完整操作流程**。
 > 训练代码、权重与中间产物全部位于独立的 `AegisTraining` 仓库（本机路径 `D:\AegisTraining`，由环境变量 `AEGIS_TRAINING_ROOT` 指向），**不进入本仓库**——本仓库只包含推理集成代码（`app/llm/client.py` 的 `RiskQloraClient`、`app/config.py` 的 `RISK_QLORA_*` 配置）与冻结验收集。
-> 验收留痕见 `D:\AegisTraining\reports\TRAINING-HISTORY-INDEX.md`；生产化改进路线见 [QLORA-SSE-PRODUCTION-IMPROVEMENTS.md](QLORA-SSE-PRODUCTION-IMPROVEMENTS.md)。
+> 验收留痕见 `D:\AegisTraining\reports\TRAINING-HISTORY-INDEX.md`；生产化改进路线见 [QLoRA-PRODUCTION.md](roadmap/QLoRA-PRODUCTION.md)。
 
 ## 1. 任务边界
 
@@ -194,7 +194,7 @@ D:\AegisTraining\envs\qlora-qwen35\python.exe ^
   --host 127.0.0.1 --port 8301
 ```
 
-`POST /assess` 契约见 [QLORA-SSE-PRODUCTION-IMPROVEMENTS.md §2.3](QLORA-SSE-PRODUCTION-IMPROVEMENTS.md#23-http-契约)。
+`POST /assess` 契约见 [QLoRA-PRODUCTION.md §2.3](roadmap/QLoRA-PRODUCTION.md#23-http-契约)。
 
 ### 4.7 主项目接入
 

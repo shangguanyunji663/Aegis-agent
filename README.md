@@ -240,7 +240,7 @@ RISK_QLORA_TIMEOUT_SECONDS=8
 
 **QLoRA 训练目标**：并非训练通用聊天能力，而是将 Qwen3.5-2B-Base 微调为 RiskGuardian 的 `low / medium / high` JSON 风险评估器。基座采用 4-bit NF4 量化并冻结，LoRA `r=8/alpha=16` 仅训练约 840 万参数（占总参数约 18.9 亿的 0.445%）。训练样本只覆盖风险判定、理由长度与主体/意图裁决，**不改变** Counselor、RAG、工具治理或审批链路。
 
-> 后续生产化改进路线（异步/并发、HTTP/SSE/WebSocket、部署、MCP/JSON-RPC/A2A、权限、流式工具调用、错误恢复、KV Cache/vLLM/SGLang、Reranker、GraphRAG）见 [`docs/QLORA-SSE-PRODUCTION-IMPROVEMENTS.md`](docs/QLORA-SSE-PRODUCTION-IMPROVEMENTS.md)。
+> 后续生产化改进路线（异步/并发、HTTP/SSE/WebSocket、部署、MCP/JSON-RPC/A2A、权限、流式工具调用、错误恢复、KV Cache/vLLM/SGLang、Reranker、GraphRAG）见 [`docs/roadmap/QLoRA-PRODUCTION.md`](docs/roadmap/QLoRA-PRODUCTION.md)。
 
 </details>
 
@@ -555,7 +555,8 @@ python -m app.mcp.server --list
 - [咨询工作台使用手册（教师版）](docs/admin-teacher-guide.md)
 - [前端学习指南](docs/frontend-learning-guide.md)
 - [QLoRA 微调参数与操作手册](docs/qlora-finetuning.md)
-- [QLoRA 生产化改进路线](docs/QLORA-SSE-PRODUCTION-IMPROVEMENTS.md)
+- [QLoRA 生产化改进路线](docs/roadmap/QLoRA-PRODUCTION.md)
+- [改进记录索引（历轮变更 + 指南修订台账 + 审阅档案）](docs/records/INDEX.md)
 - [演示脚本](docs/demo-script.md)
 - [逐文件学习指南](Aegis项目逐文件学习指南.md)
 
